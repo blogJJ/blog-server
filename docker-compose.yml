@@ -1,0 +1,24 @@
+# 로컬 개발용 MySQL 8. 실행: docker compose up -d
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: blog-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: blog
+      MYSQL_USER: blog
+      MYSQL_PASSWORD: blog
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+      # 통합 검색 FULLTEXT ngram, 2글자부터 검색 (BRD-08)
+      - --ngram-token-size=2
+    volumes:
+      - blog-mysql-data:/var/lib/mysql
+
+volumes:
+  blog-mysql-data:
