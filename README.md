@@ -9,7 +9,7 @@
 | 도구 | 버전 | 용도 |
 | --- | --- | --- |
 | JDK | 21 | 서버 실행·빌드 |
-| Docker Desktop | 최신 | 로컬 MySQL 실행 |
+| Docker Desktop | 최신 | 로컬 MySQL 실행, 테스트(Testcontainers가 MySQL을 띄움) |
 | IntelliJ IDEA | 최신 (Community도 됨) | 개발 |
 
 Gradle은 따로 설치하지 않아도 됩니다. 저장소의 `./gradlew`가 맞는 버전을 받아 씁니다.
@@ -22,13 +22,14 @@ docker compose up -d
 
 # 2. 비밀값 파일 만들기
 cp .env.example .env
-#    .env를 열어 JWT_SECRET 등을 채운다. 메일·Turnstile 키는 그 기능을 만들 때 채워도 된다
+#    .env를 열어 JWT_SECRET(32바이트 이상)을 꼭 채운다. 비어 있으면 서버가 뜨지 않는다.
+#    메일·Turnstile 키는 그 기능을 만들 때 채워도 된다
 
 # 3. 서버 실행
 ./gradlew bootRun
 ```
 
-서버를 처음 켜면 Flyway가 `db/migration`의 SQL을 차례로 실행해 테이블 33개와 인덱스를 만듭니다(로그에 `Successfully applied 2 migrations`). 다음부터는 새 파일만 실행합니다. 서버 로그에 `Started BlogServerApplication`이 보이면 성공입니다. 지금은 http://localhost:8080/login 에 Spring Security 기본 로그인 창이 뜨고 다른 주소는 401이 나오는 것이 정상입니다(보안 설정은 T016에서 만듦).
+서버를 처음 켜면 Flyway가 `db/migration`의 SQL을 차례로 실행해 테이블 33개와 인덱스를 만듭니다(로그에 `Successfully applied 2 migrations`). 다음부터는 새 파일만 실행합니다. 서버 로그에 `Started BlogServerApplication`이 보이면 성공입니다. 아직 API가 없어서 http://localhost:8080/api/... 주소는 `{"code":"NOT_FOUND", ...}`가 나오는 것이 정상입니다.
 
 Windows에서는 `./gradlew` 대신 `gradlew.bat`을 씁니다.
 
@@ -36,7 +37,7 @@ Windows에서는 `./gradlew` 대신 `gradlew.bat`을 씁니다.
 
 | 명령 | 하는 일 |
 | --- | --- |
-| `./gradlew build` | 컴파일, 코드 모양 검사, 테스트, 실행 파일(jar) 만들기 |
+| `./gradlew build` | 컴파일, 코드 모양 검사, 테스트, 실행 파일(jar) 만들기. 통합 테스트가 Docker로 MySQL을 띄우므로 Docker가 켜져 있어야 함 |
 | `./gradlew spotlessApply` | 코드 모양을 google-java-format에 맞춰 자동으로 고침. 커밋 전에 한 번 |
 | `./gradlew bootRun` | 서버 실행 |
 | `docker compose down` | MySQL 끄기 (데이터는 남음) |
