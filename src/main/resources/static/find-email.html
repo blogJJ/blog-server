@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>이메일 찾기 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/find-email.js" defer></script>
+  </head>
+  <body>
+    <!-- 이메일 찾기 (T099, USR-08, D-23, D-26) -->
+    <main>
+      <section class="auth-card">
+        <h1>이메일 찾기</h1>
+        <p class="form-message form-message--error" id="message" role="alert"></p>
+        <form id="find-form" novalidate>
+          <div class="field">
+            <label for="name">이름</label>
+            <input id="name" type="text" autocomplete="name" maxlength="30" required />
+          </div>
+          <div class="field">
+            <label for="phone">휴대폰 번호</label>
+            <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="13" placeholder="01012345678" required />
+            <p class="field__hint">가입할 때 입력한 이름과 번호를 넣어 주세요.</p>
+          </div>
+          <button class="button button--primary button--block" type="submit">이메일 찾기</button>
+        </form>
+        <div class="found-result" id="result" hidden>
+          <p class="field__hint field__hint--spaced" id="result-hint"></p>
+          <ul class="found-list" id="found"></ul>
+        </div>
+        <p class="auth-links">
+          <a href="/login.html">로그인</a> · <a href="/find-password.html">비밀번호 찾기</a> · <a href="/signup.html">회원가입</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

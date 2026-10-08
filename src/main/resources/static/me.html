@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>내 정보 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/me.js" defer></script>
+  </head>
+  <body>
+    <!-- 내 정보 (T099, USR-07). 이메일과 이름은 바꿀 수 없다 (D-21, D-32) -->
+    <main>
+      <section class="auth-card auth-card--wide" id="me" hidden>
+        <h1>내 정보</h1>
+
+        <div class="profile-photo">
+          <img class="profile-photo__img" id="photo" alt="프로필 사진" hidden />
+          <div class="profile-photo__empty" id="photo-empty" aria-hidden="true"></div>
+          <div class="profile-photo__actions">
+            <label class="button" for="photo-file">사진 올리기</label>
+            <input id="photo-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden />
+            <button class="button button--text" type="button" id="photo-delete" hidden>사진 지우기</button>
+            <p class="field__hint">JPG·PNG·GIF·WEBP, 3MB까지</p>
+          </div>
+        </div>
+
+        <dl class="me-fixed">
+          <dt>이메일</dt>
+          <dd id="email"></dd>
+          <dt>이름</dt>
+          <dd id="name"></dd>
+          <dt>가입일</dt>
+          <dd id="joined"></dd>
+        </dl>
+        <p class="field__hint">이메일과 이름은 바꿀 수 없어요.</p>
+
+        <h2 class="me-section">회원 정보</h2>
+        <form id="profile-form" novalidate>
+          <div class="field">
+            <label for="nickname">닉네임</label>
+            <input id="nickname" type="text" maxlength="12" />
+            <p class="field__hint">2~12자 한글, 영문, 숫자</p>
+          </div>
+          <div class="field">
+            <label for="phone">휴대폰 번호</label>
+            <input id="phone" type="tel" inputmode="numeric" maxlength="13" />
+          </div>
+          <div class="field">
+            <label for="bio">소개</label>
+            <textarea id="bio" rows="3" maxlength="200"></textarea>
+          </div>
+          <p class="form-message form-message--error" id="profile-message" role="alert"></p>
+          <button class="button button--primary" type="submit">저장</button>
+        </form>
+
+        <h2 class="me-section">비밀번호 변경</h2>
+        <form id="password-form" novalidate>
+          <div class="field">
+            <label for="current-password">현재 비밀번호</label>
+            <input id="current-password" type="password" autocomplete="current-password" maxlength="15" />
+          </div>
+          <div class="field">
+            <label for="new-password">새 비밀번호</label>
+            <input id="new-password" type="password" autocomplete="new-password" maxlength="15" />
+            <p class="field__hint">8~15자, 영문·숫자·특수문자를 모두 넣어 주세요.</p>
+          </div>
+          <div class="field">
+            <label for="new-password2">새 비밀번호 확인</label>
+            <input id="new-password2" type="password" autocomplete="new-password" maxlength="15" />
+          </div>
+          <p class="field__hint field__hint--spaced">바꾸면 다른 기기에서는 모두 로그아웃되고, 이 기기는 그대로 로그인돼 있어요.</p>
+          <p class="form-message form-message--error" id="password-message" role="alert"></p>
+          <button class="button button--primary" type="submit">비밀번호 바꾸기</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

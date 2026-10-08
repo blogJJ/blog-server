@@ -1,7 +1,9 @@
 package com.blog.auth.repository;
 
 import com.blog.auth.domain.User;
+import com.blog.auth.domain.UserStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -16,6 +18,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
   boolean existsByEmail(String email);
 
   boolean existsByNickname(String nickname);
+
+  /** 이메일 찾기 (USR-08). 이름·전화번호가 같은 계정을 모두. 탈퇴 계정은 status로 뺀다 */
+  List<User> findByNameAndPhoneAndStatusOrderByIdAsc(String name, String phone, UserStatus status);
 
   /** SELECT ... FOR UPDATE. 블로그 생성 개수를 셀 때 같은 회원의 동시 요청을 줄 세운다 (BLG-10, D-68). */
   @Lock(LockModeType.PESSIMISTIC_WRITE)

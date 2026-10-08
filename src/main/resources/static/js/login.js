@@ -116,6 +116,9 @@
     if (new URLSearchParams(window.location.search).get('expired')) {
       showMessage('30분 동안 활동이 없어 로그아웃됐어요. 다시 로그인해 주세요.');
     }
+    if (new URLSearchParams(window.location.search).get('reset')) {
+      Api.toast('비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.');
+    }
     $('email').focus();
   }
 
