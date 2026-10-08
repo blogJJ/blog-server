@@ -125,7 +125,7 @@ class BlogAuthzTest {
   }
 
   @Test
-  void accountSuspendedOwnerCannotManageAndReportsGoToAdmin() {
+  void accountSuspendedOwnerCannotManageAndManagersTakeOver() {
     jdbc.update(
         "update users set suspended_until = ? where id = ?",
         LocalDateTime.now().plusDays(3),
@@ -136,9 +136,43 @@ class BlogAuthzTest {
     assertThat(blogAuthz.isOwner(blogA.getId())).isFalse();
     assertThat(blogAuthz.hasPermission(blogA.getId(), "EDIT_INFO")).isFalse();
 
-    // 부블로그장은 신고 처리만 빼고 받은 권한을 그대로 쓴다 (D-100)
+    // 정지 동안 부블로그장이 신고 처리를 맡는다 (D-114)
     loginAs(manager);
     assertThat(blogAuthz.hasPermission(blogA.getId(), "MANAGE_MEMBERS")).isTrue();
+    assertThat(blogAuthz.canHandleReports(blogA.getId())).isTrue();
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "MANAGE_POSTS")).isFalse();
+  }
+
+  @Test
+  void managerWithoutMemberPermissionGetsItOnlyWhileOwnerSuspended() {
+    User other = newUser("mg2");
+    memberRepository.save(new BlogMember(blogA, other, BlogMemberRole.MANAGER));
+    loginAs(other);
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "MANAGE_MEMBERS")).isFalse();
+    assertThat(blogAuthz.canHandleReports(blogA.getId())).isFalse();
+
+    jdbc.update(
+        "update users set suspended_until = ? where id = ?",
+        LocalDateTime.now().plusDays(3),
+        owner.getId());
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "MANAGE_MEMBERS")).isTrue();
+    assertThat(blogAuthz.canHandleReports(blogA.getId())).isTrue();
+    assertThat(blogAuthz.isOwner(blogA.getId())).isFalse();
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "EDIT_INFO")).isFalse();
+
+    // 정지가 끝나면 원래 권한으로 돌아간다
+    jdbc.update(
+        "update users set suspended_until = ? where id = ?",
+        LocalDateTime.now().minusMinutes(1),
+        owner.getId());
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "MANAGE_MEMBERS")).isFalse();
+
+    // 일반 멤버는 블로그장이 정지돼도 권한이 없다
+    jdbc.update(
+        "update users set suspended_until = ? where id = ?",
+        LocalDateTime.now().plusDays(3),
+        owner.getId());
+    loginAs(member);
     assertThat(blogAuthz.canHandleReports(blogA.getId())).isFalse();
   }
 
