@@ -14,6 +14,14 @@
 
   var TIMEOUT_MS = 5000;
   var REFRESH_URL = '/api/auth/refresh';
+  // 로그인·가입·재발급·로그아웃의 401은 토큰 만료가 아니라 그 요청의 실패라서 재발급하지 않는다
+  var NO_REFRESH = ['/api/auth/login', '/api/auth/signup', REFRESH_URL, '/api/auth/logout'];
+
+  function shouldRefresh(url) {
+    return !NO_REFRESH.some(function (prefix) {
+      return url.indexOf(prefix) === 0;
+    });
+  }
   var MESSAGES = {
     REQUEST_TIMEOUT: '응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요.',
     NETWORK_ERROR: '서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.',
@@ -116,7 +124,7 @@
   async function request(method, url, body, options) {
     options = options || {};
     var response = await send(method, url, body, options);
-    if (response.status === 401 && !options.noRefresh && url !== REFRESH_URL) {
+    if (response.status === 401 && !options.noRefresh && shouldRefresh(url)) {
       if (await refreshToken()) {
         response = await send(method, url, body, options);
       }

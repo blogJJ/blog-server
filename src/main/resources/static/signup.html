@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>회원가입 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/signup.js" defer></script>
+  </head>
+  <body>
+    <!-- 가입 3단계 (T038, USR-01, USR-02): 이메일 인증 → 비밀번호 → 이름·닉네임·전화번호·약관 동의 -->
+    <main>
+      <section class="auth-card">
+        <h1>회원가입</h1>
+        <ol class="steps" aria-label="가입 단계">
+          <li data-step="1">1. 이메일 인증</li>
+          <li data-step="2">2. 비밀번호</li>
+          <li data-step="3">3. 회원 정보</li>
+        </ol>
+        <p class="form-message form-message--error" id="message" role="alert"></p>
+
+        <form id="step1" novalidate>
+          <div class="field">
+            <label for="email">이메일</label>
+            <div class="field__row">
+              <input id="email" type="email" autocomplete="email" maxlength="100" required />
+              <button class="button" type="button" id="send-code">인증번호 받기</button>
+            </div>
+            <p class="field__hint" id="send-hint">이메일이 아이디가 돼요.</p>
+          </div>
+          <div class="field" id="code-field" hidden>
+            <label for="code">인증번호 6자리</label>
+            <input
+              id="code"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              pattern="\d{6}"
+            />
+            <p class="field__hint">메일이 안 보이면 스팸함도 확인해 주세요. 10분 안에 입력해야 해요.</p>
+          </div>
+          <button class="button button--primary button--block" type="submit" id="verify" hidden>
+            인증하고 다음으로
+          </button>
+        </form>
+
+        <form id="step2" novalidate hidden>
+          <div class="field">
+            <label for="password">비밀번호</label>
+            <input id="password" type="password" autocomplete="new-password" maxlength="15" />
+            <p class="field__hint">8~15자, 영문·숫자·특수문자를 모두 넣어 주세요. 공백은 쓸 수 없어요.</p>
+          </div>
+          <div class="field">
+            <label for="password2">비밀번호 확인</label>
+            <input id="password2" type="password" autocomplete="new-password" maxlength="15" />
+          </div>
+          <button class="button button--primary button--block" type="submit">다음</button>
+        </form>
+
+        <form id="step3" novalidate hidden>
+          <div class="field">
+            <label for="name">이름</label>
+            <input id="name" type="text" autocomplete="name" maxlength="30" />
+          </div>
+          <div class="field">
+            <label for="nickname">닉네임</label>
+            <input id="nickname" type="text" autocomplete="nickname" maxlength="12" />
+            <p class="field__hint">2~12자 한글·영문·숫자. 다른 사람에게 보이는 이름이에요.</p>
+          </div>
+          <div class="field">
+            <label for="phone">휴대폰 번호</label>
+            <input id="phone" type="tel" autocomplete="tel" inputmode="numeric" maxlength="13" />
+            <p class="field__hint">숫자만 입력해도 돼요.</p>
+          </div>
+          <label class="check">
+            <input id="agree-all" type="checkbox" />
+            <strong>모두 동의</strong>
+          </label>
+          <label class="check">
+            <input id="agree-terms" type="checkbox" />
+            <span>[필수] <a href="/terms.html" target="_blank" rel="noopener">이용약관</a> 동의</span>
+          </label>
+          <label class="check">
+            <input id="agree-privacy" type="checkbox" />
+            <span
+              >[필수]
+              <a href="/privacy.html" target="_blank" rel="noopener">개인정보 수집·이용</a>
+              동의</span
+            >
+          </label>
+          <button class="button button--primary button--block" type="submit">가입하기</button>
+        </form>
+
+        <p class="auth-links">이미 계정이 있나요? <a href="/login.html">로그인</a></p>
+      </section>
+    </main>
+  </body>
+</html>

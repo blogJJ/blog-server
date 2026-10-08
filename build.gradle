@@ -80,4 +80,6 @@ tasks.named('bootRun') {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 운영과 같은 시간대. BlogServerApplication.main이 정하는 것을 테스트에서도 맞춘다
+    systemProperty 'user.timezone', 'Asia/Seoul'
 }

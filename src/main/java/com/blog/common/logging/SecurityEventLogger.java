@@ -1,5 +1,6 @@
 package com.blog.common.logging;
 
+import com.blog.common.privacy.Masking;
 import com.blog.common.security.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -8,8 +9,7 @@ import org.slf4j.LoggerFactory;
 /**
  * 보안 이벤트를 {@code security} 로거로 남긴다 (T137, OPS-03, D-103).
  *
- * <p>권한 거부(403)와 요청 제한 초과(429)를 남긴다. 로그인 실패(가린 이메일, IP)는 로그인(T034)을 만들 때 여기에 더한다.
- * 비밀번호·토큰·인증번호·쿠키·CSRF 토큰은 넘기지 않는다.
+ * <p>권한 거부(403), 요청 제한 초과(429), 로그인 실패(가린 이메일, IP)를 남긴다. 비밀번호·토큰·인증번호·쿠키·CSRF 토큰은 넘기지 않는다.
  */
 public final class SecurityEventLogger {
 
@@ -34,6 +34,11 @@ public final class SecurityEventLogger {
         sanitize(limitName),
         request.getMethod(),
         sanitize(request.getRequestURI()));
+  }
+
+  /** 로그인 실패: 가린 이메일(4.4), IP. 비밀번호는 넘기지 않는다 (T034). */
+  public static void loginFailed(String email, String ip) {
+    log.warn("login failed email={} ip={}", sanitize(Masking.email(email)), sanitize(ip));
   }
 
   private static String currentUserId() {
