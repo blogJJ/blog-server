@@ -39,7 +39,27 @@ public interface PostRepository extends JpaRepository<Post, Long> {
           + " and p.notice = true order by p.createdAt desc, p.id desc")
   List<Post> findNotices(@Param("blogId") Long blogId, Pageable pageable);
 
+  // 숫자만 바꾸는 update는 updated_at을 그대로 적어 MySQL ON UPDATE가 "수정됨" 시각을 바꾸지 않게 한다
+
   @Modifying
-  @Query("update Post p set p.viewCount = p.viewCount + 1 where p.id = :id")
+  @Query(
+      "update Post p set p.viewCount = p.viewCount + 1, p.updatedAt = p.updatedAt where p.id = :id")
   void increaseViewCount(@Param("id") Long id);
+
+  @Modifying
+  @Query(
+      "update Post p set p.commentCount = p.commentCount + :delta, p.updatedAt = p.updatedAt"
+          + " where p.id = :id")
+  void addCommentCount(@Param("id") Long id, @Param("delta") int delta);
+
+  @Modifying
+  @Query(
+      "update Post p set p.likeCount = p.likeCount + :delta, p.updatedAt = p.updatedAt"
+          + " where p.id = :id")
+  void addLikeCount(@Param("id") Long id, @Param("delta") int delta);
+
+  /** 카테고리를 지우면 그 카테고리 글은 "카테고리 없음"이 된다. */
+  @Modifying
+  @Query("update Post p set p.category = null where p.category.id = :categoryId")
+  int clearCategory(@Param("categoryId") Long categoryId);
 }

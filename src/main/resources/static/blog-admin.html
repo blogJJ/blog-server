@@ -13,7 +13,7 @@
     <script src="/js/blog-admin.js" defer></script>
   </head>
   <body>
-    <!-- 블로그 관리 /blog/{주소}/admin: 참여 신청 탭, 정보 수정 탭 (T056, BLG-05, T053). 멤버·카테고리·신고 탭은 US4·US5에서 더한다 -->
+    <!-- 블로그 관리 /blog/{주소}/admin: 참여 신청 탭, 정보 수정 탭 (T056, BLG-05, T053), 카테고리 탭 (T066, BRD-03). 멤버·신고 탭은 US4·US5에서 더한다 -->
     <main>
       <div class="blocked" id="blocked" hidden>
         <h1>관리 화면을 열 수 없어요</h1>
@@ -27,6 +27,7 @@
         <div class="tabs" role="tablist">
           <button class="tabs__item" type="button" role="tab" data-tab="requests" id="tab-requests" hidden>참여 신청</button>
           <button class="tabs__item" type="button" role="tab" data-tab="info" id="tab-info" hidden>정보 수정</button>
+          <button class="tabs__item" type="button" role="tab" data-tab="categories" id="tab-categories" hidden>카테고리</button>
         </div>
 
         <section class="tab-panel" id="panel-requests" hidden>
@@ -64,6 +65,16 @@
               <button class="button" type="button" id="regenerate">새로 만들기</button>
             </div>
           </section>
+        </section>
+
+        <section class="tab-panel" id="panel-categories" hidden>
+          <p class="field__hint">이름은 1~20자, 30개까지 만들 수 있어요. 카테고리를 지우면 그 안의 글은 "카테고리 없음"이 돼요.</p>
+          <ul class="category-list" id="categories"></ul>
+          <p class="empty" id="categories-empty" hidden>아직 카테고리가 없어요.</p>
+          <form class="field__row" id="category-form" novalidate>
+            <input type="text" id="category-name" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" />
+            <button class="button button--primary" type="submit">추가</button>
+          </form>
         </section>
       </div>
     </main>
