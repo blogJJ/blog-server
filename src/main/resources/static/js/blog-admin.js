@@ -126,6 +126,50 @@
     }
   }
 
+  function renderCover() {
+    $('cover-preview').hidden = !blog.coverImage;
+    $('cover-delete').hidden = !blog.coverImage;
+    if (blog.coverImage) {
+      $('cover-preview').src = blog.coverImage;
+    }
+  }
+
+  async function uploadCover() {
+    var file = $('cover-file').files[0];
+    if (!file) {
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      Api.toast('이미지는 3MB까지 올릴 수 있어요.');
+      $('cover-file').value = '';
+      return;
+    }
+    var form = new FormData();
+    form.append('file', file);
+    try {
+      var res = await Api.put('/api/blogs/' + blog.id + '/cover', form);
+      blog.coverImage = res.coverImage;
+      renderCover();
+      Api.toast('대표 이미지를 바꿨어요.');
+    } catch (e) {
+      Api.showError(e);
+    }
+    $('cover-file').value = '';
+  }
+
+  async function deleteCover() {
+    if (!window.confirm('대표 이미지를 지울까요?')) {
+      return;
+    }
+    try {
+      await Api.delete('/api/blogs/' + blog.id + '/cover');
+      blog.coverImage = null;
+      renderCover();
+    } catch (e) {
+      Api.showError(e);
+    }
+  }
+
   async function load() {
     try {
       blog = await Api.get('/api/blogs/by-slug/' + encodeURIComponent(slugFromPath()));
@@ -148,6 +192,7 @@
       $('slug').textContent = '/blog/' + blog.slug;
       BlogForm.render($('common-fields'), blog);
       renderShare();
+      renderCover();
     }
     showTab(v.canManageMembers ? 'requests' : 'info');
   }
@@ -160,10 +205,12 @@
     });
     $('info-form').addEventListener('submit', saveInfo);
     $('regenerate').addEventListener('click', regenerate);
+    $('cover-file').addEventListener('change', uploadCover);
+    $('cover-delete').addEventListener('click', deleteCover);
   });
 
-  document.addEventListener('layout:user', function (event) {
-    if (!event.detail) {
+  Layout.onUser(function (current) {
+    if (!current) {
       window.location.href =
         '/login.html?next=' + encodeURIComponent(window.location.pathname);
       return;

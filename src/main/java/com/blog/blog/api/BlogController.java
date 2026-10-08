@@ -10,13 +10,16 @@ import com.blog.blog.service.BlogQueryService.MyBlogs;
 import com.blog.blog.service.BlogService;
 import com.blog.blog.service.BlogService.BlogForm;
 import com.blog.blog.service.ShareLinkService;
+import com.blog.board.service.ImageService;
 import com.blog.common.security.AuthUser;
 import com.blog.common.web.PageResponse;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 블로그 API (T044~T049, T052, T053, BLG-01~03, BLG-06, BLG-10). */
 @RestController
@@ -33,12 +37,17 @@ public class BlogController {
   private final BlogService blogService;
   private final BlogQueryService queryService;
   private final ShareLinkService shareLinkService;
+  private final ImageService imageService;
 
   public BlogController(
-      BlogService blogService, BlogQueryService queryService, ShareLinkService shareLinkService) {
+      BlogService blogService,
+      BlogQueryService queryService,
+      ShareLinkService shareLinkService,
+      ImageService imageService) {
     this.blogService = blogService;
     this.queryService = queryService;
     this.shareLinkService = shareLinkService;
+    this.imageService = imageService;
   }
 
   /** 만들기 요청. form 값에 주소(slug)를 더한다. */
@@ -110,6 +119,31 @@ public class BlogController {
   @PreAuthorize("@blogAuthz.hasPermission(#blogId, 'EDIT_INFO')")
   public Map<String, String> regenerateShareLink(@PathVariable Long blogId) {
     return Map.of("shareKey", shareLinkService.regenerate(blogId));
+  }
+
+  /** 대표 이미지 올리기 (BLG-01, BRD-05). 3MB 1장, 이전 이미지는 지운다 */
+  @PutMapping("/api/blogs/{blogId}/cover")
+  @PreAuthorize("@blogAuthz.hasPermission(#blogId, 'EDIT_INFO')")
+  public Map<String, String> changeCover(
+      @PathVariable Long blogId, @RequestParam("file") MultipartFile file) {
+    String stored = imageService.storeSingle(file);
+    String old;
+    try {
+      old = blogService.changeCover(blogId, stored);
+    } catch (RuntimeException e) {
+      imageService.deleteQuietly(stored);
+      throw e;
+    }
+    imageService.deleteQuietly(old);
+    return Map.of("coverImage", ImageService.url(stored));
+  }
+
+  /** 대표 이미지 지우기 */
+  @DeleteMapping("/api/blogs/{blogId}/cover")
+  @PreAuthorize("@blogAuthz.hasPermission(#blogId, 'EDIT_INFO')")
+  public ResponseEntity<Void> deleteCover(@PathVariable Long blogId) {
+    imageService.deleteQuietly(blogService.changeCover(blogId, null));
+    return ResponseEntity.noContent().build();
   }
 
   /** 내 블로그 목록 (T052) */

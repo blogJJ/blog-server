@@ -40,6 +40,8 @@ dependencies {
 
     // 글 본문: 마크다운 → HTML 변환 후 jsoup으로 걸러냄 (SEC-06, D-64)
     implementation 'org.commonmark:commonmark:0.30.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.30.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0'
     implementation 'org.jsoup:jsoup:1.23.2'
 
     // 이미지 EXIF 확인·제거 (BRD-05)

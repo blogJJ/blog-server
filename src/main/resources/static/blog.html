@@ -10,9 +10,10 @@
     <script src="/js/session.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
     <script src="/js/blog.js" defer></script>
+    <script src="/js/post-list.js" defer></script>
   </head>
   <body>
-    <!-- 블로그 첫 화면 /blog/{주소} (T055, BLG-01, BLG-04). 글 목록은 US3(T071)에서 더한다 -->
+    <!-- 블로그 첫 화면 /blog/{주소} (T055, BLG-01, BLG-04). 글 목록은 post-list.js(T071) -->
     <main>
       <div class="blocked" id="blocked" hidden>
         <h1 id="blocked-title">블로그를 볼 수 없어요</h1>
@@ -22,6 +23,7 @@
       <article id="blog" hidden>
         <div class="notice notice--danger" id="notice-closing" hidden></div>
         <div class="notice" id="notice-owner" hidden></div>
+        <img class="blog-cover" id="cover" alt="" hidden />
         <header class="blog-hero">
           <div class="blog-hero__title">
             <h1 id="name"></h1>
@@ -46,8 +48,24 @@
           </div>
         </section>
         <section class="blog-posts">
-          <h2>글</h2>
-          <p class="empty">글 목록은 준비 중이에요.</p>
+          <div class="blog-posts__head">
+            <h2>글</h2>
+            <div class="blog-posts__tools">
+              <select id="category" aria-label="카테고리">
+                <option value="">전체</option>
+              </select>
+              <select id="size" aria-label="한 페이지에 볼 글 수">
+                <option value="10">10개씩</option>
+                <option value="20">20개씩</option>
+                <option value="30">30개씩</option>
+              </select>
+              <a class="button button--primary" id="write" hidden>글쓰기</a>
+            </div>
+          </div>
+          <ul class="post-list post-list--notice" id="notices"></ul>
+          <ul class="post-list" id="posts"></ul>
+          <p class="empty" id="posts-empty" hidden>아직 글이 없어요.</p>
+          <nav class="pager" id="pager" aria-label="페이지"></nav>
         </section>
       </article>
     </main>

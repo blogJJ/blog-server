@@ -15,6 +15,7 @@ import com.blog.blog.repository.BlogJoinRequestRepository;
 import com.blog.blog.repository.BlogMemberRepository;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogTagRepository;
+import com.blog.board.service.ImageService;
 import com.blog.board.service.TagNormalizer;
 import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
@@ -94,7 +95,8 @@ public class BlogQueryService {
       Long joinRequestId,
       LocalDateTime reapplyAt,
       boolean canEditInfo,
-      boolean canManageMembers) {}
+      boolean canManageMembers,
+      boolean canManagePosts) {}
 
   /** 내 블로그 목록 (BLG-06) */
   public record MyBlogs(
@@ -195,6 +197,8 @@ public class BlogQueryService {
         member != null && blogAuthz.hasPermission(blog.getId(), ManagerPermission.EDIT_INFO);
     boolean canManage =
         member != null && blogAuthz.hasPermission(blog.getId(), ManagerPermission.MANAGE_MEMBERS);
+    boolean canManagePosts =
+        member != null && blogAuthz.hasPermission(blog.getId(), ManagerPermission.MANAGE_POSTS);
     Viewer viewer =
         new Viewer(
             viewerId != null,
@@ -203,7 +207,8 @@ public class BlogQueryService {
             requestId,
             reapplyAt,
             canEdit,
-            canManage);
+            canManage,
+            canManagePosts);
 
     User owner = blog.getOwner();
     return new BlogDetail(
@@ -211,7 +216,7 @@ public class BlogQueryService {
         blog.getSlug(),
         blog.getName(),
         blog.getDescription(),
-        blog.getCoverImage(),
+        ImageService.url(blog.getCoverImage()),
         blog.getVisibility(),
         blog.getJoinPolicy(),
         blog.getStatus(),
@@ -302,7 +307,7 @@ public class BlogQueryService {
                     b.getSlug(),
                     b.getName(),
                     b.getDescription(),
-                    b.getCoverImage(),
+                    ImageService.url(b.getCoverImage()),
                     b.getVisibility(),
                     b.getStatus(),
                     b.getMemberCount(),

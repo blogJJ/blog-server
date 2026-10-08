@@ -82,8 +82,7 @@
     load();
   });
 
-  document.addEventListener('layout:user', function (event) {
-    var user = event.detail;
+  Layout.onUser(function (user) {
     // 메인 관리자는 블로그를 만들지 않는다 (D-90)
     document.getElementById('new-blog').hidden = !user || user.role === 'ADMIN';
   });

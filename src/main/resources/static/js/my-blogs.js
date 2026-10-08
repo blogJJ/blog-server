@@ -31,8 +31,8 @@
     }
   }
 
-  document.addEventListener('layout:user', function (event) {
-    if (!event.detail) {
+  Layout.onUser(function (current) {
+    if (!current) {
       window.location.href = '/login.html?next=' + encodeURIComponent('/my-blogs.html');
       return;
     }
