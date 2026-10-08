@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>블로그 관리 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/blog-form.js" defer></script>
+    <script src="/js/blog-admin.js" defer></script>
+  </head>
+  <body>
+    <!-- 블로그 관리 /blog/{주소}/admin: 참여 신청 탭, 정보 수정 탭 (T056, BLG-05, T053). 멤버·카테고리·신고 탭은 US4·US5에서 더한다 -->
+    <main>
+      <div class="blocked" id="blocked" hidden>
+        <h1>관리 화면을 열 수 없어요</h1>
+        <p id="blocked-desc"></p>
+        <a class="button" href="/">메인으로</a>
+      </div>
+      <div id="admin" hidden>
+        <div class="page-head">
+          <h1><a id="blog-link"></a> 관리</h1>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tabs__item" type="button" role="tab" data-tab="requests" id="tab-requests" hidden>참여 신청</button>
+          <button class="tabs__item" type="button" role="tab" data-tab="info" id="tab-info" hidden>정보 수정</button>
+        </div>
+
+        <section class="tab-panel" id="panel-requests" hidden>
+          <p class="field__hint">승인제 블로그에 들어온 신청이에요. 거절하면 7일 뒤에 다시 신청할 수 있어요.</p>
+          <ul class="request-list" id="requests"></ul>
+          <p class="empty" id="requests-empty" hidden>기다리는 신청이 없어요.</p>
+        </section>
+
+        <section class="tab-panel" id="panel-info" hidden>
+          <div class="form-card form-card--flat">
+            <p class="form-message form-message--error" id="message" role="alert"></p>
+            <form id="info-form" novalidate>
+              <div class="field">
+                <span class="field__label">주소</span>
+                <p id="slug"></p>
+              </div>
+              <div id="common-fields"></div>
+              <button class="button button--primary" type="submit">저장</button>
+            </form>
+          </div>
+          <section class="share-box" id="share-box" hidden>
+            <h2>공유 링크</h2>
+            <p class="field__hint">새로 만들면 이전 링크로는 더 이상 들어올 수 없어요.</p>
+            <div class="field__row">
+              <input type="text" id="share-url" readonly aria-label="공유 링크" />
+              <button class="button" type="button" id="regenerate">새로 만들기</button>
+            </div>
+          </section>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

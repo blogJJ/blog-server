@@ -103,6 +103,29 @@ public class Blog extends BaseTimeEntity {
     return status == BlogStatus.ACTIVE;
   }
 
+  /** 폐쇄되지 않았다. 폐쇄 예정(CLOSING)은 평소처럼 운영한다 (D-67). */
+  public boolean isOpen() {
+    return status != BlogStatus.CLOSED;
+  }
+
+  /** 블로그 정보 수정 (T053). 주소(slug)는 바꾸지 않는다. */
+  public void updateInfo(
+      String name, String description, BlogVisibility visibility, JoinPolicy joinPolicy) {
+    this.name = name;
+    this.description = description;
+    this.visibility = visibility;
+    this.joinPolicy = joinPolicy;
+  }
+
+  /** 공유 링크 값을 바꾼다. null이면 링크를 없앤다 (D-37, D-49). */
+  public void changeShareKey(String shareKey) {
+    this.shareKey = shareKey;
+  }
+
+  public void changeCoverImage(String coverImage) {
+    this.coverImage = coverImage;
+  }
+
   public Long getId() {
     return id;
   }

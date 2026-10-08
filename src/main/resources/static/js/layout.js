@@ -75,7 +75,12 @@
       window.location.href = '/';
     });
 
-    menu.replaceChildren(bell, nickname, link('/me.html', 'button', '내 정보'), logout);
+    var items = [bell, nickname];
+    if (user.role !== 'ADMIN') {
+      items.push(link('/my-blogs.html', 'button', '내 블로그'));
+    }
+    items.push(link('/me.html', 'button', '내 정보'), logout);
+    menu.replaceChildren.apply(menu, items);
   }
 
   /** 안 읽은 알림 수를 종 아이콘에 표시한다. 0이면 숨긴다. notifications.js가 30초마다 부른다. */

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>내 블로그 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/my-blogs.js" defer></script>
+  </head>
+  <body>
+    <!-- 내 블로그 목록 (T055, BLG-06) -->
+    <main>
+      <div class="page-head">
+        <h1>내 블로그</h1>
+        <a class="button button--primary" href="/blog-new.html">블로그 만들기</a>
+      </div>
+      <section class="my-section">
+        <h2>만든 블로그</h2>
+        <div class="blog-grid" id="owned"></div>
+        <p class="empty" id="owned-empty" hidden>아직 만든 블로그가 없어요.</p>
+      </section>
+      <section class="my-section">
+        <h2>참여한 블로그</h2>
+        <div class="blog-grid" id="joined"></div>
+        <p class="empty" id="joined-empty" hidden>참여한 블로그가 없어요.</p>
+      </section>
+      <section class="my-section" id="pending-section" hidden>
+        <h2>승인 대기</h2>
+        <div class="blog-grid" id="pending"></div>
+      </section>
+    </main>
+  </body>
+</html>

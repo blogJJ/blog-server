@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/blog.js" defer></script>
+  </head>
+  <body>
+    <!-- 블로그 첫 화면 /blog/{주소} (T055, BLG-01, BLG-04). 글 목록은 US3(T071)에서 더한다 -->
+    <main>
+      <div class="blocked" id="blocked" hidden>
+        <h1 id="blocked-title">블로그를 볼 수 없어요</h1>
+        <p id="blocked-desc"></p>
+        <a class="button" href="/">메인으로</a>
+      </div>
+      <article id="blog" hidden>
+        <div class="notice notice--danger" id="notice-closing" hidden></div>
+        <div class="notice" id="notice-owner" hidden></div>
+        <header class="blog-hero">
+          <div class="blog-hero__title">
+            <h1 id="name"></h1>
+            <span class="badge badge--muted" id="visibility" hidden></span>
+          </div>
+          <p class="blog-hero__desc" id="description"></p>
+          <div id="tags"></div>
+          <p class="blog-hero__meta" id="meta"></p>
+          <div class="blog-hero__actions">
+            <button class="button button--primary" type="button" id="join" hidden></button>
+            <button class="button" type="button" id="cancel-join" hidden>신청 취소</button>
+            <span class="blog-hero__state" id="join-state"></span>
+            <a class="button" id="manage" hidden>블로그 관리</a>
+          </div>
+        </header>
+        <section class="share-box" id="share-box" hidden>
+          <h2>공유 링크</h2>
+          <p class="field__hint">이 링크를 받은 사람만 블로그를 볼 수 있어요. 관리 화면에서 새로 만들면 이 링크는 막혀요.</p>
+          <div class="field__row">
+            <input type="text" id="share-url" readonly aria-label="공유 링크" />
+            <button class="button" type="button" id="copy-share">복사</button>
+          </div>
+        </section>
+        <section class="blog-posts">
+          <h2>글</h2>
+          <p class="empty">글 목록은 준비 중이에요.</p>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>
