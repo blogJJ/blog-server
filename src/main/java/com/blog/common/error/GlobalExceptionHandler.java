@@ -3,7 +3,9 @@ package com.blog.common.error;
 import com.blog.common.logging.RequestIdFilter;
 import com.blog.common.logging.SecurityEventLogger;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
+import java.io.IOException;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,12 +34,19 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  *
  * <p>스택 트레이스·SQL·클래스 이름·서버 경로는 응답에 넣지 않는다. 예상하지 못한 오류(500)는 로그에만 자세히 남기고, 응답에는 로그에서 찾을 오류
  * 번호(errorId)만 준다.
+ *
+ * <p>{@code /api/}가 아닌 화면 주소에서 난 404·403·500은 JSON 대신 오류 화면(static/error, ErrorPageViewResolver)을
+ * 보여 준다 (T136).
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
   /** 요청 ID 필터(T137)가 MDC에 넣는 키. 없으면 오류 번호를 새로 만든다. */
   static final String REQUEST_ID_KEY = RequestIdFilter.MDC_KEY;
+
+  /** 화면 500 오류에서 오류 화면에 오류 번호를 넘기는 요청 속성 이름. */
+  public static final String ERROR_ID_ATTRIBUTE =
+      GlobalExceptionHandler.class.getName() + ".errorId";
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -82,7 +91,13 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(NoResourceFoundException.class)
-  public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException e) {
+  public ResponseEntity<ErrorResponse> handleNotFound(
+      NoResourceFoundException e, HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
+    if (isPage(request)) {
+      response.sendError(HttpServletResponse.SC_NOT_FOUND);
+      return null;
+    }
     return respond(ErrorCode.NOT_FOUND);
   }
 
@@ -97,8 +112,13 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ErrorResponse> handleAccessDenied(
-      AccessDeniedException e, HttpServletRequest request) {
+      AccessDeniedException e, HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
     SecurityEventLogger.accessDenied(request);
+    if (isPage(request)) {
+      response.sendError(HttpServletResponse.SC_FORBIDDEN);
+      return null;
+    }
     return respond(ErrorCode.FORBIDDEN);
   }
 
@@ -128,12 +148,23 @@ public class GlobalExceptionHandler {
 
   /** 그 밖의 모든 예외는 500. 로그에는 스택 트레이스와 오류 번호를, 응답에는 오류 번호만 남긴다. */
   @ExceptionHandler(Exception.class)
-  public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
+  public ResponseEntity<ErrorResponse> handleUnexpected(
+      Exception e, HttpServletRequest request, HttpServletResponse response) throws IOException {
     String errorId = currentErrorId();
     log.error("Unhandled exception [errorId={}]", errorId, e);
+    if (isPage(request)) {
+      request.setAttribute(ERROR_ID_ATTRIBUTE, errorId);
+      response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      return null;
+    }
     ErrorCode code = ErrorCode.INTERNAL_ERROR;
     return ResponseEntity.status(code.getStatus())
         .body(new ErrorResponse(code.name(), code.getDefaultMessage(), errorId));
+  }
+
+  /** 화면(HTML) 요청인지. API는 모두 /api/ 아래에 있다. */
+  private static boolean isPage(HttpServletRequest request) {
+    return !request.getRequestURI().startsWith("/api/");
   }
 
   private static ResponseEntity<ErrorResponse> respond(ErrorCode code) {
