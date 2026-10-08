@@ -131,6 +131,11 @@
         remove(c);
       }));
     }
+    if (user && !c.canEdit) {
+      actions.appendChild(linkButton('신고', function () {
+        Report.open({ targetType: 'COMMENT', targetId: c.id });
+      }));
+    }
     li.appendChild(actions);
     return li;
   }

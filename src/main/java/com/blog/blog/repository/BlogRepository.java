@@ -66,6 +66,12 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
   @Query("update Blog b set b.memberCount = b.memberCount + 1 where b.id = :id")
   void increaseMemberCount(@Param("id") Long id);
 
+  @Modifying(flushAutomatically = true)
+  @Query(
+      "update Blog b set b.memberCount = case when b.memberCount > 0 then b.memberCount - 1"
+          + " else 0 end where b.id = :id")
+  void decreaseMemberCount(@Param("id") Long id);
+
   /** 글 수를 DB에서 바로 바꾼다 (delta는 +1 또는 -1). 0 아래로는 내려가지 않는다. */
   @Modifying(flushAutomatically = true)
   @Query(

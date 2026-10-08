@@ -16,10 +16,11 @@ app:
     site-key: ${TURNSTILE_SITE_KEY:1x00000000000000000000AA}
     secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
 
-# 시험용 회원 20명(비밀번호 test1234!)을 넣는다. 운영·테스트에는 없다
+# 예전에 자동으로 넣던 시험 회원(R__local_seed_users)은 없앴다. 시험 데이터는 dummy/dummy_data.sql을 직접 실행한다.
+# 그 기록이 남은 DB도 뜨도록 사라진 마이그레이션은 무시한다
 spring:
   flyway:
-    locations: classpath:db/migration,classpath:db/seed-local
+    ignore-migration-patterns: "*:missing,*:future"
 
 # Swagger: http://localhost:8080/swagger-ui.html (T145, OPS-12)
 springdoc:

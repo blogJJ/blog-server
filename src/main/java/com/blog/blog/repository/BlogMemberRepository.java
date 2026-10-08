@@ -34,4 +34,11 @@ public interface BlogMemberRepository extends JpaRepository<BlogMember, Long> {
       "select m from BlogMember m join fetch m.user where m.blog.id = :blogId"
           + " and m.role = com.blog.blog.domain.BlogMemberRole.MANAGER")
   List<BlogMember> findManagers(@Param("blogId") Long blogId);
+
+  /** 멤버 관리 화면 (T082). 블로그장, 부블로그장, 멤버 순으로 */
+  @Query(
+      "select m from BlogMember m join fetch m.user where m.blog.id = :blogId"
+          + " order by case m.role when com.blog.blog.domain.BlogMemberRole.OWNER then 0"
+          + " when com.blog.blog.domain.BlogMemberRole.MANAGER then 1 else 2 end, m.joinedAt asc")
+  List<BlogMember> findForAdmin(@Param("blogId") Long blogId);
 }

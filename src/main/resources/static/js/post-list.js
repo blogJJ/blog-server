@@ -1,6 +1,6 @@
 /*
  * 블로그 첫 화면의 글 목록 (T071, BRD-02, BRD-03, D-76). blog.js가 블로그를 읽으면 보내는 'blog:loaded'를 받아 시작한다.
- * 최신순, 번호 페이지, 10·20·30개씩. 첫 페이지 위에 공지를 따로 보여 준다. 제목에 마우스를 올리면 첫 사진을 보여 준다 (BRD-05).
+ * 표처럼 칸으로 나눠 카테고리를 같이 보여 준다. 최신순, 번호 페이지, 10·20·30개씩. 첫 페이지 위에 공지를 따로 보여 준다. 제목에 마우스를 올리면 첫 사진을 보여 준다 (BRD-05).
  */
 (function () {
   'use strict';
@@ -28,14 +28,16 @@
     return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
   }
 
+  /** 한 줄을 칸(카테고리 · 제목 · 글쓴이 · 날짜 · 조회 · 좋아요)으로 나눈다. 제목 칸 전체를 눌러도 글로 간다 */
   function row(p) {
     var li = el('li', 'post-row' + (p.notice ? ' post-row--notice' : ''));
+    li.appendChild(el('span', 'post-row__category', p.notice ? '공지' : p.categoryName || '-'));
     var a = el('a', 'post-row__title');
     a.href = postUrl(p.id);
     if (p.notice) {
       a.appendChild(el('span', 'badge', '공지'));
     }
-    a.appendChild(el('span', '', p.title));
+    a.appendChild(el('span', 'post-row__text', p.title));
     if (p.commentCount > 0) {
       a.appendChild(el('span', 'post-row__comments', '[' + p.commentCount + ']'));
     }
@@ -47,11 +49,15 @@
       a.appendChild(img);
     }
     li.appendChild(a);
-    var meta = [p.authorNickname, formatDate(p.createdAt), '조회 ' + p.viewCount];
-    if (p.categoryName && !state.category) {
-      meta.unshift(p.categoryName);
-    }
-    li.appendChild(el('span', 'post-row__meta', meta.join(' · ')));
+    li.appendChild(el('span', 'post-row__break')); // 휴대폰에서만 줄을 바꾼다
+    li.appendChild(el('span', 'post-row__author', p.authorNickname));
+    li.appendChild(el('span', 'post-row__date', formatDate(p.createdAt)));
+    var views = el('span', 'post-row__num', String(p.viewCount));
+    views.dataset.label = '조회';
+    var likes = el('span', 'post-row__num', String(p.likeCount));
+    likes.dataset.label = '좋아요';
+    li.appendChild(views);
+    li.appendChild(likes);
     return li;
   }
 
@@ -64,7 +70,9 @@
       var data = await Api.get(url);
       $('notices').replaceChildren.apply($('notices'), data.notices.map(row));
       $('posts').replaceChildren.apply($('posts'), data.page.items.map(row));
-      $('posts-empty').hidden = data.page.items.length > 0 || data.notices.length > 0;
+      var any = data.page.items.length > 0 || data.notices.length > 0;
+      $('posts-empty').hidden = any;
+      $('posts-head').hidden = !any;
       ui.pager($('pager'), data.page.page, data.page.totalPages, function (page) {
         state.page = page;
         load();
