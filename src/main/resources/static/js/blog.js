@@ -64,6 +64,8 @@
     var canManage = v.canEditInfo || v.canManageMembers;
     $('manage').hidden = !canManage;
     $('manage').href = ui.blogUrl(blog.slug) + '/admin';
+    $('cover-wrap').hidden = !blog.coverImage && !canManage;
+    $('cover-wrap').classList.toggle('has-cover', !!blog.coverImage);
 
     $('share-box').hidden = !blog.shareKey;
     if (blog.shareKey) {

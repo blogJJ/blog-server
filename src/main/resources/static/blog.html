@@ -23,7 +23,11 @@
       <article id="blog" hidden>
         <div class="notice notice--danger" id="notice-closing" hidden></div>
         <div class="notice" id="notice-owner" hidden></div>
-        <img class="blog-cover" id="cover" alt="" hidden />
+        <!-- 블로그 관리 버튼은 대표 이미지 오른쪽 아래에 둔다. 이미지가 없으면 이 줄 오른쪽 끝 -->
+        <div class="blog-cover-wrap" id="cover-wrap" hidden>
+          <img class="blog-cover" id="cover" alt="" hidden />
+          <a class="button blog-cover-wrap__manage" id="manage" hidden>블로그 관리</a>
+        </div>
         <header class="blog-hero">
           <div class="blog-hero__title">
             <h1 id="name"></h1>
@@ -36,7 +40,6 @@
             <button class="button button--primary" type="button" id="join" hidden></button>
             <button class="button" type="button" id="cancel-join" hidden>신청 취소</button>
             <span class="blog-hero__state" id="join-state"></span>
-            <a class="button" id="manage" hidden>블로그 관리</a>
           </div>
         </header>
         <section class="share-box" id="share-box" hidden>

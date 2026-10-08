@@ -800,6 +800,26 @@ main {
   margin-top: 8px;
 }
 
+/* 대표 이미지 오른쪽 아래 블로그 관리 버튼 */
+.blog-cover-wrap {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.blog-cover-wrap .blog-cover {
+  margin-top: 0;
+}
+
+.blog-cover-wrap.has-cover .blog-cover-wrap__manage {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: var(--color-bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
 .cover-preview {
   display: block;
   max-width: 100%;
