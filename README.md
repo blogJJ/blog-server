@@ -50,6 +50,14 @@ IntelliJ에서 `BlogServerApplication`을 바로 실행할 때는 Run Configurat
 
 로그는 모든 줄에 8자리 요청 ID가 붙고, 응답 헤더 `X-Request-Id`와 500 오류의 `errorId`가 같은 값입니다. local은 콘솔에만, 그 밖에는 `LOG_PATH`(기본 `./logs`)에 날짜별 파일로 남기고 30일 뒤 지웁니다.
 
+## 운영 서버 배포
+
+- main의 CI가 통과하면 `.github/workflows/deploy.yml`이 도커 이미지를 만들어 ssh로 서버에 올리고 `deploy/deploy.sh`로 띄운다. Actions 탭 > Deploy > Run workflow로 직접 돌릴 수도 있다.
+- 필요한 값은 저장소 Settings > Secrets and variables > Actions의 Repository secrets에 넣는다. 이름 목록은 `deploy.yml` 맨 위에 있다. DB는 Crowfoot의 MySQL #2(빈 DB)이고, 서버가 처음 뜰 때 Flyway가 테이블을 만든다.
+- 더미 데이터는 Run workflow에서 "더미 데이터 넣기"를 켜고 돌리면 서버가 뜬 뒤 `dummy/dummy_data.sql`을 넣는다. 더미 관리자(admin@example.com)도 비밀번호가 test1234!라서, 실제로 쓰기 시작하면 바꾼다.
+- 서버에서는 `~/blog-server/`에 파일이 있고, 컨테이너 이름은 `<계정>-blog-server`다. 로그는 `docker logs <계정>-blog-server`. 새 버전이 2분 안에 뜨지 않으면 마지막으로 성공한 버전으로 되돌린다.
+- nginx 설정(설명서 5단계)은 이 저장소 밖에서 한다. nginx는 `X-Forwarded-Proto`를 넘겨야 한다(안 넘기면 https로 돌려보낸다).
+
 ## 자주 쓰는 명령
 
 | 명령 | 하는 일 |

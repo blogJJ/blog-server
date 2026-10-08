@@ -44,6 +44,14 @@ class ProdProfileTest {
   }
 
   @Test
+  void redirectsDockerPublishedPortToStandardHttpsPort() throws Exception {
+    // 서버의 docker가 연 포트(APP_PORT)로 바로 들어와도 500이 아니라 https로 보낸다
+    mvc.perform(get("http://blog.example.com:18300/api/blogs"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(header().string("Location", "https://blog.example.com:443/api/blogs"));
+  }
+
+  @Test
   void healthIsNotRedirected() throws Exception {
     mvc.perform(get("http://blog.example.com/actuator/health")).andExpect(status().isOk());
   }
