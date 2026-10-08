@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>글쓰기 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <link rel="stylesheet" href="/vendor/toastui-editor-3.2.2/toastui-editor.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/vendor/toastui-editor-3.2.2/toastui-editor-all.min.js" defer></script>
+    <script src="/js/post-edit.js" defer></script>
+  </head>
+  <body>
+    <!-- 글쓰기·수정 (T070, BRD-01, BRD-04, BRD-05, D-74). 임시저장은 이 브라우저에만 한다 -->
+    <main class="main--wide">
+      <div class="blocked" id="blocked" hidden>
+        <h1>글을 쓸 수 없어요</h1>
+        <p id="blocked-desc"></p>
+        <a class="button" href="/">메인으로</a>
+      </div>
+      <form id="post-form" novalidate hidden>
+        <p class="post-edit__blog" id="blog-name"></p>
+        <p class="form-message form-message--error" id="message" role="alert"></p>
+        <div class="post-edit__row">
+          <select id="category" aria-label="카테고리">
+            <option value="">카테고리 없음</option>
+          </select>
+          <label class="check" id="notice-wrap" hidden>
+            <input id="notice" type="checkbox" />
+            <span>공지로 올리기</span>
+          </label>
+        </div>
+        <input class="post-edit__title" id="title" type="text" maxlength="30" placeholder="제목 (30자까지)" aria-label="제목" />
+        <div id="editor"></div>
+        <p class="field__hint post-edit__count"><span id="count">0</span> / 5,000자 · 이미지는 장당 3MB, 10장까지</p>
+        <div class="field">
+          <label for="tags">태그</label>
+          <input id="tags" type="text" placeholder="쉼표로 나눠 10개까지" />
+        </div>
+        <div class="post-edit__actions">
+          <span class="field__hint" id="draft-state"></span>
+          <a class="button" id="cancel">취소</a>
+          <button class="button button--primary" type="submit" id="save">올리기</button>
+        </div>
+      </form>
+    </main>
+  </body>
+</html>

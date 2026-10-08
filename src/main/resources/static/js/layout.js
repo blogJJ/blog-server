@@ -3,6 +3,7 @@
  * api.js 다음에 불러온다. <body>에 이 틀이 앞뒤로 붙는다.
  *
  * 로그인한 회원 정보는 Layout.user에 두고, 다 읽으면 document에 'layout:user' 이벤트(detail: 회원 또는 null)를 보낸다.
+ * 화면 스크립트는 Layout.onUser(fn)로 받는다(이벤트를 놓쳐도 부른다).
  * 종 아이콘을 누르면 'layout:bell' 이벤트를 보낸다. 알림 사이드바와 30초 확인은 notifications.js(T114)가 맡는다.
  *
  * 화면에 넣는 회원 값은 모두 textContent로 넣는다(innerHTML 금지, SEC-06).
@@ -108,6 +109,7 @@
 
     var user = await loadUser();
     window.Layout.user = user;
+    window.Layout.ready = true;
     if (user) {
       renderMember(parts.menu, user);
     } else {
@@ -116,7 +118,21 @@
     document.dispatchEvent(new CustomEvent('layout:user', { detail: user }));
   }
 
-  window.Layout = { user: null, setUnreadCount: setUnreadCount };
+  /**
+   * 로그인 상태를 안 뒤에 fn(회원 또는 null)을 부른다. 이미 알면 바로 부른다.
+   * 큰 스크립트를 함께 불러오는 화면은 'layout:user' 이벤트가 먼저 지나갈 수 있어 이것을 쓴다.
+   */
+  function onUser(fn) {
+    if (window.Layout.ready) {
+      fn(window.Layout.user);
+    } else {
+      document.addEventListener('layout:user', function (event) {
+        fn(event.detail);
+      });
+    }
+  }
+
+  window.Layout = { user: null, ready: false, setUnreadCount: setUnreadCount, onUser: onUser };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

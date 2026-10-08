@@ -36,6 +36,10 @@
     $('blocked').hidden = true;
     $('blog').hidden = false;
     $('name').textContent = blog.name;
+    $('cover').hidden = !blog.coverImage;
+    if (blog.coverImage) {
+      $('cover').src = blog.coverImage;
+    }
     $('description').textContent = blog.description || '';
     $('tags').replaceChildren(ui.tagList(blog.tags));
     $('visibility').hidden = blog.visibility === 'PUBLIC';
@@ -67,6 +71,7 @@
         window.location.origin + ui.blogUrl(blog.slug) + '?share=' + encodeURIComponent(blog.shareKey);
     }
     renderJoin();
+    document.dispatchEvent(new CustomEvent('blog:loaded', { detail: blog }));
   }
 
   function renderJoin() {
@@ -170,8 +175,8 @@
     load();
   });
 
-  document.addEventListener('layout:user', function (event) {
-    user = event.detail;
+  Layout.onUser(function (current) {
+    user = current;
     if (blog) {
       renderJoin();
     }

@@ -9,3 +9,6 @@ app:
     api-per-minute: 1000000
   mail:
     log-only: true
+  # 테스트에서 올린 이미지는 build 아래에 둔다
+  storage:
+    local-dir: build/test-uploads

@@ -36,6 +36,13 @@
   function card(blog, badge) {
     var a = el('a', 'blog-card');
     a.href = blogUrl(blog.slug);
+    if (blog.coverImage) {
+      var cover = el('img', 'blog-card__cover');
+      cover.src = blog.coverImage;
+      cover.alt = '';
+      cover.loading = 'lazy';
+      a.appendChild(cover);
+    }
     var title = el('div', 'blog-card__title');
     title.appendChild(el('strong', '', blog.name));
     if (badge) {

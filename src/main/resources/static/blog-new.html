@@ -13,7 +13,7 @@
     <script src="/js/blog-new.js" defer></script>
   </head>
   <body>
-    <!-- 블로그 만들기 (T054, BLG-01, BLG-10). 대표 이미지는 이미지 업로드(T062)가 생기면 더한다 -->
+    <!-- 블로그 만들기 (T054, BLG-01, BLG-10). 대표 이미지는 만든 뒤 바로 올린다 -->
     <main>
       <section class="form-card">
         <h1>블로그 만들기</h1>
@@ -27,6 +27,11 @@
               <button class="button" type="button" id="slug-check">중복 확인</button>
             </div>
             <p class="field__hint" id="slug-hint">영문 소문자, 숫자, -로 3~30자. 만든 뒤에는 바꿀 수 없어요.</p>
+          </div>
+          <div class="field">
+            <label for="cover-file">대표 이미지 (선택)</label>
+            <input id="cover-file" type="file" accept=".jpg,.jpeg,.png,.gif,.webp" />
+            <p class="field__hint">jpg·png·gif·webp, 3MB 1장</p>
           </div>
           <div id="common-fields"></div>
           <button class="button button--primary button--block" type="submit">만들기</button>

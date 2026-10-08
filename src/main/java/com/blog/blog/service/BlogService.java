@@ -168,6 +168,24 @@ public class BlogService {
     return blog;
   }
 
+  /**
+   * 대표 이미지를 바꾼다. 권한(블로그장 또는 EDIT_INFO)은 컨트롤러가 확인한다.
+   *
+   * @param storedName 새 이미지 저장 이름. null이면 지운다
+   * @return 이전 이미지 저장 이름 (파일을 지우는 데 쓴다). 없으면 null
+   */
+  @Transactional
+  public String changeCover(Long blogId, String storedName) {
+    Blog blog =
+        blogRepository
+            .findById(blogId)
+            .filter(Blog::isOpen)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+    String old = blog.getCoverImage();
+    blog.changeCoverImage(storedName);
+    return old;
+  }
+
   /** 주소 규칙 확인. 앞뒤 공백은 지우고 대문자는 소문자로 바꾼다. */
   public static String validateSlug(String raw) {
     String slug = raw == null ? "" : raw.strip().toLowerCase(Locale.ROOT);

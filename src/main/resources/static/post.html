@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>글 - 블로그</title>
+    <!--og-->
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/post-view.js" defer></script>
+  </head>
+  <body>
+    <!-- 글 상세 /blog/{주소}/posts/{번호} (T071, BRD-01, BRD-07). og 태그는 서버가 채운다(T069). 댓글·좋아요는 다음 단계에서 더한다 -->
+    <main>
+      <div class="blocked" id="blocked" hidden>
+        <h1 id="blocked-title">글을 볼 수 없어요</h1>
+        <p id="blocked-desc"></p>
+        <a class="button" href="/">메인으로</a>
+      </div>
+      <article class="post" id="post" hidden>
+        <a class="post__blog" id="blog-link"></a>
+        <h1 class="post__title" id="title"></h1>
+        <p class="post__meta" id="meta"></p>
+        <div class="post__actions">
+          <button class="button" type="button" id="copy-link">링크 복사</button>
+          <a class="button" id="edit" hidden>수정</a>
+          <button class="button button--danger" type="button" id="delete" hidden>삭제</button>
+        </div>
+        <!-- 본문은 서버가 걸러낸 HTML이라 이곳만 innerHTML로 넣는다 (SEC-06) -->
+        <div class="post__body" id="body"></div>
+        <div id="tags"></div>
+        <p class="post__counts" id="counts"></p>
+        <a class="button" id="back">목록으로</a>
+      </article>
+    </main>
+  </body>
+</html>

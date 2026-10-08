@@ -40,6 +40,10 @@
     if (!SLUG.test(slugValue())) {
       problem = '주소는 영문 소문자, 숫자, -로 3~30자 입력해 주세요.';
     }
+    var coverFile = document.getElementById('cover-file').files[0];
+    if (!problem && coverFile && coverFile.size > 3 * 1024 * 1024) {
+      problem = '대표 이미지는 3MB까지 올릴 수 있어요.';
+    }
     if (problem) {
       message(problem);
       return;
@@ -49,6 +53,17 @@
     button.disabled = true;
     try {
       var created = await Api.post('/api/blogs', form);
+      var cover = document.getElementById('cover-file').files[0];
+      if (cover) {
+        var data = new FormData();
+        data.append('file', cover);
+        try {
+          await Api.put('/api/blogs/' + created.id + '/cover', data);
+        } catch (e) {
+          // 블로그는 만들어졌으니 넘어가고, 관리 화면에서 다시 올리게 한다
+          alert('블로그는 만들었지만 대표 이미지를 올리지 못했어요. 블로그 관리에서 다시 올려 주세요. (' + e.message + ')');
+        }
+      }
       var url = BlogUi.blogUrl(created.slug);
       window.location.href = created.shareKey ? url + '?share=' + encodeURIComponent(created.shareKey) : url;
     } catch (e) {
@@ -63,8 +78,7 @@
     document.getElementById('blog-form').addEventListener('submit', submit);
   });
 
-  document.addEventListener('layout:user', function (event) {
-    var user = event.detail;
+  Layout.onUser(function (user) {
     if (!user) {
       window.location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
     } else if (user.role === 'ADMIN') {

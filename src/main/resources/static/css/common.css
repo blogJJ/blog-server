@@ -781,3 +781,262 @@ main {
     padding: 0 10px;
   }
 }
+
+/* 대표 이미지 (BLG-01) */
+.blog-card__cover {
+  width: calc(100% + 32px);
+  margin: -16px -16px 4px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.blog-cover {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-top: 8px;
+}
+
+.cover-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  margin: 4px 0 8px;
+  border-radius: var(--radius);
+}
+
+/* 블로그 글 목록 (T071) */
+.blog-posts {
+  margin-top: 24px;
+}
+
+.blog-posts__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.blog-posts__tools {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.blog-posts__tools select,
+.post-edit__row select {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  font: inherit;
+  font-size: 14px;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.post-list--notice:empty {
+  display: none;
+}
+
+.post-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.post-row--notice {
+  background: var(--color-surface);
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.post-row__title {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.post-row__title:hover > span:not(.badge) {
+  text-decoration: underline;
+}
+
+.post-row__comments {
+  color: var(--color-primary);
+  font-size: 13px;
+}
+
+/* 제목에 마우스를 올리면 첫 사진 (BRD-05, 썸네일은 따로 만들지 않고 CSS로 줄임) */
+.post-row__thumb {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 5;
+  width: 200px;
+  height: 140px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.post-row__title:hover .post-row__thumb {
+  display: block;
+}
+
+.post-row__meta {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .post-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+/* 글 상세 (T071) */
+.post__blog {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.post__title {
+  margin: 8px 0 4px;
+  font-size: 28px;
+}
+
+.post__meta,
+.post__counts {
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.post__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.button--danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.post__body {
+  padding: 24px 0;
+  line-height: 1.8;
+}
+
+.post__body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.post__body pre {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.post__body table {
+  border-collapse: collapse;
+}
+
+.post__body th,
+.post__body td {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+}
+
+.post__body blockquote {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-muted);
+}
+
+.post__counts {
+  margin: 16px 0;
+}
+
+/* 글쓰기 (T070) */
+.main--wide {
+  max-width: 1100px;
+}
+
+.post-edit__blog {
+  margin: 0 0 8px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.post-edit__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.post-edit__title {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.post-edit__count {
+  text-align: right;
+  margin-top: 4px;
+}
+
+.post-edit__count.is-over {
+  color: var(--color-danger);
+}
+
+.post-edit__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.post-edit__actions .field__hint {
+  margin-right: auto;
+}
+
+.field input[type="file"] {
+  font: inherit;
+  font-size: 14px;
+}
