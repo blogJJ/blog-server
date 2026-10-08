@@ -11,6 +11,7 @@ class ProdSecretsCheckTest {
   private static MockEnvironment allSecrets() {
     return new MockEnvironment()
         .withProperty("app.jwt.secret", "prod-secret-0123456789abcdef0123456789")
+        .withProperty("app.hash.secret", "prod-hash-secret-0123456789abcdef01234")
         .withProperty("spring.datasource.password", "s3cure-db")
         .withProperty("spring.mail.password", "gmail-app-password")
         .withProperty("app.turnstile.secret-key", "turnstile-secret");
@@ -41,6 +42,7 @@ class ProdSecretsCheckTest {
   @Test
   void listsEveryMissingSecret() {
     assertThat(ProdSecretsCheck.findInvalid(new MockEnvironment()))
-        .containsExactly("JWT_SECRET", "DB_PASSWORD", "MAIL_PASSWORD", "TURNSTILE_SECRET_KEY");
+        .containsExactly(
+            "JWT_SECRET", "HASH_SECRET", "DB_PASSWORD", "MAIL_PASSWORD", "TURNSTILE_SECRET_KEY");
   }
 }
