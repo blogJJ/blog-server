@@ -6,7 +6,8 @@
 # 필요한 Repository secrets (Settings > Secrets and variables > Actions). 값은 저장소에 올리지 않는다:
 #   SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD  서버 접속. 주소는 외부(핫스팟)용 주소
 #   APP_PORT                                     내가 받은 포트번호. nginx가 이 포트로 넘겨준다
-#   DB_ADDRESS, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD  Crowfoot MySQL #2 접속 정보
+#   DB_ADDRESS, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD  Crowfoot MySQL #2 접속 정보.
+#       DB_ADDRESS는 내부 IP(10.116.64.14)를 쓴다. 컨테이너 안에서는 s4.java21.net이 외부 주소로 가서 막힌다
 #   JWT_SECRET, HASH_SECRET                      openssl rand -base64 48 로 만든 값. 한 번 정하면 바꾸지 않는다
 #   MAIL_USERNAME, MAIL_PASSWORD                 Gmail 주소와 앱 비밀번호
 #   TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY     Cloudflare Turnstile 키
@@ -105,6 +106,10 @@ jobs:
           }
           put SPRING_PROFILES_ACTIVE prod
           put DB_URL "jdbc:mysql://${DB_ADDRESS}:${DB_PORT}/${DB_NAME}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
+          # 더미 데이터 넣기(deploy.sh --load-dummy)가 쓴다. 서버는 DB_URL만 본다
+          put DB_HOST "$DB_ADDRESS"
+          put DB_PORT "$DB_PORT"
+          put DB_NAME "$DB_NAME"
           put DB_USERNAME "$DB_USERNAME"
           put DB_PASSWORD "$DB_PASSWORD"
           put JWT_SECRET "$JWT_SECRET"
@@ -122,7 +127,7 @@ jobs:
           sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
             'mkdir -p ~/blog-server && chmod 700 ~/blog-server'
           sshpass -e scp -p "${opts[@]}" -P "$SSH_PORT" \
-            "$RUNNER_TEMP/image.tar.gz" "$RUNNER_TEMP/app.env" deploy/deploy.sh \
+            "$RUNNER_TEMP/image.tar.gz" "$RUNNER_TEMP/app.env" deploy/deploy.sh dummy/dummy_data.sql \
             "$SSH_ID@$SSH_ADDRESS:blog-server/"
 
       - name: Start on server
@@ -133,9 +138,8 @@ jobs:
       # 서버가 뜨면서 Flyway가 테이블을 만든 뒤에 넣는다
       - name: Load dummy data
         if: github.event_name == 'workflow_dispatch' && inputs.dummy
-        env:
-          MYSQL_PWD: ${{ secrets.DB_PASSWORD }}
+        # DB가 학교 내부 주소라 깃허브에서 바로 붙지 못해서 서버 안에서 넣는다
         run: |
-          mysql --default-character-set=utf8mb4 -h "$DB_ADDRESS" -P "$DB_PORT" -u "$DB_USERNAME" "$DB_NAME" \
-            < dummy/dummy_data.sql
+          sshpass -e ssh -o StrictHostKeyChecking=accept-new -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
+            'bash ~/blog-server/deploy.sh --load-dummy'
           echo "더미 데이터를 넣었어요"
