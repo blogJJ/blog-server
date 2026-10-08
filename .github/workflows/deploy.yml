@@ -1,0 +1,139 @@
+# 운영 서버 배포 (서버 배포 설명서 4단계).
+# main의 CI가 통과하면 도커 이미지를 만들어 ssh로 서버에 올리고 deploy/deploy.sh로 띄운다.
+# Actions 탭 > Deploy > Run workflow로 직접 돌릴 수도 있고, 이때 "더미 데이터 넣기"를 켜면
+# 서버가 뜬 뒤 dummy/dummy_data.sql을 DB에 넣는다(여러 번 넣어도 같은 행이 두 번 생기지 않는다).
+#
+# 필요한 Repository secrets (Settings > Secrets and variables > Actions). 값은 저장소에 올리지 않는다:
+#   SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD  서버 접속. 주소는 외부(핫스팟)용 주소
+#   APP_PORT                                     내가 받은 포트번호. nginx가 이 포트로 넘겨준다
+#   DB_ADDRESS, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD  Crowfoot MySQL #2 접속 정보
+#   JWT_SECRET, HASH_SECRET                      openssl rand -base64 48 로 만든 값. 한 번 정하면 바꾸지 않는다
+#   MAIL_USERNAME, MAIL_PASSWORD                 Gmail 주소와 앱 비밀번호
+#   TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY     Cloudflare Turnstile 키
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dummy:
+        description: '더미 데이터 넣기 (회원 20명, 블로그 8개, 글·댓글)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# 배포는 한 번에 하나씩. 돌고 있는 배포는 끊지 않고 다음 배포가 기다린다
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # CI가 실패한 main은 배포하지 않는다
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SSH_ADDRESS: ${{ secrets.SSH_ADDRESS }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_ID: ${{ secrets.SSH_ID }}
+      SSHPASS: ${{ secrets.SSH_PASSWORD }}
+      APP_PORT: ${{ secrets.APP_PORT }}
+      DB_ADDRESS: ${{ secrets.DB_ADDRESS }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USERNAME: ${{ secrets.DB_USERNAME }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      HASH_SECRET: ${{ secrets.HASH_SECRET }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+    steps:
+      - name: Check secrets
+        run: |
+          missing=""
+          for name in SSH_ADDRESS SSH_PORT SSH_ID SSHPASS APP_PORT DB_ADDRESS DB_PORT DB_NAME \
+                      DB_USERNAME DB_PASSWORD JWT_SECRET HASH_SECRET MAIL_USERNAME MAIL_PASSWORD \
+                      TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY; do
+            if [ -z "${!name}" ]; then
+              missing="$missing ${name/SSHPASS/SSH_PASSWORD}"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Repository secrets가 비어 있어요:$missing"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          # CI가 통과한 바로 그 커밋을 배포한다
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # 테스트는 CI가 이미 돌렸다
+      - name: Build jar
+        run: ./gradlew bootJar
+
+      - name: Build image
+        run: |
+          tag="blog-server:${GITHUB_SHA::12}"
+          docker build -t "$tag" .
+          docker save "$tag" | gzip > "$RUNNER_TEMP/image.tar.gz"
+          ls -lh "$RUNNER_TEMP/image.tar.gz"
+
+      - name: Write env file
+        run: |
+          umask 077
+          f="$RUNNER_TEMP/app.env"
+          : > "$f"
+          put() {
+            case "$2" in *$'\n'*) echo "::error::$1 값에 줄바꿈이 있어요"; exit 1;; esac
+            printf '%s=%s\n' "$1" "$2" >> "$f"
+          }
+          put SPRING_PROFILES_ACTIVE prod
+          put DB_URL "jdbc:mysql://${DB_ADDRESS}:${DB_PORT}/${DB_NAME}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
+          put DB_USERNAME "$DB_USERNAME"
+          put DB_PASSWORD "$DB_PASSWORD"
+          put JWT_SECRET "$JWT_SECRET"
+          put HASH_SECRET "$HASH_SECRET"
+          put MAIL_USERNAME "$MAIL_USERNAME"
+          put MAIL_PASSWORD "$MAIL_PASSWORD"
+          put TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY"
+          put TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY"
+
+      - name: Upload to server
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass > /dev/null
+          opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+          sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" 'mkdir -p ~/blog-server'
+          sshpass -e scp "${opts[@]}" -P "$SSH_PORT" \
+            "$RUNNER_TEMP/image.tar.gz" "$RUNNER_TEMP/app.env" deploy/deploy.sh \
+            "$SSH_ID@$SSH_ADDRESS:blog-server/"
+
+      - name: Start on server
+        run: |
+          sshpass -e ssh -o StrictHostKeyChecking=accept-new -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
+            "bash ~/blog-server/deploy.sh '$APP_PORT'"
+
+      # 서버가 뜨면서 Flyway가 테이블을 만든 뒤에 넣는다
+      - name: Load dummy data
+        if: github.event_name == 'workflow_dispatch' && inputs.dummy
+        env:
+          MYSQL_PWD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          mysql --default-character-set=utf8mb4 -h "$DB_ADDRESS" -P "$DB_PORT" -u "$DB_USERNAME" "$DB_NAME" \
+            < dummy/dummy_data.sql
+          echo "더미 데이터를 넣었어요"
