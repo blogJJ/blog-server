@@ -40,9 +40,10 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
   Page<Blog> findListed(Pageable pageable);
 
   /**
-   * 블로그 검색 (BLG-03). 이름·소개는 FULLTEXT ngram, 태그는 정리한 값과 정확히 같은 것. 관련도 순, 같으면 최신순. 공개 블로그만.
+   * 블로그 검색 (BLG-03, BRD-08). 이름·소개는 FULLTEXT ngram, 태그는 정리한 값과 정확히 같은 것. 공개 블로그만.
    *
    * @param tag 검색어를 태그 규칙으로 정리한 값. 태그로 쓸 수 없는 검색어면 빈 문자열
+   * @param sort relevance(관련도, 같으면 최신), latest(만든 순), popular(멤버 수, D-89)
    */
   @Query(
       value =
@@ -51,7 +52,9 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
               + " and (match(b.name, b.description) against (:q in boolean mode)"
               + " or exists (select 1 from blog_tags bt join tags t on t.id = bt.tag_id"
               + " where bt.blog_id = b.id and t.name = :tag))"
-              + " order by match(b.name, b.description) against (:q in boolean mode) desc, b.id desc",
+              + " order by case when :sort = 'latest' then b.created_at end desc,"
+              + " case when :sort = 'popular' then b.member_count end desc,"
+              + " match(b.name, b.description) against (:q in boolean mode) desc, b.id desc",
       countQuery =
           "select count(*) from blogs b"
               + " where b.visibility = 'PUBLIC' and b.status <> 'CLOSED' and b.is_hidden = false"
@@ -59,7 +62,18 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
               + " or exists (select 1 from blog_tags bt join tags t on t.id = bt.tag_id"
               + " where bt.blog_id = b.id and t.name = :tag))",
       nativeQuery = true)
-  Page<Blog> search(@Param("q") String q, @Param("tag") String tag, Pageable pageable);
+  Page<Blog> search(
+      @Param("q") String q,
+      @Param("tag") String tag,
+      @Param("sort") String sort,
+      Pageable pageable);
+
+  /** 구독자 수를 DB에서 바로 바꾼다 (delta는 +1 또는 -1). 0 아래로는 내려가지 않는다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      "update Blog b set b.subscriberCount = case when b.subscriberCount + :delta < 0 then 0"
+          + " else b.subscriberCount + :delta end where b.id = :id")
+  void addSubscriberCount(@Param("id") Long id, @Param("delta") int delta);
 
   /** 멤버 수를 DB에서 바로 늘린다. 동시에 여러 명이 들어와도 빠지지 않는다. */
   @Modifying(flushAutomatically = true)

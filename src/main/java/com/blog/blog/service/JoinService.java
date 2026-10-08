@@ -18,6 +18,7 @@ import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
 import com.blog.common.security.AccountGuard;
 import com.blog.common.security.AccountGuard.Activity;
+import com.blog.social.repository.UserBlockRepository;
 import com.blog.social.domain.NotificationTargetType;
 import com.blog.social.domain.NotificationType;
 import com.blog.social.service.NotificationService;
@@ -63,6 +64,7 @@ public class JoinService {
   private final AccountGuard accountGuard;
   private final NotificationService notificationService;
   private final BlacklistService blacklistService;
+  private final UserBlockRepository blockRepository;
   private final Clock clock;
 
   public JoinService(
@@ -75,6 +77,7 @@ public class JoinService {
       AccountGuard accountGuard,
       NotificationService notificationService,
       BlacklistService blacklistService,
+      UserBlockRepository blockRepository,
       Clock clock) {
     this.blogRepository = blogRepository;
     this.memberRepository = memberRepository;
@@ -85,6 +88,7 @@ public class JoinService {
     this.accountGuard = accountGuard;
     this.notificationService = notificationService;
     this.blacklistService = blacklistService;
+    this.blockRepository = blockRepository;
     this.clock = clock;
   }
 
@@ -102,6 +106,10 @@ public class JoinService {
     }
     if (blacklistService.isBlacklisted(blogId, userId)) {
       throw new BusinessException(ErrorCode.BLACKLISTED);
+    }
+    if (blockRepository.existsByBlockerIdAndBlockedId(blog.getOwner().getId(), userId)) {
+      // 블로그장이 차단한 회원의 신청은 자동 거절 (SOC-05, D-36)
+      throw new BusinessException(ErrorCode.FORBIDDEN, "이 블로그에는 참여 신청을 할 수 없어요. 신청이 자동으로 거절되었어요.");
     }
     LocalDateTime now = now();
     List<BlogMember> managers = memberRepository.findManagers(blogId);

@@ -25,4 +25,13 @@ public interface BlogJoinRequestRepository extends JpaRepository<BlogJoinRequest
       "select r from BlogJoinRequest r join fetch r.blog"
           + " where r.user.id = :userId and r.status = 'PENDING' order by r.id desc")
   List<BlogJoinRequest> findPendingWithBlogByUserId(@Param("userId") Long userId);
+
+  /** userId가 ownerId의 블로그들에 낸 대기 중 신청. 블로그장이 그 회원을 차단하면 거절한다 (SOC-05). */
+  @Query(
+      "select r from BlogJoinRequest r where r.user.id = :userId and r.blog.owner.id = :ownerId"
+          + " and r.status = :status")
+  List<BlogJoinRequest> findPendingToOwnerBlogs(
+      @Param("userId") Long userId,
+      @Param("ownerId") Long ownerId,
+      @Param("status") JoinRequestStatus status);
 }

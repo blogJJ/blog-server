@@ -8,6 +8,7 @@ import com.blog.social.domain.NotificationTargetType;
 import com.blog.social.domain.NotificationType;
 import com.blog.social.repository.NotificationRepository;
 import com.blog.social.repository.NotificationSettingRepository;
+import com.blog.social.repository.UserBlockRepository;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>끌 수 있는 종류를 회원이 껐으면 만들지 않는다. 이미 받은 알림은 그대로 둔다.
  *   <li>끌 수 없는 종류(위임 요청, 폐쇄 예정, 내 글 삭제됨, 제재 등)는 설정과 상관없이 항상 만든다.
  *   <li>자기 행동으로 자기에게 가는 알림(내 글에 내가 댓글)은 만들지 않는다.
+ *   <li>끌 수 있는 종류는 받는 회원이 차단한 회원이 일으켰으면 만들지 않는다 (SOC-05).
  *   <li>부른 쪽의 트랜잭션 안에서 저장되므로, 댓글 저장이 실패하면 알림도 남지 않는다.
  * </ul>
  */
@@ -35,14 +37,17 @@ public class NotificationService {
   private final NotificationRepository notificationRepository;
   private final NotificationSettingRepository settingRepository;
   private final UserRepository userRepository;
+  private final UserBlockRepository blockRepository;
 
   public NotificationService(
       NotificationRepository notificationRepository,
       NotificationSettingRepository settingRepository,
-      UserRepository userRepository) {
+      UserRepository userRepository,
+      UserBlockRepository blockRepository) {
     this.notificationRepository = notificationRepository;
     this.settingRepository = settingRepository;
     this.userRepository = userRepository;
+    this.blockRepository = blockRepository;
   }
 
   /**
@@ -93,6 +98,9 @@ public class NotificationService {
     }
     if (type.isOptional()) {
       receivers.removeAll(new HashSet<>(settingRepository.findDisabledUserIds(type, receivers)));
+      if (actorId != null && !receivers.isEmpty()) {
+        receivers.removeAll(new HashSet<>(blockRepository.findBlockersOf(actorId, receivers)));
+      }
     }
     User actor = actorId == null ? null : userRepository.getReferenceById(actorId);
     List<Notification> notifications = new ArrayList<>(receivers.size());

@@ -14,6 +14,7 @@ import com.blog.blog.domain.ManagerPermission;
 import com.blog.blog.repository.BlogJoinRequestRepository;
 import com.blog.blog.repository.BlogMemberRepository;
 import com.blog.blog.repository.BlogRepository;
+import com.blog.blog.repository.BlogSubscriptionRepository;
 import com.blog.blog.repository.BlogTagRepository;
 import com.blog.board.service.ImageService;
 import com.blog.board.service.TagNormalizer;
@@ -87,6 +88,7 @@ public class BlogQueryService {
    * @param role 멤버가 아니면 null
    * @param joinRequestId 대기 중인 신청 번호 (취소 버튼용)
    * @param reapplyAt 거절되어 다시 신청할 수 있는 시각. 지났거나 없으면 null
+   * @param subscribed 이 블로그를 구독 중인지 (SOC-01). 일부 공개는 이 화면을 볼 수 있는 회원(링크로 온 회원·멤버)만 구독할 수 있다
    */
   public record Viewer(
       boolean loggedIn,
@@ -97,7 +99,8 @@ public class BlogQueryService {
       boolean canEditInfo,
       boolean canManageMembers,
       boolean canManagePosts,
-      boolean owner) {}
+      boolean owner,
+      boolean subscribed) {}
 
   /** 내 블로그 목록 (BLG-06) */
   public record MyBlogs(
@@ -112,6 +115,7 @@ public class BlogQueryService {
   private final BlogTagRepository blogTagRepository;
   private final BlogMemberRepository memberRepository;
   private final BlogJoinRequestRepository requestRepository;
+  private final BlogSubscriptionRepository subscriptionRepository;
   private final BlogAccessService accessService;
   private final BlogAuthz blogAuthz;
   private final Clock clock;
@@ -121,6 +125,7 @@ public class BlogQueryService {
       BlogTagRepository blogTagRepository,
       BlogMemberRepository memberRepository,
       BlogJoinRequestRepository requestRepository,
+      BlogSubscriptionRepository subscriptionRepository,
       BlogAccessService accessService,
       BlogAuthz blogAuthz,
       Clock clock) {
@@ -128,6 +133,7 @@ public class BlogQueryService {
     this.blogTagRepository = blogTagRepository;
     this.memberRepository = memberRepository;
     this.requestRepository = requestRepository;
+    this.subscriptionRepository = subscriptionRepository;
     this.accessService = accessService;
     this.blogAuthz = blogAuthz;
     this.clock = clock;
@@ -145,16 +151,17 @@ public class BlogQueryService {
         this::summaries);
   }
 
-  /** 검색 (T049). 이름·소개는 단어마다 모두 들어 있는 블로그, 태그는 정리한 값과 같은 블로그. */
+  /** 검색 (T049). 이름·소개는 단어마다 모두 들어 있는 블로그, 태그는 정리한 값과 같은 블로그. 관련도 순. */
   @Transactional(readOnly = true)
   public PageResponse<BlogSummary> search(String rawQuery, int page) {
-    String q = rawQuery == null ? "" : rawQuery.strip();
+    return search(rawQuery, "relevance", page);
+  }
+
+  /** 통합 검색의 블로그 분류 (T107, BRD-08). sort는 relevance(기본)·latest·popular. */
+  @Transactional(readOnly = true)
+  public PageResponse<BlogSummary> search(String rawQuery, String sort, int page) {
+    String q = validateQuery(rawQuery);
     String fulltext = toBooleanQuery(q);
-    if (q.length() < QUERY_MIN
-        || q.length() > QUERY_MAX
-        || q.replaceAll("[\\p{L}\\p{N}]", "").length() == q.length()) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "검색어는 2~20자로, 글자나 숫자를 넣어 입력해 주세요.");
-    }
     String tag;
     try {
       tag = TagNormalizer.normalize(q);
@@ -163,9 +170,53 @@ public class BlogQueryService {
     }
     return PageResponse.of(
         blogRepository.search(
-            fulltext, tag == null ? "" : tag, PageRequest.of(pageIndex(page), PAGE_SIZE)),
+            fulltext,
+            tag == null ? "" : tag,
+            normalizeSort(sort),
+            PageRequest.of(pageIndex(page), PAGE_SIZE)),
         this::summaries);
   }
+
+  /** 검색어 규칙 (BRD-08): 앞뒤 공백을 뗀 2~20자, 글자나 숫자가 하나는 있어야 한다. 정리한 검색어를 돌려준다. */
+  public static String validateQuery(String rawQuery) {
+    String q = rawQuery == null ? "" : rawQuery.strip();
+    if (q.length() < QUERY_MIN
+        || q.length() > QUERY_MAX
+        || q.replaceAll("[\\p{L}\\p{N}]", "").length() == q.length()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "검색어는 2~20자로, 글자나 숫자를 넣어 입력해 주세요.");
+    }
+    return q;
+  }
+
+  /** relevance·latest·popular 밖의 값은 relevance */
+  public static String normalizeSort(String sort) {
+    return "latest".equals(sort) || "popular".equals(sort) ? sort : "relevance";
+  }
+
+  /** 프로필에 보여 줄 블로그 (T103, SOC-03). 메인 목록에 나오는 공개 블로그만. 비공개·일부 공개는 참여 사실도 숨긴다. */
+  @Transactional(readOnly = true)
+  public ProfileBlogs profileBlogs(Long userId) {
+    List<BlogMember> memberships =
+        memberRepository.findWithBlogByUserId(userId).stream()
+            .filter(
+                m ->
+                    m.getBlog().isOpen()
+                        && !m.getBlog().isHidden()
+                        && m.getBlog().getVisibility() == BlogVisibility.PUBLIC)
+            .toList();
+    Map<Long, BlogSummary> byId = new LinkedHashMap<>();
+    for (BlogSummary s : summaries(memberships.stream().map(BlogMember::getBlog).toList())) {
+      byId.put(s.id(), s);
+    }
+    List<BlogSummary> owned = new ArrayList<>();
+    List<BlogSummary> joined = new ArrayList<>();
+    for (BlogMember m : memberships) {
+      (m.isOwner() ? owned : joined).add(byId.get(m.getBlog().getId()));
+    }
+    return new ProfileBlogs(owned, joined);
+  }
+
+  public record ProfileBlogs(List<BlogSummary> owned, List<BlogSummary> joined) {}
 
   /** 블로그 첫 화면 (T055). 볼 수 없으면 BlogAccessService가 막는다. */
   @Transactional(readOnly = true)
@@ -210,7 +261,9 @@ public class BlogQueryService {
             canEdit,
             canManage,
             canManagePosts,
-            member != null && blogAuthz.isOwner(blog.getId()));
+            member != null && blogAuthz.isOwner(blog.getId()),
+            viewerId != null
+                && subscriptionRepository.existsByBlogIdAndUserId(blog.getId(), viewerId));
 
     User owner = blog.getOwner();
     return new BlogDetail(
