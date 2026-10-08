@@ -8,6 +8,9 @@ app:
   # http://localhost에서는 Secure 쿠키가 저장되지 않으므로 끈다
   cookie:
     secure: false
+  # Gmail 설정 없이 가입을 시험할 수 있게 메일은 콘솔에만 찍는다. 진짜로 보내려면 MAIL_LOG_ONLY=false와 MAIL_USERNAME·MAIL_PASSWORD
+  mail:
+    log-only: ${MAIL_LOG_ONLY:true}
 
 # Swagger: http://localhost:8080/swagger-ui.html (T145, OPS-12)
 springdoc:

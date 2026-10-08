@@ -19,6 +19,10 @@ public enum ErrorCode {
   CONFLICT(HttpStatus.CONFLICT, "이미 처리되었거나 다른 요청과 겹쳤어요."),
   PAYLOAD_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "파일이 너무 커요."),
   TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많아요. 잠시 뒤 다시 시도해 주세요."),
+  /** 요청 처리가 5초를 넘음 (T009, D-48). */
+  REQUEST_TIMEOUT(HttpStatus.SERVICE_UNAVAILABLE, "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요."),
+  /** 메일 발송 실패. 가입된 이메일인지와 상관없이 같은 문구 (T023, OPS-07, D-107). */
+  MAIL_SEND_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "메일을 보내지 못했어요. 잠시 뒤 다시 시도해 주세요."),
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 생겼어요. 잠시 뒤 다시 시도해 주세요.");
 
   private final HttpStatus status;

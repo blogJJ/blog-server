@@ -5,6 +5,9 @@ app:
   security:
     # http 요청은 https로 돌려보낸다. 상태 확인 주소만 예외 (SEC-10)
     require-https: true
+  # 운영에서는 메일을 꼭 보낸다. 환경변수로도 바꿀 수 없게 고정한다
+  mail:
+    log-only: false
 
 server:
   # 로드밸런서·프록시가 붙인 X-Forwarded-For, X-Forwarded-Proto를 읽는다 (SCL-01).

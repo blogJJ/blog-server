@@ -103,6 +103,14 @@ blog:
     private: 5
 
 app:
+  # 요청 처리 제한 시간. 넘으면 쿼리를 끊고 "다시 시도" 응답 (T009, D-48)
+  request-timeout: 5s
+  # IP별 API 요청 제한. 학교·회사처럼 여러 명이 한 IP를 쓰는 경우를 생각해 넉넉히 둔다 (T022, SEC-03)
+  rate-limit:
+    api-per-minute: ${RATE_LIMIT_API_PER_MINUTE:600}
+  # true면 메일을 보내지 않고 콘솔에 찍는다. local 전용, 운영은 false (T023)
+  mail:
+    log-only: false
   # 로그인 쿠키에 Secure를 붙인다. http://localhost에서 쓰는 local만 끈다 (SEC-04, OPS-11)
   cookie:
     secure: true
