@@ -2,7 +2,7 @@
 
 티스토리형 블로그 플랫폼(메인블로그)의 서버입니다. Spring Boot 하나가 API와 정적 화면을 함께 내려주고, MySQL 8 한 곳에 모든 데이터를 둡니다.
 
-요구사항·설계·작업 목록은 [blog-docs](https://github.com/blogJJ/blog-docs) 저장소에 있습니다. 구현은 [tasks.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/tasks.md)의 작업 번호(T001~T141) 순서대로 진행합니다.
+요구사항·설계·작업 목록은 [blog-docs](https://github.com/blogJJ/blog-docs) 저장소에 있습니다. 구현은 [tasks.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/tasks.md)의 작업 번호(T001~T147) 순서대로 진행합니다.
 
 ## 필요한 것
 
@@ -32,6 +32,23 @@ cp .env.example .env
 서버를 처음 켜면 Flyway가 `db/migration`의 SQL을 차례로 실행해 테이블 33개와 인덱스를 만듭니다(로그에 `Successfully applied 2 migrations`). 다음부터는 새 파일만 실행합니다. 서버 로그에 `Started BlogServerApplication`이 보이면 성공입니다. 아직 API가 없어서 http://localhost:8080/api/... 주소는 `{"code":"NOT_FOUND", ...}`가 나오는 것이 정상입니다.
 
 Windows에서는 `./gradlew` 대신 `gradlew.bat`을 씁니다.
+
+## 실행 환경 (local, prod)
+
+| 프로필 | 언제 | 다른 점 |
+| --- | --- | --- |
+| local | 개발자 컴퓨터. `./gradlew bootRun`이 자동으로 고름 | Swagger 열림, 쿠키 Secure 꺼짐(http://localhost용), SQL 로그 |
+| prod | 운영 서버. 서버 환경변수 `SPRING_PROFILES_ACTIVE=prod` | 비밀값(JWT_SECRET, DB_PASSWORD, MAIL_PASSWORD, TURNSTILE_SECRET_KEY)이 비었거나 예시 값이면 서버가 뜨지 않음, http → https로 돌려보냄, 로그 파일 |
+| (없음) | 프로필을 빠뜨렸을 때 | `application.yml`의 운영 기준 값: Swagger 닫힘, 쿠키 Secure |
+
+IntelliJ에서 `BlogServerApplication`을 바로 실행할 때는 Run Configuration의 Active profiles에 `local`을 적습니다.
+
+| 주소 | 설명 |
+| --- | --- |
+| http://localhost:8080/swagger-ui.html | API 문서(Swagger). local에서만 열림 |
+| http://localhost:8080/actuator/health | 서버 상태. `{"status":"UP"}`이면 정상(DB 연결 포함) |
+
+로그는 모든 줄에 8자리 요청 ID가 붙고, 응답 헤더 `X-Request-Id`와 500 오류의 `errorId`가 같은 값입니다. local은 콘솔에만, 그 밖에는 `LOG_PATH`(기본 `./logs`)에 날짜별 파일로 남기고 30일 뒤 지웁니다.
 
 ## 자주 쓰는 명령
 
@@ -65,6 +82,7 @@ src/main/resources/
 
 - 비밀값은 `.env`나 서버 환경변수에만 둡니다. `.env`는 `.gitignore`에 들어 있어 올라가지 않습니다.
 - DB 구조는 Flyway SQL로만 바꿉니다. 테이블·컬럼을 바꾸려면 먼저 blog-docs의 `erd_tables.sql`을 고친 뒤, 이미 올라간 V 파일은 고치지 말고 다음 번호(`V3__설명.sql`)로 새 파일을 더합니다. 이미 실행된 파일을 고치면 Flyway가 체크섬이 다르다며 서버를 띄우지 않습니다.
-- PR을 올리면 GitHub Actions(`.github/workflows/ci.yml`)가 `./gradlew build`를 돌립니다. 빨간 X가 뜨면 합치기 전에 고칩니다.
+- PR을 올리면 GitHub Actions(`.github/workflows/ci.yml`)가 `./gradlew build`를 돌리고, 이미 merge된 Flyway 파일을 고쳤는지 검사합니다(`migrations`). 빨간 X가 뜨면 합치기 전에 고칩니다.
+- Dependabot이 매주 월요일 라이브러리 업데이트 PR을 엽니다. CI가 통과하면 확인하고 merge합니다(자동 merge 없음).
 - 시간대는 Asia/Seoul입니다. 서버 시작 때와 DB 연결, JSON에 모두 지정되어 있습니다.
 - 원칙은 blog-docs의 [constitution.md](https://github.com/blogJJ/blog-docs/blob/main/.specify/memory/constitution.md)를 따릅니다(보안 먼저, 블로그별 역할은 요청마다 DB로 확인 등).

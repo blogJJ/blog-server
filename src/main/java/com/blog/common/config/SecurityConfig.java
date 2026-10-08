@@ -4,6 +4,7 @@ import com.blog.auth.repository.UserRepository;
 import com.blog.common.security.JsonSecurityErrorHandler;
 import com.blog.common.security.JwtCookieAuthFilter;
 import com.blog.common.security.JwtProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -16,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -28,6 +31,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>주소 권한: 비회원·회원·관리자만 여기서 나눈다. 블로그별 역할은 {@code @PreAuthorize("@blogAuthz...")}로 메서드에서 확인한다
  *       (SEC-11, T017).
  *   <li>보안 헤더: X-Frame-Options DENY, nosniff, CSP, HSTS(HTTPS일 때), Referrer-Policy (SEC-12).
+ *   <li>HTTPS: {@code app.security.require-https=true}(prod)면 http 요청을 https로 돌려보낸다. 로드밸런서가 http로
+ *       묻는 상태 확인 주소만 예외 (SEC-10, OPS-11).
  * </ul>
  */
 @Configuration
@@ -49,14 +54,27 @@ public class SecurityConfig {
           + "form-action 'self'; "
           + "frame-ancestors 'none'";
 
+  static final String HEALTH_PATH = "/actuator/health";
+
   @Bean
   public SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       JwtProvider jwtProvider,
       UserRepository userRepository,
-      JsonMapper jsonMapper)
+      JsonMapper jsonMapper,
+      @Value("${app.security.require-https:false}") boolean requireHttps)
       throws Exception {
     JsonSecurityErrorHandler errorHandler = new JsonSecurityErrorHandler(jsonMapper);
+
+    if (requireHttps) {
+      // 서버는 8080으로 받고 사용자에게는 443(https 기본 포트)으로 보낸다. 기본 매핑은 8080 → 8443이라 바꾼다
+      http.portMapper(ports -> ports.http(8080).mapsTo(443));
+      http.redirectToHttps(
+          https ->
+              https.requestMatchers(
+                  new NegatedRequestMatcher(
+                      PathPatternRequestMatcher.withDefaults().matcher(HEALTH_PATH))));
+    }
 
     http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .csrf(csrf -> csrf.spa())
@@ -78,6 +96,11 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth
+                    // 서버 상태 확인은 누구나, 다른 Actuator 주소는 막는다 (OPS-04, T138)
+                    .requestMatchers(HttpMethod.GET, HEALTH_PATH)
+                    .permitAll()
+                    .requestMatchers("/actuator/**")
+                    .denyAll()
                     // 가입·로그인·토큰 재발급은 비회원도 (USR-01~03)
                     .requestMatchers("/api/auth/**")
                     .permitAll()

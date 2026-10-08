@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  로그 설정 (T137, OPS-03, D-103)
+  - 모든 줄에 요청 ID(RequestIdFilter). 500 오류 응답의 오류 번호와 같아서 사용자가 알려 준 번호로 찾는다
+  - local·test가 아니면 logging.file.path(기본 ./logs)에 날짜별 파일로 남기고 30일 뒤 지운다
+  - 비밀번호·JWT·Refresh Token·인증번호·쿠키·CSRF 토큰은 로그에 넣지 않는다. 이메일·전화번호는 Masking(T019)으로 가린다
+-->
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <springProperty name="LOG_PATH" source="logging.file.path" defaultValue="./logs"/>
+  <property name="LOG_PATTERN"
+            value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:--------}] %logger{36} - %msg%n"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${LOG_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <springProfile name="local | test">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+
+  <springProfile name="!local &amp; !test">
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_PATH}/blog-server.log</file>
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <!-- 하루에 한 파일, 한 파일이 100MB를 넘으면 나눔 -->
+        <fileNamePattern>${LOG_PATH}/blog-server.%d{yyyy-MM-dd, Asia/Seoul}.%i.log.gz</fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        <!-- 30일 지난 파일 삭제. 디스크가 차지 않게 전체 3GB를 넘으면 오래된 것부터 지움 -->
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>3GB</totalSizeCap>
+      </rollingPolicy>
+      <encoder>
+        <pattern>${LOG_PATTERN}</pattern>
+        <charset>UTF-8</charset>
+      </encoder>
+    </appender>
+
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
+    </root>
+  </springProfile>
+</configuration>

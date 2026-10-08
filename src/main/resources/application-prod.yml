@@ -1,0 +1,12 @@
+# 운영 서버용 (T144, OPS-11, D-111). SPRING_PROFILES_ACTIVE=prod로 띄운다.
+# 비밀값이 비었거나 .env.example의 예시 값이면 ProdSecretsCheck가 서버를 멈춘다.
+
+app:
+  security:
+    # http 요청은 https로 돌려보낸다. 상태 확인 주소만 예외 (SEC-10)
+    require-https: true
+
+server:
+  # 로드밸런서·프록시가 붙인 X-Forwarded-For, X-Forwarded-Proto를 읽는다 (SCL-01).
+  # native는 사설 IP에서 온 헤더만 믿는다
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
