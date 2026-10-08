@@ -9,6 +9,7 @@ import com.blog.board.domain.Category;
 import com.blog.board.domain.Post;
 import com.blog.board.repository.CategoryRepository;
 import com.blog.board.repository.PostImageRepository;
+import com.blog.board.repository.PostLikeRepository;
 import com.blog.board.repository.PostRepository;
 import com.blog.board.repository.PostTagRepository;
 import com.blog.common.error.BusinessException;
@@ -60,6 +61,7 @@ public class PostQueryService {
    *
    * @param html 걸러낸 본문 HTML. 화면은 이것만 innerHTML로 넣는다
    * @param markdown 고칠 때 쓰는 원문. 작성자에게만 준다
+   * @param liked 보는 회원이 좋아요를 눌렀는지
    */
   public record PostDetail(
       Long id,
@@ -78,7 +80,8 @@ public class PostQueryService {
       LocalDateTime updatedAt,
       BlogRef blog,
       boolean canEdit,
-      boolean canDelete) {}
+      boolean canDelete,
+      boolean liked) {}
 
   public record BlogRef(Long id, String slug, String name, String coverImage) {}
 
@@ -88,6 +91,7 @@ public class PostQueryService {
   private final PostTagRepository postTagRepository;
   private final PostImageRepository imageRepository;
   private final CategoryRepository categoryRepository;
+  private final PostLikeRepository likeRepository;
   private final BlogAccessService accessService;
   private final BlogAuthz blogAuthz;
   private final ContentRenderer renderer;
@@ -97,6 +101,7 @@ public class PostQueryService {
       PostTagRepository postTagRepository,
       PostImageRepository imageRepository,
       CategoryRepository categoryRepository,
+      PostLikeRepository likeRepository,
       BlogAccessService accessService,
       BlogAuthz blogAuthz,
       ContentRenderer renderer) {
@@ -104,6 +109,7 @@ public class PostQueryService {
     this.postTagRepository = postTagRepository;
     this.imageRepository = imageRepository;
     this.categoryRepository = categoryRepository;
+    this.likeRepository = likeRepository;
     this.accessService = accessService;
     this.blogAuthz = blogAuthz;
     this.renderer = renderer;
@@ -169,7 +175,8 @@ public class PostQueryService {
         new BlogRef(
             blog.getId(), blog.getSlug(), blog.getName(), ImageService.url(blog.getCoverImage())),
         canEdit,
-        canDelete);
+        canDelete,
+        viewerId != null && likeRepository.existsByPostIdAndUserId(post.getId(), viewerId));
   }
 
   /** 공유 미리보기(og 태그)용 값. 비회원이 볼 수 없는 글이면 null. */

@@ -1,5 +1,6 @@
 /*
- * 블로그 관리 화면 (T056): 참여 신청 탭(멤버 관리 권한), 정보 수정 탭(정보 수정 권한, T053), 공유 링크 새로 만들기(T046).
+ * 블로그 관리 화면 (T056): 참여 신청 탭(멤버 관리 권한), 정보 수정 탭(정보 수정 권한, T053), 공유 링크 새로 만들기(T046),
+ * 카테고리 탭(정보 수정 권한, T066).
  * 탭은 권한이 있는 것만 보인다. 권한은 서버가 요청마다 다시 확인한다.
  */
 (function () {
@@ -25,12 +26,119 @@
   }
 
   function showTab(name) {
-    ['requests', 'info'].forEach(function (t) {
+    ['requests', 'info', 'categories'].forEach(function (t) {
       $('panel-' + t).hidden = t !== name;
       $('tab-' + t).classList.toggle('is-current', t === name);
     });
     if (name === 'requests') {
       loadRequests();
+    }
+    if (name === 'categories') {
+      loadCategories();
+    }
+  }
+
+  var categories = [];
+
+  async function loadCategories() {
+    try {
+      categories = await Api.get('/api/blogs/' + blog.id + '/categories');
+      renderCategories();
+    } catch (e) {
+      Api.showError(e);
+    }
+  }
+
+  function renderCategories() {
+    var list = $('categories');
+    list.replaceChildren.apply(list, categories.map(categoryRow));
+    $('categories-empty').hidden = categories.length > 0;
+  }
+
+  function smallButton(label, onClick, disabled) {
+    var b = el('button', 'button', label);
+    b.type = 'button';
+    b.disabled = !!disabled;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function categoryRow(c, index) {
+    var li = el('li', 'category-list__item');
+    var input = el('input');
+    input.type = 'text';
+    input.maxLength = 20;
+    input.value = c.name;
+    input.setAttribute('aria-label', '카테고리 이름');
+    li.appendChild(input);
+    li.appendChild(smallButton('↑', function () {
+      move(index, -1);
+    }, index === 0));
+    li.appendChild(smallButton('↓', function () {
+      move(index, 1);
+    }, index === categories.length - 1));
+    li.appendChild(smallButton('이름 저장', function () {
+      renameCategory(c, input.value);
+    }));
+    var del = smallButton('삭제', function () {
+      deleteCategory(c);
+    });
+    del.classList.add('button--danger');
+    li.appendChild(del);
+    return li;
+  }
+
+  async function addCategory(event) {
+    event.preventDefault();
+    var name = $('category-name').value.trim();
+    if (!name) {
+      Api.toast('카테고리 이름을 입력해 주세요.');
+      return;
+    }
+    try {
+      await Api.post('/api/blogs/' + blog.id + '/categories', { name: name });
+      $('category-name').value = '';
+      loadCategories();
+    } catch (e) {
+      Api.showError(e);
+    }
+  }
+
+  async function renameCategory(c, name) {
+    try {
+      await Api.put('/api/blogs/' + blog.id + '/categories/' + c.id, { name: name });
+      Api.toast('이름을 바꿨어요.');
+      loadCategories();
+    } catch (e) {
+      Api.showError(e);
+    }
+  }
+
+  async function move(index, delta) {
+    var ids = categories.map(function (c) {
+      return c.id;
+    });
+    var other = index + delta;
+    var tmp = ids[index];
+    ids[index] = ids[other];
+    ids[other] = tmp;
+    try {
+      await Api.put('/api/blogs/' + blog.id + '/categories', { ids: ids });
+    } catch (e) {
+      Api.showError(e);
+    }
+    loadCategories();
+  }
+
+  async function deleteCategory(c) {
+    if (!window.confirm("'" + c.name + "' 카테고리를 지울까요? 안에 있던 글은 \"카테고리 없음\"이 돼요.")) {
+      return;
+    }
+    try {
+      await Api.delete('/api/blogs/' + blog.id + '/categories/' + c.id);
+      loadCategories();
+    } catch (e) {
+      Api.showError(e);
     }
   }
 
@@ -188,6 +296,7 @@
     $('blog-link').href = ui.blogUrl(blog.slug);
     $('tab-requests').hidden = !v.canManageMembers;
     $('tab-info').hidden = !v.canEditInfo;
+    $('tab-categories').hidden = !v.canEditInfo;
     if (v.canEditInfo) {
       $('slug').textContent = '/blog/' + blog.slug;
       BlogForm.render($('common-fields'), blog);
@@ -207,6 +316,7 @@
     $('regenerate').addEventListener('click', regenerate);
     $('cover-file').addEventListener('change', uploadCover);
     $('cover-delete').addEventListener('click', deleteCover);
+    $('category-form').addEventListener('submit', addCategory);
   });
 
   Layout.onUser(function (current) {
