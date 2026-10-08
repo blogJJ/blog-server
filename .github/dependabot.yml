@@ -1,0 +1,26 @@
+# 라이브러리 업데이트 확인 (T142, OPS-10, D-110)
+# 매주 월요일 Gradle 라이브러리와 GitHub Actions의 새 버전을 확인해 PR을 연다.
+# 업데이트 PR도 CI를 통과해야 merge하고, 자동 merge는 켜지 않는다.
+# 보안 취약점 알림과 보안 업데이트 PR은 저장소 관리자가 GitHub 설정 > Code security에서
+# Dependabot alerts, Dependabot security updates를 켠다.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    labels: [dependencies]

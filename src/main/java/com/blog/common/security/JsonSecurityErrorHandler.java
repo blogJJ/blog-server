@@ -2,6 +2,7 @@ package com.blog.common.security;
 
 import com.blog.common.error.ErrorCode;
 import com.blog.common.error.ErrorResponse;
+import com.blog.common.logging.SecurityEventLogger;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -37,6 +38,7 @@ public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, Acces
       HttpServletResponse response,
       AccessDeniedException accessDeniedException)
       throws IOException {
+    SecurityEventLogger.accessDenied(request);
     write(response, ErrorCode.FORBIDDEN);
   }
 

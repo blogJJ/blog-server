@@ -25,6 +25,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    // 상태 확인 주소 /actuator/health만 연다 (T138, OPS-04)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'org.flywaydb:flyway-mysql'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
@@ -42,6 +44,9 @@ dependencies {
 
     // 이미지 EXIF 확인·제거 (BRD-05)
     implementation 'com.drewnoakes:metadata-extractor:2.21.0'
+
+    // API 문서(Swagger). local 프로필에서만 연다 (T145, OPS-12)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 
     // 04:00 배치를 서버 한 대에서만 실행 (SCL-03)
     implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
@@ -66,6 +71,11 @@ spotless {
         trimTrailingWhitespace()
         endWithNewline()
     }
+}
+
+// ./gradlew bootRun은 local 프로필로 뜬다. 다른 프로필은 SPRING_PROFILES_ACTIVE로 (T144, OPS-11)
+tasks.named('bootRun') {
+    systemProperty 'spring.profiles.active', System.getenv('SPRING_PROFILES_ACTIVE') ?: 'local'
 }
 
 tasks.named('test') {

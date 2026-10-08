@@ -1,6 +1,6 @@
 # PR과 main 푸시마다 ./gradlew build(코드 모양 검사, 컴파일, 테스트)를 돌린다 (T135, OPS-05, D-105)
 # 이 검사를 merge 필수로 하려면 저장소 관리자가 GitHub 설정 > Branches > main 보호 규칙에서
-# "Require status checks to pass"를 켜고 build를 고른다.
+# "Require status checks to pass"를 켜고 build와 migrations를 고른다.
 name: CI
 
 on:
@@ -32,3 +32,16 @@ jobs:
 
       - name: Build
         run: ./gradlew build
+
+  # 이미 merge된 Flyway 파일을 고치지 않았는지, 파일 이름과 번호가 맞는지 (T143, OPS-08, D-108)
+  migrations:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check Flyway migrations
+        run: .github/scripts/check-migrations.sh "origin/${{ github.base_ref }}"

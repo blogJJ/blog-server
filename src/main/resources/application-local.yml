@@ -1,0 +1,19 @@
+# 개발자 컴퓨터용 (T144, OPS-11, D-111). ./gradlew bootRun이 이 프로필로 띄운다.
+# 운영 기준인 application.yml에서 개발에 필요한 것만 푼다.
+
+app:
+  # http://localhost에서는 Secure 쿠키가 저장되지 않으므로 끈다
+  cookie:
+    secure: false
+
+# Swagger: http://localhost:8080/swagger-ui.html (T145, OPS-12)
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+logging:
+  level:
+    # 실행되는 SQL을 콘솔에서 본다
+    org.hibernate.SQL: debug

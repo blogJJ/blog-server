@@ -1,5 +1,8 @@
 package com.blog.common.error;
 
+import com.blog.common.logging.RequestIdFilter;
+import com.blog.common.logging.SecurityEventLogger;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -31,7 +34,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
   /** 요청 ID 필터(T137)가 MDC에 넣는 키. 없으면 오류 번호를 새로 만든다. */
-  static final String REQUEST_ID_KEY = "requestId";
+  static final String REQUEST_ID_KEY = RequestIdFilter.MDC_KEY;
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -90,7 +93,9 @@ public class GlobalExceptionHandler {
    * @PreAuthorize 거부. 컨트롤러 안에서 난 것은 Security 필터까지 가지 않으므로 여기서 받는다.
    */
   @ExceptionHandler(AccessDeniedException.class)
-  public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+  public ResponseEntity<ErrorResponse> handleAccessDenied(
+      AccessDeniedException e, HttpServletRequest request) {
+    SecurityEventLogger.accessDenied(request);
     return respond(ErrorCode.FORBIDDEN);
   }
 
