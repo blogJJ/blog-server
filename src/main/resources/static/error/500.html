@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>일시적인 오류가 생겼어요</title>
+    <link rel="stylesheet" href="/css/common.css" />
+  </head>
+  <body>
+    <!-- 오류 안내 화면 (T136, OPS-02, D-102). 내부 정보는 넣지 않는다 -->
+    <main class="error-page">
+      <p class="error-page__code">500</p>
+      <h1 class="error-page__title">일시적인 오류가 생겼어요</h1>
+      <p class="error-page__desc">잠시 뒤 다시 시도해 주세요. 계속되면 아래 오류 번호와 함께 알려 주세요.</p>
+      <p class="error-page__id">오류 번호: <span data-error-id>-</span></p>
+      <a class="button button--primary" href="/">메인으로 가기</a>
+    </main>
+  </body>
+</html>

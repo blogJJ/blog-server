@@ -35,7 +35,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void businessExceptionBecomesCodeAndMessage() throws Exception {
     mockMvc
-        .perform(get("/test/business"))
+        .perform(get("/api/test/business"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"))
         .andExpect(jsonPath("$.message").value("블로그를 찾을 수 없어요."))
@@ -46,7 +46,9 @@ class GlobalExceptionHandlerTest {
   void validationFailureReturnsFieldMessage() throws Exception {
     mockMvc
         .perform(
-            post("/test/valid").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
+            post("/api/test/valid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
         .andExpect(jsonPath("$.message").value("이름을 입력해 주세요."));
@@ -55,7 +57,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void malformedJsonIsBadRequestWithoutParserDetails() throws Exception {
     mockMvc
-        .perform(post("/test/valid").contentType(MediaType.APPLICATION_JSON).content("{oops"))
+        .perform(post("/api/test/valid").contentType(MediaType.APPLICATION_JSON).content("{oops"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
         .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_INPUT.getDefaultMessage()));
@@ -64,7 +66,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void unexpectedErrorHidesInternalsAndGivesErrorId() throws Exception {
     mockMvc
-        .perform(get("/test/boom"))
+        .perform(get("/api/test/boom"))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
         .andExpect(jsonPath("$.errorId").isNotEmpty())
@@ -74,7 +76,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void timeoutAsksToRetry() throws Exception {
-    for (String path : new String[] {"/test/query-timeout", "/test/async-timeout"}) {
+    for (String path : new String[] {"/api/test/query-timeout", "/api/test/async-timeout"}) {
       mockMvc
           .perform(get(path))
           .andExpect(status().isServiceUnavailable())
@@ -85,25 +87,25 @@ class GlobalExceptionHandlerTest {
   @RestController
   static class TestController {
 
-    @GetMapping("/test/query-timeout")
+    @GetMapping("/api/test/query-timeout")
     void queryTimeout() {
       throw new org.springframework.dao.QueryTimeoutException("Statement cancelled");
     }
 
-    @GetMapping("/test/async-timeout")
+    @GetMapping("/api/test/async-timeout")
     void asyncTimeout() {
       throw new org.springframework.web.context.request.async.AsyncRequestTimeoutException();
     }
 
-    @GetMapping("/test/business")
+    @GetMapping("/api/test/business")
     void business() {
       throw new BusinessException(ErrorCode.NOT_FOUND, "블로그를 찾을 수 없어요.");
     }
 
-    @PostMapping("/test/valid")
+    @PostMapping("/api/test/valid")
     void valid(@Valid @RequestBody NameRequest request) {}
 
-    @GetMapping("/test/boom")
+    @GetMapping("/api/test/boom")
     void boom() {
       throw new IllegalStateException("SELECT * FROM users failed at /srv/app");
     }
