@@ -10,6 +10,8 @@
     <script src="/js/layout.js" defer></script>
     <script src="/js/session.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
+    <script src="/js/form-dialog.js" defer></script>
+    <script src="/js/report.js" defer></script>
     <script src="/js/post-view.js" defer></script>
     <script src="/js/comments.js" defer></script>
   </head>
@@ -30,6 +32,7 @@
           <button class="button" type="button" id="copy-link">링크 복사</button>
           <a class="button" id="edit" hidden>수정</a>
           <button class="button button--danger" type="button" id="delete" hidden>삭제</button>
+          <button class="button" type="button" id="report" hidden>신고</button>
         </div>
         <!-- 본문은 서버가 걸러낸 HTML이라 이곳만 innerHTML로 넣는다 (SEC-06) -->
         <div class="post__body" id="body"></div>

@@ -96,7 +96,8 @@ public class BlogQueryService {
       LocalDateTime reapplyAt,
       boolean canEditInfo,
       boolean canManageMembers,
-      boolean canManagePosts) {}
+      boolean canManagePosts,
+      boolean owner) {}
 
   /** 내 블로그 목록 (BLG-06) */
   public record MyBlogs(
@@ -208,7 +209,8 @@ public class BlogQueryService {
             reapplyAt,
             canEdit,
             canManage,
-            canManagePosts);
+            canManagePosts,
+            member != null && blogAuthz.isOwner(blog.getId()));
 
     User owner = blog.getOwner();
     return new BlogDetail(

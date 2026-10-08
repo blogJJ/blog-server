@@ -11,4 +11,8 @@ public interface BlogManagerPermissionRepository
   List<BlogManagerPermission> findByBlogMemberId(Long blogMemberId);
 
   boolean existsByBlogMemberIdAndPermission(Long blogMemberId, ManagerPermission permission);
+
+  void deleteByBlogMemberId(Long blogMemberId);
+
+  List<BlogManagerPermission> findByBlogMemberIdIn(java.util.Collection<Long> blogMemberIds);
 }

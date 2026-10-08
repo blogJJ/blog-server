@@ -26,10 +26,13 @@
   }
 
   function showTab(name) {
-    ['requests', 'info', 'categories'].forEach(function (t) {
+    document.querySelectorAll('.tabs__item').forEach(function (b) {
+      var t = b.dataset.tab;
       $('panel-' + t).hidden = t !== name;
-      $('tab-' + t).classList.toggle('is-current', t === name);
+      b.classList.toggle('is-current', t === name);
     });
+    // 멤버·신고·블랙리스트 탭은 blog-admin-members.js가 그린다
+    document.dispatchEvent(new CustomEvent('admin:tab', { detail: { name: name, blog: blog } }));
     if (name === 'requests') {
       loadRequests();
     }
@@ -297,6 +300,9 @@
     $('tab-requests').hidden = !v.canManageMembers;
     $('tab-info').hidden = !v.canEditInfo;
     $('tab-categories').hidden = !v.canEditInfo;
+    $('tab-members').hidden = !v.canManageMembers;
+    $('tab-reports').hidden = !v.canManageMembers;
+    $('tab-blacklist').hidden = !v.canManageMembers;
     if (v.canEditInfo) {
       $('slug').textContent = '/blog/' + blog.slug;
       BlogForm.render($('common-fields'), blog);

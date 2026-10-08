@@ -39,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>대기 중인 신청이 있으면 다시 신청할 수 없고, 거절되면 처리 시각부터 7일 뒤에 다시 신청할 수 있다.
  *   <li>블로그를 볼 수 있어야 신청할 수 있다. 일부 공개는 공유 링크로 들어온 사람만, 비공개는 신청할 수 없다.
  *   <li>블로그장이 계정 정지 중이고 부블로그장이 없으면 정지가 끝날 때까지 받지 않는다 (D-115). 자유 참여도 같다.
+ *   <li>그 블로그 블랙리스트(강제 퇴장 기록)의 이메일이나 전화번호 해시와 같으면 재가입했어도 거절한다 (T078, BLG-11).
  *   <li>승인제 신청은 블로그장과 멤버 관리 권한이 있는 부블로그장에게 알린다. 블로그장 정지 중에는 모든 부블로그장에게 (D-114).
  * </ul>
  */
@@ -61,6 +62,7 @@ public class JoinService {
   private final BlogAccessService accessService;
   private final AccountGuard accountGuard;
   private final NotificationService notificationService;
+  private final BlacklistService blacklistService;
   private final Clock clock;
 
   public JoinService(
@@ -72,6 +74,7 @@ public class JoinService {
       BlogAccessService accessService,
       AccountGuard accountGuard,
       NotificationService notificationService,
+      BlacklistService blacklistService,
       Clock clock) {
     this.blogRepository = blogRepository;
     this.memberRepository = memberRepository;
@@ -81,6 +84,7 @@ public class JoinService {
     this.accessService = accessService;
     this.accountGuard = accountGuard;
     this.notificationService = notificationService;
+    this.blacklistService = blacklistService;
     this.clock = clock;
   }
 
@@ -95,6 +99,9 @@ public class JoinService {
     BlogAccessService.Access access = accessService.check(blog, userId, shareKey);
     if (access.membership().isPresent()) {
       throw new BusinessException(ErrorCode.CONFLICT, "이미 이 블로그의 멤버예요.");
+    }
+    if (blacklistService.isBlacklisted(blogId, userId)) {
+      throw new BusinessException(ErrorCode.BLACKLISTED);
     }
     LocalDateTime now = now();
     List<BlogMember> managers = memberRepository.findManagers(blogId);

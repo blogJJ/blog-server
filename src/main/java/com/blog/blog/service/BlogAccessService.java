@@ -3,8 +3,11 @@ package com.blog.blog.service;
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogMember;
 import com.blog.blog.domain.BlogVisibility;
+import com.blog.blog.domain.MemberSanction;
+import com.blog.blog.domain.SanctionType;
 import com.blog.blog.repository.BlogMemberRepository;
 import com.blog.blog.repository.BlogRepository;
+import com.blog.blog.repository.MemberSanctionRepository;
 import com.blog.common.domain.Suspensions;
 import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
@@ -32,12 +35,17 @@ public class BlogAccessService {
 
   private final BlogRepository blogRepository;
   private final BlogMemberRepository memberRepository;
+  private final MemberSanctionRepository sanctionRepository;
   private final Clock clock;
 
   public BlogAccessService(
-      BlogRepository blogRepository, BlogMemberRepository memberRepository, Clock clock) {
+      BlogRepository blogRepository,
+      BlogMemberRepository memberRepository,
+      MemberSanctionRepository sanctionRepository,
+      Clock clock) {
     this.blogRepository = blogRepository;
     this.memberRepository = memberRepository;
+    this.sanctionRepository = sanctionRepository;
     this.clock = clock;
   }
 
@@ -99,12 +107,22 @@ public class BlogAccessService {
         : "비공개 블로그예요. 멤버만 볼 수 있어요.";
   }
 
-  private static void rejectSuspended(BlogMember member) {
+  /** 정지된 멤버에게 기간과 사유를 알려 주고 막는다 (BLG-13). */
+  private void rejectSuspended(BlogMember member) {
     LocalDateTime until = member.getSuspendedUntil();
     String message =
         !until.isBefore(Suspensions.PERMANENT)
             ? "이 블로그에서 영구 정지되어 들어갈 수 없어요."
             : "이 블로그에서 " + until.format(UNTIL_FORMAT) + "까지 정지되어 들어갈 수 없어요.";
+    String reason =
+        sanctionRepository
+            .findFirstByBlogIdAndUserIdAndTypeOrderByIdDesc(
+                member.getBlog().getId(), member.getUser().getId(), SanctionType.SUSPENSION)
+            .map(MemberSanction::getReason)
+            .orElse(null);
+    if (reason != null) {
+      message += " 사유: " + reason;
+    }
     throw new BusinessException(ErrorCode.FORBIDDEN, message);
   }
 }

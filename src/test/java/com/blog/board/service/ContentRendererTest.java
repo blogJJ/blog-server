@@ -35,6 +35,12 @@ class ContentRendererTest {
   }
 
   @Test
+  void textOnTheNextLineOfAnImageGoesBelowIt() {
+    String html = renderer.render("![a](" + IMG + ")\n이미지 아래 글");
+    assertThat(html).containsPattern("<img[^>]*>\\s*<br\\s*/?>\\s*이미지 아래 글");
+  }
+
+  @Test
   void tablesAndStrikethroughRender() {
     String html = renderer.render("| a | b |\n|---|---|\n| 1 | 2 |\n\n~~지움~~");
 

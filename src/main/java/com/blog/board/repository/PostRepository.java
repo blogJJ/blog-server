@@ -62,4 +62,11 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   @Modifying
   @Query("update Post p set p.category = null where p.category.id = :categoryId")
   int clearCategory(@Param("categoryId") Long categoryId);
+
+  /** 강제 퇴장·탈퇴한 작성자의 그 블로그 글을 "탈퇴한 계정"으로 (BLG-11) */
+  @Modifying
+  @Query(
+      "update Post p set p.authorHidden = true, p.updatedAt = p.updatedAt"
+          + " where p.blog.id = :blogId and p.author.id = :authorId")
+  int hideAuthor(@Param("blogId") Long blogId, @Param("authorId") Long authorId);
 }

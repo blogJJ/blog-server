@@ -15,6 +15,8 @@ public enum ErrorCode {
   /** 메인 관리자 계정은 블로그 활동을 하지 않는다 (D-90, SEC-09). */
   ADMIN_NOT_ALLOWED(HttpStatus.FORBIDDEN, "관리자 계정은 블로그 활동을 할 수 없어요."),
   NOT_FOUND(HttpStatus.NOT_FOUND, "찾을 수 없어요."),
+  /** 강제 퇴장 기록(블랙리스트)에 걸려 참여 신청을 막았다 (BLG-11). 화면은 이 코드로 "문의하기"를 보여 준다 */
+  BLACKLISTED(HttpStatus.FORBIDDEN, "이 블로그에서 강제 퇴장된 기록이 있어 참여 신청을 할 수 없어요. 잘못 막혔다면 문의하기를 남겨 주세요."),
   // 가입·로그인 (US1)
   /** 가입된 이메일인지 드러나지 않게 이메일이 없을 때와 비밀번호가 틀렸을 때 같은 문구 (USR-03). */
   LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 맞지 않아요."),

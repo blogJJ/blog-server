@@ -53,7 +53,8 @@ public class ContentRenderer {
   public ContentRenderer() {
     List<Extension> extensions = List.of(TablesExtension.create(), StrikethroughExtension.create());
     this.parser = Parser.builder().extensions(extensions).build();
-    this.renderer = HtmlRenderer.builder().extensions(extensions).build();
+    // 에디터 미리보기처럼 줄을 한 번만 바꿔도 줄바꿈으로 보여 준다. 이미지 다음 줄 글이 이미지 옆에 붙지 않게
+    this.renderer = HtmlRenderer.builder().extensions(extensions).softbreak("<br />\n").build();
   }
 
   /** 길이 확인. 비었거나 5,000자를 넘으면 INVALID_INPUT. */

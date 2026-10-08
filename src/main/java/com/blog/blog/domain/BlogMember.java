@@ -67,6 +67,27 @@ public class BlogMember {
     this.role = role;
   }
 
+  /** 이 블로그에서 정지한다. 정지 횟수가 1 오른다 (BLG-13). */
+  public void suspend(LocalDateTime until) {
+    this.suspendedUntil = until;
+    this.suspensionCount++;
+  }
+
+  public void releaseSuspension() {
+    this.suspendedUntil = null;
+  }
+
+  /** 부블로그장으로 올린다 (D-03). 자동 위임 순서를 위해 처음 된 시각을 남긴다. */
+  public void promoteToManager(LocalDateTime now) {
+    this.role = BlogMemberRole.MANAGER;
+    this.managerSince = now;
+  }
+
+  public void demoteToMember() {
+    this.role = BlogMemberRole.MEMBER;
+    this.managerSince = null;
+  }
+
   public boolean isOwner() {
     return role == BlogMemberRole.OWNER;
   }

@@ -64,6 +64,9 @@
     var canManage = v.canEditInfo || v.canManageMembers;
     $('manage').hidden = !canManage;
     $('manage').href = ui.blogUrl(blog.slug) + '/admin';
+    $('cover-wrap').hidden = !blog.coverImage && !canManage;
+    $('report-blog').hidden = !v.loggedIn || v.role === 'OWNER';
+    $('cover-wrap').classList.toggle('has-cover', !!blog.coverImage);
 
     $('share-box').hidden = !blog.shareKey;
     if (blog.shareKey) {
@@ -140,8 +143,31 @@
       Api.toast(res.message);
       await load();
     } catch (e) {
-      Api.showError(e);
       $('join').disabled = false;
+      if (e.code === 'BLACKLISTED') {
+        inquire(e.message);
+        return;
+      }
+      Api.showError(e);
+    }
+  }
+
+  /** 블랙리스트에 걸렸을 때 해제 문의를 남긴다 (BLG-12) */
+  async function inquire(message) {
+    var values = await FormDialog.open({
+      title: '참여 신청을 할 수 없어요',
+      desc: message + ' 전화번호 주인이 바뀌었다면 문의를 남겨 주세요. 블로그장이 확인하면 알림으로 알려 드려요.',
+      submitLabel: '문의하기',
+      fields: [{ name: 'message', label: '문의 내용 (선택)', type: 'textarea', maxLength: 500 }]
+    });
+    if (!values) {
+      return;
+    }
+    try {
+      await Api.post('/api/blogs/' + blog.id + '/blacklist-inquiries', { message: values.message || null });
+      Api.toast('문의를 남겼어요.');
+    } catch (e) {
+      Api.showError(e);
     }
   }
 
@@ -169,6 +195,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    $('report-blog').addEventListener('click', function () {
+      Report.open({ targetType: 'BLOG', targetId: blog.id });
+    });
     $('join').addEventListener('click', onJoin);
     $('cancel-join').addEventListener('click', onCancel);
     $('copy-share').addEventListener('click', onCopy);

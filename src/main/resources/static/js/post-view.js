@@ -61,6 +61,7 @@
     $('edit').hidden = !post.canEdit;
     $('edit').href = '/post-edit.html?post=' + post.id;
     $('delete').hidden = !post.canDelete;
+    $('report').hidden = post.canEdit;
     renderLike();
     document.dispatchEvent(new CustomEvent('post:loaded', { detail: { post: post, share: share() } }));
   }
@@ -134,6 +135,9 @@
     $('delete').addEventListener('click', onDelete);
     $('copy-link').addEventListener('click', onCopy);
     $('like').addEventListener('click', onLike);
+    $('report').addEventListener('click', function () {
+      Report.open({ targetType: 'POST', targetId: post.id });
+    });
     document.addEventListener('comments:count', function (e) {
       if (post) {
         post.commentCount = e.detail;
