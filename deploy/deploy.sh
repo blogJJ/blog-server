@@ -105,8 +105,11 @@ if docker image inspect "$IMAGE:previous" >/dev/null 2>&1 && [ -f "$APP_DIR/app.
   start "$IMAGE:latest" "$APP_DIR/app.env.ok"
   if healthy; then
     echo "== 이전 버전으로 돌아왔어요" >&2
-  else
-    echo "== 이전 버전도 뜨지 않았어요" >&2
+    exit 1
   fi
+  echo "== 이전 버전도 뜨지 않았어요" >&2
 fi
+# 계속 재시작하며 공용 서버 자원을 쓰지 않게 멈춰 둔다
+echo "== 컨테이너를 멈췄어요. 원인을 고친 뒤 다시 배포해 주세요" >&2
+docker rm -f "$NAME" >/dev/null 2>&1 || true
 exit 1
