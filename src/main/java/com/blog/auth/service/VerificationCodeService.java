@@ -92,6 +92,18 @@ public class VerificationCodeService {
   }
 
   /**
+   * 번호를 확인하고 바로 사용한 것으로 남긴다. 비밀번호 재설정처럼 확인과 사용이 한 번에 일어날 때 쓴다 (USR-06, SEC-05). 틀린 횟수는 {@link
+   * #verify}처럼 남는다.
+   */
+  @Transactional(noRollbackFor = BusinessException.class)
+  public void verifyAndUse(String email, VerificationPurpose purpose, String code) {
+    verify(email, purpose, code);
+    repository
+        .findFirstByEmailAndPurposeOrderByIdDesc(email, purpose)
+        .ifPresent(c -> c.markUsed(now()));
+  }
+
+  /**
    * 가입 마지막 단계에서 인증을 마쳤는지 서버가 다시 확인하고, 그 번호를 사용한 것으로 남긴다 (USR-02).
    *
    * @throws BusinessException 인증하지 않았거나, 이미 썼거나, 인증한 지 30분이 지났으면 EMAIL_NOT_VERIFIED

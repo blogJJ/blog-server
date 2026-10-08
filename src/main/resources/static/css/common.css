@@ -1361,3 +1361,91 @@ main {
   margin: 24px 0 4px;
   font-size: 16px;
 }
+
+/* ---------- 계정 찾기·내 정보 (US6) ---------- */
+.auth-card--wide {
+  max-width: 560px;
+}
+
+.found-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.found-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.found-list__date {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.found-target {
+  margin: 0 0 16px;
+  font-weight: 600;
+}
+
+.profile-photo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.profile-photo__img,
+.profile-photo__empty {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-surface, #f3f3f3);
+}
+
+.profile-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-photo__actions .field__hint {
+  width: 100%;
+  margin: 0;
+}
+
+.me-fixed {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 6px 12px;
+  margin: 0 0 4px;
+}
+
+.me-fixed dt {
+  color: var(--color-muted);
+}
+
+.me-fixed dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+.me-section {
+  margin: 32px 0 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+  font-size: 17px;
+}
+
+.found-result {
+  margin-top: 20px;
+}

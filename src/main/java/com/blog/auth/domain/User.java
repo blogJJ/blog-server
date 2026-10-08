@@ -145,6 +145,30 @@ public class User extends BaseTimeEntity {
     lockedUntil = null;
   }
 
+  /** 비밀번호 변경·재설정. 재설정이면 로그인 잠금도 함께 푼다 (USR-06) */
+  public void changePassword(String passwordHash) {
+    this.passwordHash = passwordHash;
+    resetLoginFailures();
+  }
+
+  /** 내 정보 수정 (USR-07). 이메일과 이름은 바꿀 수 없다 (D-21, D-32) */
+  public void changeProfile(String nickname, String phone, String bio) {
+    this.nickname = nickname;
+    this.phone = phone;
+    this.bio = bio;
+  }
+
+  /**
+   * 프로필 사진을 바꾸거나(null이면) 지운다.
+   *
+   * @return 이전 사진의 저장 이름. 없으면 null
+   */
+  public String changeProfileImage(String storedName) {
+    String old = this.profileImage;
+    this.profileImage = storedName;
+    return old;
+  }
+
   /** 다음 로그인 때 사람 확인이 필요한지 */
   public boolean needsCaptcha() {
     return loginFailCount >= CAPTCHA_AFTER_FAILS;
