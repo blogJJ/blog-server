@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.blog.auth.domain.User;
 import com.blog.auth.repository.UserRepository;
+import com.blog.auth.service.LoginSessionService;
 import com.blog.common.security.JwtCookieAuthFilter;
-import com.blog.common.security.JwtProvider;
 import com.blog.support.IntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.time.LocalDateTime;
@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class SecurityConfigTest {
 
   @Autowired MockMvc mockMvc;
-  @Autowired JwtProvider jwtProvider;
+  @Autowired LoginSessionService sessionService;
   @Autowired UserRepository userRepository;
   @Autowired JdbcTemplate jdbcTemplate;
 
@@ -122,6 +122,7 @@ class SecurityConfigTest {
 
   private Cookie tokenCookie(User user) {
     return new Cookie(
-        JwtCookieAuthFilter.ACCESS_TOKEN_COOKIE, jwtProvider.createAccessToken(user.getId()));
+        JwtCookieAuthFilter.ACCESS_TOKEN_COOKIE,
+        sessionService.start(user, false, "test").accessToken());
   }
 }

@@ -122,6 +122,34 @@ public class User extends BaseTimeEntity {
     return lockedUntil != null && lockedUntil.isAfter(now);
   }
 
+  /** 이만큼 연속으로 틀리면 다음 로그인부터 사람 확인(Turnstile)을 요구한다 (SEC-13). */
+  public static final int CAPTCHA_AFTER_FAILS = 3;
+
+  /**
+   * 비밀번호를 틀렸을 때. 연속 5번째부터는 5분 잠근다 (SEC-03). 잠금이 풀린 뒤에도 연속 실패는 이어서 세므로, 다시 틀리면 바로 잠긴다.
+   *
+   * @return 이번에 잠갔으면 true
+   */
+  public boolean recordLoginFailure(LocalDateTime now) {
+    loginFailCount++;
+    if (loginFailCount >= MAX_LOGIN_FAILS) {
+      lockedUntil = now.plusMinutes(5);
+      return true;
+    }
+    return false;
+  }
+
+  /** 로그인에 성공하면 실패 횟수와 잠금을 지운다. */
+  public void resetLoginFailures() {
+    loginFailCount = 0;
+    lockedUntil = null;
+  }
+
+  /** 다음 로그인 때 사람 확인이 필요한지 */
+  public boolean needsCaptcha() {
+    return loginFailCount >= CAPTCHA_AFTER_FAILS;
+  }
+
   public Long getId() {
     return id;
   }

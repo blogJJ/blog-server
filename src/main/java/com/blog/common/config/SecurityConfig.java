@@ -1,6 +1,7 @@
 package com.blog.common.config;
 
-import com.blog.auth.repository.UserRepository;
+import com.blog.auth.service.ActivityPolicy;
+import com.blog.auth.service.LoginSessionService;
 import com.blog.common.security.JsonSecurityErrorHandler;
 import com.blog.common.security.JwtCookieAuthFilter;
 import com.blog.common.security.JwtProvider;
@@ -60,7 +61,8 @@ public class SecurityConfig {
   public SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       JwtProvider jwtProvider,
-      UserRepository userRepository,
+      LoginSessionService sessionService,
+      ActivityPolicy activityPolicy,
       JsonMapper jsonMapper,
       @Value("${app.security.require-https:false}") boolean requireHttps)
       throws Exception {
@@ -125,7 +127,7 @@ public class SecurityConfig {
                     .anyRequest()
                     .denyAll())
         .addFilterBefore(
-            new JwtCookieAuthFilter(jwtProvider, userRepository),
+            new JwtCookieAuthFilter(jwtProvider, sessionService, activityPolicy),
             UsernamePasswordAuthenticationFilter.class);
     return http.build();
   }
