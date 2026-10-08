@@ -114,6 +114,9 @@ app:
     secret: ${JWT_SECRET:}
     # Access Token은 짧게, 만료되면 Refresh Token으로 다시 받는다 (SEC-04)
     access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+  # 인증번호·토큰·블랙리스트 해시에 섞는 비밀값. 32바이트 이상, 운영 중에는 바꾸지 않는다 (T020)
+  hash:
+    secret: ${HASH_SECRET:}
   turnstile:
     site-key: ${TURNSTILE_SITE_KEY:}
     secret-key: ${TURNSTILE_SECRET_KEY:}

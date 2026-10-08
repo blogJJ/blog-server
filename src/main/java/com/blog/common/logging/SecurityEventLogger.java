@@ -1,11 +1,9 @@
 package com.blog.common.logging;
 
-import com.blog.common.security.AuthUser;
+import com.blog.common.security.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * 보안 이벤트를 {@code security} 로거로 남긴다 (T137, OPS-03, D-103).
@@ -29,11 +27,7 @@ public final class SecurityEventLogger {
   }
 
   private static String currentUserId() {
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth != null && auth.getPrincipal() instanceof AuthUser user) {
-      return String.valueOf(user.id());
-    }
-    return "-";
+    return CurrentUser.id().map(String::valueOf).orElse("-");
   }
 
   /** 줄바꿈으로 로그 줄을 위조하지 못하게 한다. */

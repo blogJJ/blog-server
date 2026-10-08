@@ -23,6 +23,7 @@ public class ProdSecretsCheck {
 
   static {
     REQUIRED_SECRETS.put("app.jwt.secret", "JWT_SECRET");
+    REQUIRED_SECRETS.put("app.hash.secret", "HASH_SECRET");
     REQUIRED_SECRETS.put("spring.datasource.password", "DB_PASSWORD");
     REQUIRED_SECRETS.put("spring.mail.password", "MAIL_PASSWORD");
     REQUIRED_SECRETS.put("app.turnstile.secret-key", "TURNSTILE_SECRET_KEY");

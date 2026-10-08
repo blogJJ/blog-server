@@ -2,3 +2,5 @@
 app:
   jwt:
     secret: test-secret-for-jwt-signing-0123456789abcdef
+  hash:
+    secret: test-secret-for-hmac-hashing-0123456789abcdef

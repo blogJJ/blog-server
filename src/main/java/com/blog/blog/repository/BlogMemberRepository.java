@@ -4,6 +4,8 @@ import com.blog.blog.domain.BlogMember;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface BlogMemberRepository extends JpaRepository<BlogMember, Long> {
 
@@ -11,6 +13,12 @@ public interface BlogMemberRepository extends JpaRepository<BlogMember, Long> {
   Optional<BlogMember> findByBlogIdAndUserId(Long blogId, Long userId);
 
   boolean existsByBlogIdAndUserId(Long blogId, Long userId);
+
+  /** 권한 확인용. 블로그·블로그장·회원을 같이 읽어 트랜잭션 밖(@PreAuthorize)에서도 쓸 수 있게 한다 (T017). */
+  @Query(
+      "select m from BlogMember m join fetch m.blog b join fetch b.owner join fetch m.user"
+          + " where m.blog.id = :blogId and m.user.id = :userId")
+  Optional<BlogMember> findForAuthz(@Param("blogId") Long blogId, @Param("userId") Long userId);
 
   /** 내 블로그 목록 (BLG-06). */
   List<BlogMember> findByUserId(Long userId);

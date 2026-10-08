@@ -2,6 +2,9 @@
 # 운영 기준인 application.yml에서 개발에 필요한 것만 푼다.
 
 app:
+  # 로컬 개발용 기본값. 운영(prod)은 HASH_SECRET 환경변수가 꼭 있어야 뜬다
+  hash:
+    secret: ${HASH_SECRET:local-dev-hash-secret-not-for-production}
   # http://localhost에서는 Secure 쿠키가 저장되지 않으므로 끈다
   cookie:
     secure: false
