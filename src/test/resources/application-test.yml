@@ -4,3 +4,8 @@ app:
     secret: test-secret-for-jwt-signing-0123456789abcdef
   hash:
     secret: test-secret-for-hmac-hashing-0123456789abcdef
+  # 테스트는 한 IP(127.0.0.1)로 많이 부르므로 기본 제한에 걸리지 않게 한다. 제한 자체는 RateLimitFilterTest에서 확인
+  rate-limit:
+    api-per-minute: 1000000
+  mail:
+    log-only: true

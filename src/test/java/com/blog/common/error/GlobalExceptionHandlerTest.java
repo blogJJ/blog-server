@@ -72,8 +72,28 @@ class GlobalExceptionHandlerTest {
         .andExpect(content().string(not(containsString("IllegalStateException"))));
   }
 
+  @Test
+  void timeoutAsksToRetry() throws Exception {
+    for (String path : new String[] {"/test/query-timeout", "/test/async-timeout"}) {
+      mockMvc
+          .perform(get(path))
+          .andExpect(status().isServiceUnavailable())
+          .andExpect(jsonPath("$.code").value("REQUEST_TIMEOUT"));
+    }
+  }
+
   @RestController
   static class TestController {
+
+    @GetMapping("/test/query-timeout")
+    void queryTimeout() {
+      throw new org.springframework.dao.QueryTimeoutException("Statement cancelled");
+    }
+
+    @GetMapping("/test/async-timeout")
+    void asyncTimeout() {
+      throw new org.springframework.web.context.request.async.AsyncRequestTimeoutException();
+    }
 
     @GetMapping("/test/business")
     void business() {

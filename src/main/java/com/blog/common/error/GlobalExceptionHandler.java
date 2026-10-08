@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -19,6 +21,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -102,6 +105,25 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(AuthenticationException.class)
   public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException e) {
     return respond(ErrorCode.UNAUTHORIZED);
+  }
+
+  /**
+   * 5초 제한에 걸린 요청 (T009, D-48). 느린 쿼리가 DB에서 끊겼거나, 트랜잭션 시간이 이미 지났거나, 비동기 응답이 늦었을 때. 원인을 찾을 수 있게 로그에는
+   * 남긴다.
+   */
+  @ExceptionHandler({
+    QueryTimeoutException.class,
+    jakarta.persistence.QueryTimeoutException.class,
+    TransactionTimedOutException.class,
+    AsyncRequestTimeoutException.class
+  })
+  public ResponseEntity<ErrorResponse> handleTimeout(Exception e, HttpServletRequest request) {
+    log.warn(
+        "request timed out {} {}: {}",
+        request.getMethod(),
+        SecurityEventLogger.sanitize(request.getRequestURI()),
+        e.getClass().getSimpleName());
+    return respond(ErrorCode.REQUEST_TIMEOUT);
   }
 
   /** 그 밖의 모든 예외는 500. 로그에는 스택 트레이스와 오류 번호를, 응답에는 오류 번호만 남긴다. */
