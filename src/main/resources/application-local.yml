@@ -16,6 +16,11 @@ app:
     site-key: ${TURNSTILE_SITE_KEY:1x00000000000000000000AA}
     secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
 
+# 시험용 회원 20명(비밀번호 test1234!)을 넣는다. 운영·테스트에는 없다
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed-local
+
 # Swagger: http://localhost:8080/swagger-ui.html (T145, OPS-12)
 springdoc:
   api-docs:
