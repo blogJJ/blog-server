@@ -118,8 +118,10 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq sshpass > /dev/null
           opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
-          sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" 'mkdir -p ~/blog-server'
-          sshpass -e scp "${opts[@]}" -P "$SSH_PORT" \
+          # 공용 서버라 폴더와 환경변수 파일은 본인만 읽게 둔다. scp -p로 runner의 600 권한을 그대로 옮긴다
+          sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
+            'mkdir -p ~/blog-server && chmod 700 ~/blog-server'
+          sshpass -e scp -p "${opts[@]}" -P "$SSH_PORT" \
             "$RUNNER_TEMP/image.tar.gz" "$RUNNER_TEMP/app.env" deploy/deploy.sh \
             "$SSH_ID@$SSH_ADDRESS:blog-server/"
 
