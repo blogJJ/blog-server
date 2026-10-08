@@ -8,12 +8,28 @@
     <script src="/js/api.js" defer></script>
     <script src="/js/layout.js" defer></script>
     <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/blog-list.js" defer></script>
   </head>
   <body>
-    <!-- 임시 메인 화면. 블로그 목록·검색·피드는 T054, T110에서 이 파일을 채운다 -->
+    <!-- 메인 블로그 목록·검색 (T054, BLG-02, BLG-03). 피드는 T110에서 더한다 -->
     <main>
-      <h1>블로그</h1>
-      <p>메인 화면은 준비 중이에요.</p>
+      <div class="page-head">
+        <h1>블로그 둘러보기</h1>
+        <a class="button button--primary" href="/blog-new.html" id="new-blog" hidden>블로그 만들기</a>
+      </div>
+      <form class="search" id="search-form" role="search">
+        <input id="q" type="search" maxlength="20" placeholder="블로그 이름, 소개, 태그로 찾기" aria-label="블로그 검색" />
+        <button class="button" type="submit">검색</button>
+      </form>
+      <div class="tabs" role="tablist" id="tabs">
+        <button class="tabs__item is-current" type="button" role="tab" data-sort="latest">최신순</button>
+        <button class="tabs__item" type="button" role="tab" data-sort="popular">인기순</button>
+      </div>
+      <p class="list-caption" id="caption"></p>
+      <div class="blog-grid" id="list"></div>
+      <p class="empty" id="empty" hidden></p>
+      <nav class="pager" id="pager" aria-label="페이지"></nav>
     </main>
   </body>
 </html>

@@ -97,7 +97,7 @@ class SecurityConfigTest {
   void publicReadIsOpenAndSendsSecurityHeaders() throws Exception {
     mockMvc
         .perform(get("/api/blogs"))
-        .andExpect(status().isNotFound())
+        .andExpect(status().isOk())
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().string("X-Content-Type-Options", "nosniff"))
         .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")))

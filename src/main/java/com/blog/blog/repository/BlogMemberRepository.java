@@ -22,4 +22,16 @@ public interface BlogMemberRepository extends JpaRepository<BlogMember, Long> {
 
   /** 내 블로그 목록 (BLG-06). */
   List<BlogMember> findByUserId(Long userId);
+
+  /** 내 블로그 목록 화면용. 블로그를 같이 읽는다. */
+  @Query(
+      "select m from BlogMember m join fetch m.blog b where m.user.id = :userId"
+          + " order by m.joinedAt desc, m.id desc")
+  List<BlogMember> findWithBlogByUserId(@Param("userId") Long userId);
+
+  /** 부블로그장들. 참여 신청 알림을 보낼 때 쓴다. */
+  @Query(
+      "select m from BlogMember m join fetch m.user where m.blog.id = :blogId"
+          + " and m.role = com.blog.blog.domain.BlogMemberRole.MANAGER")
+  List<BlogMember> findManagers(@Param("blogId") Long blogId);
 }
