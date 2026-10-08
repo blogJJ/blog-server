@@ -127,6 +127,7 @@ public class PostController {
         d.updatedAt(),
         d.blog(),
         d.canEdit(),
-        d.canDelete());
+        d.canDelete(),
+        d.liked());
   }
 }

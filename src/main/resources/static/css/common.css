@@ -1040,3 +1040,136 @@ main {
   font: inherit;
   font-size: 14px;
 }
+
+/* 좋아요·댓글 (T071) */
+.like-button.is-on {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.comments {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.comments__title {
+  font-size: 18px;
+}
+
+.comment-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  resize: vertical;
+}
+
+.comment-form__foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.comment-form__foot .field__hint {
+  margin: 0 auto 0 0;
+}
+
+.comment-form--inline {
+  margin-top: 8px;
+}
+
+.comment-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comment-list--replies {
+  margin: 0 0 0 24px;
+}
+
+.comment {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.comment-list--replies .comment:last-child {
+  border-bottom: none;
+}
+
+.comment__head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.comment__meta {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.comment__text {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment--deleted > .comment__text {
+  color: var(--color-muted);
+}
+
+.comment__mention {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.comment__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.comment__action {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.comment__action:hover {
+  color: var(--color-text);
+}
+
+#comment-more {
+  margin-top: 12px;
+}
+
+/* 카테고리 관리 (T066) */
+.category-list {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.category-list__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.category-list__item input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+}

@@ -1,6 +1,6 @@
 /*
  * 글 상세 (T071, BRD-01, BRD-07). 본문은 서버가 jsoup으로 걸러낸 HTML이라 이곳만 innerHTML로 넣고, 나머지는 textContent로 넣는다 (SEC-06).
- * 공유는 1차에 링크 복사만 (BRD-07).
+ * 공유는 1차에 링크 복사만 (BRD-07). 좋아요는 다시 누르면 취소 (BRD-06). 댓글은 comments.js가 'post:loaded'를 받아 그린다.
  */
 (function () {
   'use strict';
@@ -58,10 +58,37 @@
     $('meta').textContent = meta.join(' · ');
     $('body').innerHTML = post.html;
     $('tags').replaceChildren(ui.tagList(post.tags));
-    $('counts').textContent = '조회 ' + post.viewCount + ' · 좋아요 ' + post.likeCount + ' · 댓글 ' + post.commentCount;
     $('edit').hidden = !post.canEdit;
     $('edit').href = '/post-edit.html?post=' + post.id;
     $('delete').hidden = !post.canDelete;
+    renderLike();
+    document.dispatchEvent(new CustomEvent('post:loaded', { detail: { post: post, share: share() } }));
+  }
+
+  function renderLike() {
+    $('like').setAttribute('aria-pressed', post.liked ? 'true' : 'false');
+    $('like').classList.toggle('is-on', post.liked);
+    $('like').textContent = (post.liked ? '♥' : '♡') + ' 좋아요 ' + post.likeCount;
+    renderCounts();
+  }
+
+  function renderCounts() {
+    $('counts').textContent = '조회 ' + post.viewCount + ' · 좋아요 ' + post.likeCount + ' · 댓글 ' + post.commentCount;
+  }
+
+  async function onLike() {
+    if (!window.Layout.user) {
+      window.location.href = '/login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+      return;
+    }
+    try {
+      var res = await Api.post(withShare('/api/posts/' + post.id + '/like'));
+      post.liked = res.liked;
+      post.likeCount = res.likeCount;
+      renderLike();
+    } catch (e) {
+      Api.showError(e);
+    }
   }
 
   async function load() {
@@ -106,6 +133,13 @@
   document.addEventListener('DOMContentLoaded', function () {
     $('delete').addEventListener('click', onDelete);
     $('copy-link').addEventListener('click', onCopy);
+    $('like').addEventListener('click', onLike);
+    document.addEventListener('comments:count', function (e) {
+      if (post) {
+        post.commentCount = e.detail;
+        renderCounts();
+      }
+    });
     load();
   });
 })();

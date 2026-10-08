@@ -11,9 +11,10 @@
     <script src="/js/session.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
     <script src="/js/post-view.js" defer></script>
+    <script src="/js/comments.js" defer></script>
   </head>
   <body>
-    <!-- 글 상세 /blog/{주소}/posts/{번호} (T071, BRD-01, BRD-07). og 태그는 서버가 채운다(T069). 댓글·좋아요는 다음 단계에서 더한다 -->
+    <!-- 글 상세 /blog/{주소}/posts/{번호} (T071, BRD-01, BRD-07). og 태그는 서버가 채운다(T069). 좋아요·댓글(BRD-06) -->
     <main>
       <div class="blocked" id="blocked" hidden>
         <h1 id="blocked-title">글을 볼 수 없어요</h1>
@@ -25,6 +26,7 @@
         <h1 class="post__title" id="title"></h1>
         <p class="post__meta" id="meta"></p>
         <div class="post__actions">
+          <button class="button like-button" type="button" id="like" aria-pressed="false">♡ 좋아요</button>
           <button class="button" type="button" id="copy-link">링크 복사</button>
           <a class="button" id="edit" hidden>수정</a>
           <button class="button button--danger" type="button" id="delete" hidden>삭제</button>
@@ -35,6 +37,20 @@
         <p class="post__counts" id="counts"></p>
         <a class="button" id="back">목록으로</a>
       </article>
+      <section class="comments" id="comments" hidden>
+        <h2 class="comments__title">댓글 <span id="comment-count">0</span></h2>
+        <form class="comment-form" id="comment-form" novalidate hidden>
+          <textarea id="comment-input" maxlength="500" rows="3" placeholder="댓글을 남겨 주세요." aria-label="댓글"></textarea>
+          <div class="comment-form__foot">
+            <span class="field__hint" id="comment-length">0/500</span>
+            <button class="button button--primary" type="submit">등록</button>
+          </div>
+        </form>
+        <p class="field__hint" id="comment-login" hidden><a href="#" id="comment-login-link">로그인</a>하면 댓글을 남길 수 있어요.</p>
+        <ul class="comment-list" id="comment-list"></ul>
+        <p class="empty" id="comment-empty" hidden>첫 댓글을 남겨 보세요.</p>
+        <button class="button" type="button" id="comment-more" hidden>댓글 더 보기</button>
+      </section>
     </main>
   </body>
 </html>
