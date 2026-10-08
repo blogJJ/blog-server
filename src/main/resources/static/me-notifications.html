@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>알림 설정 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/me-notifications.js" defer></script>
+  </head>
+  <body>
+    <!-- 알림 설정 (T114, SOC-04, 3.6). 끌 수 없는 알림(위임 요청, 폐쇄 예정, 내 글 삭제됨, 제재 등)은 나오지 않는다 -->
+    <main>
+      <section class="auth-card auth-card--wide" id="settings" hidden>
+        <h1>알림 설정</h1>
+        <p class="field__hint">끄면 새 알림만 오지 않고, 이미 받은 알림은 그대로 남아요. 위임 요청, 블로그 폐쇄 예정, 내 글 삭제, 제재 같은 알림은 끌 수 없어요.</p>
+        <form id="settings-form" novalidate>
+          <div id="groups"></div>
+          <h2 class="me-section">보관 기간</h2>
+          <label class="check">
+            <input type="radio" name="keep" value="30" />
+            <span>30일</span>
+          </label>
+          <label class="check">
+            <input type="radio" name="keep" value="7" />
+            <span>7일</span>
+          </label>
+          <p class="field__hint field__hint--spaced">기간이 지난 알림은 알림함에서 사라져요.</p>
+          <button class="button button--primary" type="submit">저장</button>
+        </form>
+        <p class="auth-links"><a href="/me.html">내 정보로 돌아가기</a></p>
+      </section>
+    </main>
+  </body>
+</html>

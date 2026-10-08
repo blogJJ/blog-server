@@ -82,6 +82,18 @@
     }
     items.push(link('/me.html', 'button', '내 정보'), logout);
     menu.replaceChildren.apply(menu, items);
+    loadNotifications();
+  }
+
+  /** 알림 사이드바와 30초 확인(notifications.js)을 한 번만 불러온다 */
+  function loadNotifications() {
+    if (document.querySelector('script[data-notifications]')) {
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = '/js/notifications.js';
+    script.dataset.notifications = 'true';
+    document.head.appendChild(script);
   }
 
   /** 안 읽은 알림 수를 종 아이콘에 표시한다. 0이면 숨긴다. notifications.js가 30초마다 부른다. */

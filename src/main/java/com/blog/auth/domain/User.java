@@ -169,6 +169,14 @@ public class User extends BaseTimeEntity {
     return old;
   }
 
+  /** 알림 보관 일수 30 또는 7 (SOC-04) */
+  public void changeNotificationKeepDays(int days) {
+    if (days != 30 && days != 7) {
+      throw new IllegalArgumentException("notification keep days must be 30 or 7: " + days);
+    }
+    this.notificationKeepDays = days;
+  }
+
   /** 다음 로그인 때 사람 확인이 필요한지 */
   public boolean needsCaptcha() {
     return loginFailCount >= CAPTCHA_AFTER_FAILS;
