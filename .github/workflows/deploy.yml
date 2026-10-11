@@ -1,7 +1,7 @@
 # 운영 서버 배포 (서버 배포 설명서 4단계).
 # main의 CI가 통과하면 도커 이미지를 만들어 ssh로 서버에 올리고 deploy/deploy.sh로 띄운다.
 # Actions 탭 > Deploy > Run workflow로 직접 돌릴 수도 있고, 이때 "더미 데이터 넣기"를 켜면
-# 서버가 뜬 뒤 dummy/dummy_data.sql을 DB에 넣는다(여러 번 넣어도 같은 행이 두 번 생기지 않는다).
+# 서버가 뜬 뒤 dummy/dummy_data.sql과 dummy_data_bulk.sql을 DB에 넣는다(여러 번 넣어도 같은 행이 두 번 생기지 않는다).
 #
 # 필요한 Repository secrets (Settings > Secrets and variables > Actions). 값은 저장소에 올리지 않는다:
 #   SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD  서버 접속. 주소는 외부(핫스팟)용 주소
@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       dummy:
-        description: '더미 데이터 넣기 (회원 20명, 블로그 8개, 글·댓글)'
+        description: '더미 데이터 넣기 (회원 140명, 블로그 38개, 글 550개, 댓글 2,300개)'
         type: boolean
         default: false
 
@@ -127,7 +127,7 @@ jobs:
           sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
             'mkdir -p ~/blog-server && chmod 700 ~/blog-server'
           sshpass -e scp -p "${opts[@]}" -P "$SSH_PORT" \
-            "$RUNNER_TEMP/image.tar.gz" "$RUNNER_TEMP/app.env" deploy/deploy.sh dummy/dummy_data.sql \
+            "$RUNNER_TEMP/image.tar.gz" "$RUNNER_TEMP/app.env" deploy/deploy.sh dummy/dummy_data.sql dummy/dummy_data_bulk.sql \
             "$SSH_ID@$SSH_ADDRESS:blog-server/"
 
       - name: Start on server
