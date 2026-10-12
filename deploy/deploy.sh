@@ -86,6 +86,8 @@ if [ "$(docker inspect -f '{{.State.Running}}' "$PROXY" 2>/dev/null)" = "true" ]
 fi
 if [ "$ACTIVE" = "blue" ]; then NEXT="green"; else NEXT="blue"; fi
 NEXT_NAME="${NAME}-${NEXT}"
+# 네트워크 안에서 부르는 이름. 컨테이너 이름에는 계정의 _가 들어가는데, Tomcat은 _가 든 Host를 400으로 막는다
+NEXT_HOST="app-${NEXT}"
 
 # 서버 컨테이너는 포트를 열지 않고 프록시와 같은 네트워크에만 붙는다
 start() {
@@ -94,6 +96,7 @@ start() {
     --name "$NEXT_NAME" \
     --restart unless-stopped \
     --network "$NET" \
+    --network-alias "$NEXT_HOST" \
     --env-file "$APP_DIR/app.env" \
     -v "${OWNER}-blog-uploads:/app/uploads" \
     -v "${OWNER}-blog-logs:/app/logs" \
@@ -104,7 +107,7 @@ start() {
 # 네트워크 안에서 새 컨테이너의 상태 확인 주소를 읽는다
 probe() {
   docker run --rm --network "$NET" "$PROXY_IMAGE" \
-    wget -qO- -T 3 "http://${NEXT_NAME}:8080/actuator/health" 2>/dev/null | grep -q '"UP"'
+    wget -qO- -T 3 "http://${NEXT_HOST}:8080/actuator/health" 2>/dev/null | grep -q '"UP"'
 }
 
 healthy() {
@@ -130,7 +133,7 @@ server {
     access_log off;
 
     location / {
-        set \$app http://${NEXT_NAME}:8080;
+        set \$app http://${NEXT_HOST}:8080;
         proxy_pass \$app;
         proxy_http_version 1.1;
         proxy_set_header Host              \$http_host;
