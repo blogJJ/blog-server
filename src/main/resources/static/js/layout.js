@@ -64,7 +64,7 @@
       document.dispatchEvent(new CustomEvent('layout:bell'));
     });
 
-    var nickname = el('span', 'site-header__nickname', user.nickname || '');
+    var nickname = link('/profile.html?id=' + encodeURIComponent(user.id), 'site-header__nickname', user.nickname || '');
     var logout = el('button', 'button', '로그아웃');
     logout.type = 'button';
     logout.addEventListener('click', async function () {

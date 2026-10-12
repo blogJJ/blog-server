@@ -48,14 +48,19 @@
     $('blog-link').href = withShare(ui.blogUrl(post.blog.slug));
     $('back').href = withShare(ui.blogUrl(post.blog.slug));
     $('title').textContent = (post.notice ? '[공지] ' : '') + post.title;
-    var meta = [post.authorNickname, formatDateTime(post.createdAt)];
+    var meta = [formatDateTime(post.createdAt)];
     if (post.categoryName) {
       meta.push(post.categoryName);
     }
     if (post.updatedAt && post.updatedAt !== post.createdAt) {
       meta.push('수정됨');
     }
-    $('meta').textContent = meta.join(' · ');
+    // 작성자는 프로필로 가는 링크 (SOC-03). "탈퇴한 계정"이면 링크 없이
+    var author = post.authorId ? ui.el('a', '', post.authorNickname) : document.createTextNode(post.authorNickname);
+    if (post.authorId) {
+      author.href = ui.profileUrl(post.authorId);
+    }
+    $('meta').replaceChildren(author, document.createTextNode(' · ' + meta.join(' · ')));
     $('body').innerHTML = post.html;
     $('tags').replaceChildren(ui.tagList(post.tags));
     $('edit').hidden = !post.canEdit;

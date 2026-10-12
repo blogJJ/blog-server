@@ -204,6 +204,7 @@ public class NotificationInboxService {
             ? "/blog/" + slug + "/admin"
             : "/blog/" + slug;
       }
+      case USER -> "/profile.html?id=" + n.getTargetId(); // 새 팔로워·블로그 구독은 그 회원의 프로필 (SOC-03)
       default -> null;
     };
   }

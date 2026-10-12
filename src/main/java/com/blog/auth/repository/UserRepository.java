@@ -19,6 +19,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   boolean existsByNickname(String nickname);
 
+  /** 통합 검색의 닉네임 일치 검색 (BRD-08). 닉네임은 UNIQUE */
+  Optional<User> findByNickname(String nickname);
+
   /** 이메일 찾기 (USR-08). 이름·전화번호가 같은 계정을 모두. 탈퇴 계정은 status로 뺀다 */
   List<User> findByNameAndPhoneAndStatusOrderByIdAsc(String name, String phone, UserStatus status);
 

@@ -102,6 +102,12 @@
       li.appendChild(el('p', 'comment__text', '삭제된 댓글입니다'));
       return li;
     }
+    if (c.blocked) {
+      // 내가 차단한 회원의 댓글. 다른 사람의 답글이 있어 자리만 남긴다 (SOC-05)
+      li.classList.add('comment--deleted');
+      li.appendChild(el('p', 'comment__text', '차단한 회원의 댓글이에요'));
+      return li;
+    }
     var head = el('div', 'comment__head');
     head.appendChild(el('strong', 'comment__author', c.authorNickname));
     var meta = formatDateTime(c.createdAt) + (c.edited ? ' · 수정됨' : '');
