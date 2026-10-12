@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>프로필 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/form-dialog.js" defer></script>
+    <script src="/js/report.js" defer></script>
+    <script src="/js/profile.js" defer></script>
+  </head>
+  <body>
+    <!-- 프로필 /profile.html?id={회원 번호} (T110, SOC-02, SOC-03, SOC-05). 이메일·이름·전화번호는 보여 주지 않는다 (4.4) -->
+    <main>
+      <div class="blocked" id="blocked" hidden>
+        <h1>회원을 찾을 수 없어요</h1>
+        <p>탈퇴했거나 없는 회원이에요.</p>
+        <a class="button" href="/">메인으로</a>
+      </div>
+      <article id="profile" hidden>
+        <header class="profile-head">
+          <img class="profile-photo__img" id="photo" alt="" hidden />
+          <div class="profile-photo__empty" id="photo-empty" aria-hidden="true"></div>
+          <div class="profile-head__body">
+            <h1 id="nickname"></h1>
+            <p class="profile-head__bio" id="bio"></p>
+            <p class="profile-head__meta">팔로워 <strong id="follower-count">0</strong></p>
+            <div class="blog-hero__actions">
+              <button class="button button--primary" type="button" id="follow" hidden>팔로우</button>
+              <a class="button" href="/me.html" id="edit" hidden>내 정보 수정</a>
+              <button class="button button--text" type="button" id="block" hidden>차단</button>
+              <button class="button button--text" type="button" id="report" hidden>회원 신고</button>
+            </div>
+          </div>
+        </header>
+
+        <h2 class="me-section">운영하는 블로그</h2>
+        <div class="blog-grid" id="owned"></div>
+        <p class="empty" id="owned-empty" hidden>공개 블로그가 없어요.</p>
+
+        <h2 class="me-section">참여한 블로그</h2>
+        <div class="blog-grid" id="joined"></div>
+        <p class="empty" id="joined-empty" hidden>공개 블로그가 없어요.</p>
+
+        <div class="tabs me-section-tabs" role="tablist" id="people-tabs">
+          <button class="tabs__item is-current" type="button" role="tab" data-list="followers">팔로워</button>
+          <button class="tabs__item" type="button" role="tab" data-list="followings">팔로잉</button>
+        </div>
+        <ul class="request-list" id="people"></ul>
+        <p class="empty" id="people-empty" hidden></p>
+        <nav class="pager" id="people-pager" aria-label="페이지"></nav>
+      </article>
+    </main>
+  </body>
+</html>

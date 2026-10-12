@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>검색 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/search.js" defer></script>
+  </head>
+  <body>
+    <!-- 통합 검색 (T110, BRD-08). 분류바로 대상을 고르고, 정렬은 관련도·최신·인기. 자동완성은 없다 -->
+    <main>
+      <div class="page-head">
+        <h1>검색</h1>
+      </div>
+      <form class="search" id="search-form" role="search" novalidate>
+        <input id="q" type="search" maxlength="20" placeholder="검색어 2~20자" aria-label="검색어" autocomplete="off" />
+        <button class="button button--primary" type="submit">검색</button>
+      </form>
+      <div class="recent" id="recent" hidden>
+        <div class="recent__head">
+          <strong>최근 검색어</strong>
+          <button class="button button--text" type="button" id="recent-clear">전체 삭제</button>
+        </div>
+        <ul class="chips" id="recent-list"></ul>
+      </div>
+      <div class="tabs" role="tablist" id="types">
+        <button class="tabs__item is-current" type="button" role="tab" data-type="post">글 제목</button>
+        <button class="tabs__item" type="button" role="tab" data-type="blog">블로그</button>
+        <button class="tabs__item" type="button" role="tab" data-type="tag">태그</button>
+        <button class="tabs__item" type="button" role="tab" data-type="nickname">닉네임</button>
+      </div>
+      <div class="sub-tabs" id="sorts">
+        <button class="button button--text is-current" type="button" data-sort="relevance">관련도순</button>
+        <button class="button button--text" type="button" data-sort="latest">최신순</button>
+        <button class="button button--text" type="button" data-sort="popular">인기순</button>
+      </div>
+      <p class="list-caption" id="caption"></p>
+      <div class="user-hit" id="user-hit" hidden></div>
+      <ul class="feed-list" id="posts"></ul>
+      <div class="blog-grid" id="blogs" hidden></div>
+      <p class="empty" id="empty" hidden></p>
+      <nav class="pager" id="pager" aria-label="페이지"></nav>
+    </main>
+  </body>
+</html>

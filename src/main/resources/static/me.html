@@ -13,7 +13,10 @@
     <!-- 내 정보 (T099, USR-07). 이메일과 이름은 바꿀 수 없다 (D-21, D-32) -->
     <main>
       <section class="auth-card auth-card--wide" id="me" hidden>
-        <h1>내 정보</h1>
+        <div class="page-head">
+          <h1>내 정보</h1>
+          <a class="button" id="my-profile" hidden>내 프로필 보기</a>
+        </div>
 
         <div class="profile-photo">
           <img class="profile-photo__img" id="photo" alt="프로필 사진" hidden />
@@ -57,6 +60,11 @@
 
         <h2 class="me-section">알림</h2>
         <p><a class="button" href="/me-notifications.html">알림 설정</a></p>
+
+        <!-- 차단한 회원 (T104, SOC-05). 여기서 풀 수 있다 -->
+        <h2 class="me-section">차단한 회원</h2>
+        <ul class="request-list" id="blocks"></ul>
+        <p class="field__hint" id="blocks-empty" hidden>차단한 회원이 없어요.</p>
 
         <h2 class="me-section">비밀번호 변경</h2>
         <form id="password-form" novalidate>

@@ -1,6 +1,7 @@
 /*
  * 블로그 첫 화면 /blog/{주소} (T055, BLG-01, BLG-04). 멤버는 블로그를 떠날 수 있다 (T091, BLG-07).
  * 일부 공개 블로그는 공유 링크의 ?share= 값을 API에 그대로 넘긴다. 참여 버튼은 보는 사람의 상태(viewer)로 정한다.
+ * 구독하기 버튼(T110, SOC-01, D-50): 누르면 구독, 다시 누르면 취소. 일부 공개는 링크로 들어온 회원만 구독할 수 있어 share 값을 같이 보낸다.
  */
 (function () {
   'use strict';
@@ -53,6 +54,7 @@
       '블로그장 ' + (blog.ownerNickname || '') +
       ' · 멤버 ' + blog.memberCount +
       ' · 글 ' + blog.postCount +
+      ' · 구독자 ' + blog.subscriberCount +
       ' · ' + ui.JOIN_POLICY[blog.joinPolicy];
 
     $('notice-closing').hidden = blog.status !== 'CLOSING';
@@ -78,6 +80,7 @@
         window.location.origin + ui.blogUrl(blog.slug) + '?share=' + encodeURIComponent(blog.shareKey);
     }
     renderJoin();
+    renderSubscribe();
     document.dispatchEvent(new CustomEvent('blog:loaded', { detail: blog }));
   }
 
@@ -111,6 +114,39 @@
     if (v.reapplyAt) {
       join.disabled = true;
       state.textContent = ui.formatDate(v.reapplyAt) + ' 이후 다시 신청할 수 있어요.';
+    }
+  }
+
+  function renderSubscribe() {
+    var v = blog.viewer;
+    var button = $('subscribe');
+    // 비회원에게도 보여 주고 누르면 로그인으로 보낸다. 내가 만든 블로그는 구독하지 않는다
+    button.hidden = v.role === 'OWNER';
+    button.textContent = v.subscribed ? '구독 중' : '구독하기';
+    button.setAttribute('aria-pressed', v.subscribed ? 'true' : 'false');
+  }
+
+  async function onSubscribe() {
+    if (!blog.viewer.loggedIn) {
+      window.location.href =
+        '/login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+      return;
+    }
+    var url = '/api/blogs/' + blog.id + '/subscribe';
+    if (shareKey()) {
+      url += '?share=' + encodeURIComponent(shareKey());
+    }
+    $('subscribe').disabled = true;
+    try {
+      var res = await Api.post(url);
+      blog.viewer.subscribed = res.subscribed;
+      blog.subscriberCount = res.subscriberCount;
+      Api.toast(res.subscribed ? '구독했어요. 새 글은 메인의 구독 탭에서 볼 수 있어요.' : '구독을 취소했어요.');
+      render();
+    } catch (e) {
+      Api.showError(e);
+    } finally {
+      $('subscribe').disabled = false;
     }
   }
 
@@ -219,6 +255,7 @@
       Report.open({ targetType: 'BLOG', targetId: blog.id });
     });
     $('join').addEventListener('click', onJoin);
+    $('subscribe').addEventListener('click', onSubscribe);
     $('cancel-join').addEventListener('click', onCancel);
     $('leave').addEventListener('click', onLeave);
     $('copy-share').addEventListener('click', onCopy);

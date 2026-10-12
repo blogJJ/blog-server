@@ -1577,6 +1577,208 @@ main {
   margin: 12px 16px;
 }
 
+/* ---------- 메인 피드·통합 검색·프로필 (T110) ---------- */
+
+a.site-header__nickname {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+  margin: -8px 0 12px;
+}
+
+.sub-tabs .is-current {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.feed-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feed-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.feed-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-item__title {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.feed-item__title:hover {
+  text-decoration: underline;
+}
+
+.feed-item__meta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.feed-item__meta a {
+  color: inherit;
+}
+
+.feed-item__blog {
+  font-weight: 600;
+}
+
+.feed-item__thumb {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+
+.recent {
+  margin: -8px 0 16px;
+}
+
+.recent__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+
+.chip__word,
+.chip__remove {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.chip__word {
+  padding: 4px 4px 4px 12px;
+}
+
+.chip__remove {
+  padding: 4px 10px 4px 4px;
+  color: var(--color-muted);
+}
+
+.user-hit {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.user-row__photo {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-surface);
+}
+
+.user-row__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-row__bio {
+  font-size: 13px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 8px;
+}
+
+.profile-head h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  overflow-wrap: anywhere;
+}
+
+.profile-head__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-head__bio {
+  margin: 0 0 6px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.profile-head__meta {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+}
+
+.me-section-tabs {
+  margin-top: 32px;
+}
+
+@media (max-width: 600px) {
+  .profile-head {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .feed-item__thumb {
+    width: 56px;
+    height: 56px;
+  }
+}
+
 /* ---------- 메인 관리자 화면 (T126) ---------- */
 .admin-table {
   width: 100%;

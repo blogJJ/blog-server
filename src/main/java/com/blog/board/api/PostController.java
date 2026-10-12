@@ -115,6 +115,7 @@ public class PostController {
         d.title(),
         d.html(),
         d.markdown(),
+        d.authorId(),
         d.authorNickname(),
         d.categoryId(),
         d.categoryName(),
