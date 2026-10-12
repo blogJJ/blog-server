@@ -9,6 +9,11 @@
   var ui = window.BlogUi;
   var blog = null;
   var user = undefined; // layout:user 전에는 undefined
+  // 폐쇄 예정 공지 앞에 붙는 사유 (ADM-02, ADM-07)
+  var CLOSE_REASON = {
+    OWNER_DEMOTED: '블로그장 권한 박탈로 인한 폐쇄 조치예요. ',
+    ADMIN: '운영 정책에 따라 관리자가 폐쇄하기로 했어요. '
+  };
 
   function $(id) {
     return document.getElementById(id);
@@ -55,13 +60,12 @@
     $('notice-closing').hidden = blog.status !== 'CLOSING';
     if (blog.status === 'CLOSING') {
       $('notice-closing').textContent =
+        (CLOSE_REASON[blog.closeReason] || '') +
         '이 블로그는 ' + ui.formatDate(blog.closeScheduledAt) + '에 폐쇄될 예정이에요.';
     }
-    $('notice-owner').hidden = !blog.ownerSuspendedUntil;
-    if (blog.ownerSuspendedUntil) {
-      $('notice-owner').textContent =
-        '블로그장 정지 중이에요 (' + ui.formatDate(blog.ownerSuspendedUntil) + '까지).';
-    }
+    // 블로그장 계정 정지 중 공지는 서버가 문구를 만든다 (T122, ADM-08, D-100)
+    $('notice-owner').hidden = !blog.ownerNotice;
+    $('notice-owner').textContent = blog.ownerNotice || '';
 
     var canManage = v.canEditInfo || v.canManageMembers;
     $('manage').hidden = !canManage;

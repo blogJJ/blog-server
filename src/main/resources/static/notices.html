@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>공지사항 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/notices.js" defer></script>
+  </head>
+  <body>
+    <!-- 메인 공지사항 (BRD-10, T125). ?id=번호면 그 공지를 펼친다 -->
+    <main>
+      <div class="page-head">
+        <h1>공지사항</h1>
+      </div>
+      <article class="post" id="notice" hidden>
+        <h2 id="notice-title"></h2>
+        <p class="admin-list__sub" id="notice-date"></p>
+        <div class="post__body" id="notice-body"></div>
+      </article>
+      <ul class="admin-list" id="notices"></ul>
+      <p class="empty" id="notices-empty" hidden>아직 공지가 없어요.</p>
+      <div class="pager" id="notices-pager"></div>
+    </main>
+  </body>
+</html>

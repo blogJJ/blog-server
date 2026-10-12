@@ -14,7 +14,12 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Security 필터 단계에서 막힌 요청(로그인 필요 401, 권한 없음·CSRF 실패 403)도 API와 같은 {code, message}로 답한다 (OPS-02). */
+/**
+ * Security 필터 단계에서 막힌 요청(로그인 필요 401, 권한 없음·CSRF 실패 403)도 API와 같은 {code, message}로 답한다 (OPS-02).
+ *
+ * <p>관리자 화면({@code /admin/**})은 사람이 주소창으로 여는 화면이라 JSON 대신 401은 로그인 화면으로 보내고, 403은 오류 화면을 보여 준다
+ * (T126).
+ */
 public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
   private final JsonMapper jsonMapper;
@@ -29,6 +34,10 @@ public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, Acces
       HttpServletResponse response,
       AuthenticationException authException)
       throws IOException {
+    if (isAdminPage(request)) {
+      response.sendRedirect("/login.html?next=" + ADMIN_HOME);
+      return;
+    }
     write(response, ErrorCode.UNAUTHORIZED);
   }
 
@@ -39,7 +48,19 @@ public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, Acces
       AccessDeniedException accessDeniedException)
       throws IOException {
     SecurityEventLogger.accessDenied(request);
+    if (isAdminPage(request)) {
+      response.sendError(HttpServletResponse.SC_FORBIDDEN);
+      return;
+    }
     write(response, ErrorCode.FORBIDDEN);
+  }
+
+  static final String ADMIN_HOME = "/admin/";
+
+  private static boolean isAdminPage(HttpServletRequest request) {
+    String path = request.getRequestURI().substring(request.getContextPath().length());
+    return "GET".equals(request.getMethod())
+        && (path.equals("/admin") || path.startsWith("/admin/"));
   }
 
   private void write(HttpServletResponse response, ErrorCode code) throws IOException {

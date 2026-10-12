@@ -41,6 +41,7 @@
 
   function buildFooter() {
     var footer = el('footer', 'site-footer');
+    footer.appendChild(link('/notices.html', '', '공지사항'));
     footer.appendChild(link('/privacy.html', '', '개인정보 처리방침'));
     return footer;
   }
@@ -77,7 +78,9 @@
     });
 
     var items = [bell, nickname];
-    if (user.role !== 'ADMIN') {
+    if (user.role === 'ADMIN') {
+      items.push(link('/admin/', 'button', '관리')); // 메인 관리자 화면 (T126)
+    } else {
       items.push(link('/my-blogs.html', 'button', '내 블로그'));
     }
     items.push(link('/me.html', 'button', '내 정보'), logout);

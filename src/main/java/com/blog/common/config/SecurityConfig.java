@@ -134,6 +134,9 @@ public class SecurityConfig {
                     // 그 밖의 API(쓰기)는 로그인 필요
                     .requestMatchers("/api/**")
                     .authenticated()
+                    // 관리자 화면과 그 스크립트는 관리자만 (T126). 로그인 안 했으면 로그인 화면으로 보낸다
+                    .requestMatchers("/admin", "/admin/**")
+                    .hasRole("ADMIN")
                     // 화면(정적 HTML·JS·CSS)과 오류 화면
                     .requestMatchers(HttpMethod.GET, "/**")
                     .permitAll()

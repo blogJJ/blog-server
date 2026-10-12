@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>메인 관리 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/form-dialog.js" defer></script>
+    <script src="/admin/js/admin.js" defer></script>
+  </head>
+  <body>
+    <!-- 메인 관리자 화면 /admin/ (T126, ADM-01~08, BRD-10). 주소 자체가 ADMIN만 열린다(SecurityConfig). -->
+    <main>
+      <div class="page-head">
+        <h1>메인 관리</h1>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tabs__item" type="button" role="tab" data-tab="reports">신고</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="users">회원</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="blogs">블로그</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="posts">글·댓글</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="stats">통계</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="notices">공지</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="logs">활동 기록</button>
+      </div>
+
+      <section class="tab-panel" id="panel-reports" hidden>
+        <p class="field__hint">블로그·블로그장에 대한 신고(블로그장이 쓴 글·댓글 포함), 메인 프로필 회원 신고, 블로그장이 계정 정지 중이고 부블로그장이 없는 블로그의 신고예요. 처리 결과는 신고한 사람에게 알림이 가요.</p>
+        <div class="field__row">
+          <select id="report-status" aria-label="신고 상태">
+            <option value="PENDING">대기 중</option>
+            <option value="DONE">처리함</option>
+          </select>
+        </div>
+        <ul class="admin-list" id="reports"></ul>
+        <p class="empty" id="reports-empty" hidden>신고가 없어요.</p>
+        <div class="pager" id="reports-pager"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-users" hidden>
+        <p class="field__hint">이메일·전화번호는 가려서 보여요. "전체 보기"를 누르면 원문이 보이고 활동 기록에 남아요. 회원 정지·강제 퇴장은 블로그장이 하고, 계정 경고·초기화·정지는 메인 프로필 신고로 처리해요.</p>
+        <form class="search" id="user-search" novalidate>
+          <input type="text" id="user-q" maxlength="50" placeholder="이메일·닉네임·이름" aria-label="회원 검색어" />
+          <button class="button button--primary" type="submit">검색</button>
+        </form>
+        <ul class="admin-list" id="users"></ul>
+        <p class="empty" id="users-empty" hidden>찾는 회원이 없어요.</p>
+        <div class="pager" id="users-pager"></div>
+        <div id="user-detail" hidden></div>
+      </section>
+
+      <section class="tab-panel" id="panel-blogs" hidden>
+        <p class="field__hint">숨긴 블로그는 목록·검색에서 빠지고 주소로 들어와도 보이지 않아요. 강제 폐쇄는 7일 뒤 04:00에 폐쇄되고, 그 안에 블로그장이 철회할 수 있어요. 블로그장 경고는 블로그별로 최근 1년 안에 3번이면 권한이 박탈돼요.</p>
+        <form class="search" id="blog-search" novalidate>
+          <input type="text" id="blog-q" maxlength="50" placeholder="블로그 이름·주소" aria-label="블로그 검색어" />
+          <button class="button button--primary" type="submit">검색</button>
+        </form>
+        <ul class="admin-list" id="blogs"></ul>
+        <p class="empty" id="blogs-empty" hidden>찾는 블로그가 없어요.</p>
+        <div class="pager" id="blogs-pager"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-posts" hidden>
+        <p class="field__hint">삭제하면 작성자에게 알림이 가요. 숨긴 글과 삭제한 지 30일 안의 글은 복구할 수 있어요.</p>
+        <form class="search" id="post-search" novalidate>
+          <input type="text" id="post-q" maxlength="50" placeholder="글 제목" aria-label="글 검색어" />
+          <button class="button button--primary" type="submit">검색</button>
+        </form>
+        <ul class="admin-list" id="posts"></ul>
+        <p class="empty" id="posts-empty" hidden>찾는 글이 없어요.</p>
+        <div class="pager" id="posts-pager"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-stats" hidden>
+        <div class="field__row">
+          <select id="stats-days" aria-label="기간">
+            <option value="7">최근 7일</option>
+            <option value="30" selected>최근 30일</option>
+            <option value="90">최근 90일</option>
+          </select>
+        </div>
+        <p id="stats-summary"></p>
+        <table class="admin-table" id="stats-table">
+          <thead>
+            <tr><th scope="col">날짜</th><th scope="col">가입</th><th scope="col">글</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="tab-panel" id="panel-notices" hidden>
+        <div class="form-card form-card--flat">
+          <p class="field__hint">공지는 전체 회원에게 "공지사항" 알림으로 가요. 본문은 마크다운으로 5,000자까지 쓸 수 있어요.</p>
+          <p class="form-message form-message--error" id="notice-message" role="alert"></p>
+          <form id="notice-form" novalidate>
+            <label class="field">
+              <span class="field__label">제목</span>
+              <input type="text" id="notice-title" maxlength="30" required />
+            </label>
+            <label class="field">
+              <span class="field__label">본문</span>
+              <textarea id="notice-content" rows="8" maxlength="5000" required></textarea>
+            </label>
+            <button class="button button--primary" type="submit">공지 올리기</button>
+          </form>
+        </div>
+        <h2 class="admin-subhead">올린 공지</h2>
+        <ul class="admin-list" id="notices"></ul>
+        <p class="empty" id="notices-empty" hidden>아직 공지가 없어요.</p>
+        <div class="pager" id="notices-pager"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-logs" hidden>
+        <p class="field__hint">관리자가 한 조치와 개인정보 "전체 보기"가 남아요. 1년 동안 보관해요.</p>
+        <ul class="admin-list" id="logs"></ul>
+        <p class="empty" id="logs-empty" hidden>기록이 없어요.</p>
+        <div class="pager" id="logs-pager"></div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -190,6 +190,10 @@ public class NotificationInboxService {
     if (n.getTargetType() == null || n.getTargetId() == null) {
       return null;
     }
+    if (n.getType() == NotificationType.NOTICE) {
+      // 메인 공지는 숨긴 main 블로그의 글이라 공지 화면에서 읽는다 (BRD-10)
+      return "/notices.html?id=" + n.getTargetId();
+    }
     return switch (n.getTargetType()) {
       case POST -> {
         String slug = postSlugs.get(n.getTargetId());

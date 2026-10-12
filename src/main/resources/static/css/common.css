@@ -1778,3 +1778,33 @@ a.site-header__nickname {
     height: 56px;
   }
 }
+
+/* ---------- 메인 관리자 화면 (T126) ---------- */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.admin-bar {
+  display: inline-block;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 4px;
+  background: var(--color-primary, #3b82f6);
+  vertical-align: middle;
+}
+
+.admin-detail {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}

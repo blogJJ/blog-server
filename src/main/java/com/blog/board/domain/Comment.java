@@ -79,6 +79,11 @@ public class Comment extends BaseTimeEntity {
     this.deletedAt = now;
   }
 
+  /** 관리자 숨김 (ADM-03). 화면에는 삭제된 댓글처럼 보인다. */
+  public void hide() {
+    this.status = CommentStatus.HIDDEN;
+  }
+
   public boolean isActive() {
     return status == CommentStatus.ACTIVE;
   }
