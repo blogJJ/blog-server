@@ -131,6 +131,11 @@ app:
   # 블로그 마스코트 (BLG-14, D-116). 키가 비어 있으면 Claude를 부르지 않고 태그 단어 사전으로 고른다
   mascot:
     api-key: ${ANTHROPIC_API_KEY:}
+  # 새 블로그의 대표 그림 (T155, D-126). 키·모델은 mascot 값을 같이 쓴다. 키가 비어 있으면 그리지 않고 픽셀 장면을 보여 준다
+  cover-art:
+    enabled: true
+    max-tokens: 16000
+    timeout: 3m
   storage:
     # 이미지 저장 위치. 1차는 서버 디스크, 이중화 때 S3 (SCL-02)
     local-dir: ${STORAGE_LOCAL_DIR:./uploads}

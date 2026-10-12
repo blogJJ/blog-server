@@ -158,7 +158,7 @@ public class BlogService {
     }
     memberRepository.save(new BlogMember(blog, owner, BlogMemberRole.OWNER));
     saveTags(blog, f.tags());
-    events.publishEvent(new MascotService.BlogInfoChanged(blog.getId()));
+    events.publishEvent(new MascotService.BlogInfoChanged(blog.getId(), true));
     return blog;
   }
 
@@ -189,7 +189,7 @@ public class BlogService {
     blogTagRepository.deleteByBlogId(blog.getId());
     saveTags(blog, f.tags());
     if (mascotInputChanged) {
-      events.publishEvent(new MascotService.BlogInfoChanged(blog.getId()));
+      events.publishEvent(new MascotService.BlogInfoChanged(blog.getId(), false));
     }
     if (becomesPrivate) {
       notificationService.notifyAll(
