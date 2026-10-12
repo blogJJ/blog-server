@@ -50,6 +50,7 @@ public class BlogQueryService {
       String description,
       String coverImage,
       String mascot,
+      String coverScene,
       BlogVisibility visibility,
       BlogStatus status,
       int memberCount,
@@ -62,6 +63,8 @@ public class BlogQueryService {
    * 블로그 첫 화면 (T055). viewer는 보는 사람 기준 상태.
    *
    * @param mascot 마스코트 조합(bear.mint.beret.heart 꼴). 아직 안 만들었으면 null (BLG-14, D-116, D-118)
+   * @param coverScene 대표 이미지가 없을 때 그릴 픽셀 장면(study.night.rain.mint.4821 꼴). 아직 안 만들었으면 null (BLG-15,
+   *     D-119)
    * @param closeReason 폐쇄 예정이면 사유. 화면이 블로그장 박탈·관리자 폐쇄 공지 문구를 고른다 (ADM-02, ADM-07)
    * @param ownerSuspendedUntil 블로그장이 계정 정지 중이면 끝나는 시각 (ADM-08)
    * @param ownerNotice 블로그장이 계정 정지 중이면 블로그 맨 위에 띄울 "블로그장 정지 중 (끝나는 날짜)" 공지. 아니면 null (T122, D-100)
@@ -74,6 +77,7 @@ public class BlogQueryService {
       String description,
       String coverImage,
       String mascot,
+      String coverScene,
       BlogVisibility visibility,
       JoinPolicy joinPolicy,
       BlogStatus status,
@@ -281,6 +285,7 @@ public class BlogQueryService {
         blog.getDescription(),
         ImageService.url(blog.getCoverImage()),
         mascotKey(blog),
+        coverSceneKey(blog),
         blog.getVisibility(),
         blog.getJoinPolicy(),
         blog.getStatus(),
@@ -375,6 +380,7 @@ public class BlogQueryService {
                     b.getDescription(),
                     ImageService.url(b.getCoverImage()),
                     mascotKey(b),
+                    coverSceneKey(b),
                     b.getVisibility(),
                     b.getStatus(),
                     b.getMemberCount(),
@@ -385,9 +391,14 @@ public class BlogQueryService {
         .toList();
   }
 
-  /** 마스코트 이름(bear 등). 아직 안 골랐으면 null이고, 화면이 블로그 이름으로 기본 동물을 보여 준다 (D-116). */
+  /** 마스코트 조합. 아직 안 만들었으면 null이고, 화면이 블로그 이름으로 기본 그림을 보여 준다 (D-116, D-118). */
   private static String mascotKey(Blog blog) {
     return blog.getMascot() == null ? null : blog.getMascot().value();
+  }
+
+  /** 픽셀 장면. 아직 안 만들었으면 null이고, 화면이 블로그 주소로 기본 장면을 보여 준다 (D-119). */
+  private static String coverSceneKey(Blog blog) {
+    return blog.getCoverScene() == null ? null : blog.getCoverScene().value();
   }
 
   private Map<Long, List<String>> tagsOf(List<Long> blogIds) {

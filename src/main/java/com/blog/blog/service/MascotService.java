@@ -2,6 +2,8 @@ package com.blog.blog.service;
 
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogTag;
+import com.blog.blog.domain.CoverScene;
+import com.blog.blog.domain.Mascot;
 import com.blog.blog.domain.MascotDesign;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogTagRepository;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 블로그 마스코트를 만든다 (T148, BLG-14, D-116, D-118). 블로그를 만들거나 이름·태그를 고치면 저장이 끝난 뒤 따로 만들고(블로그 저장은 기다리지
  * 않음), 아직 없는 블로그는 예약 작업이 조금씩 채운다. Claude가 바탕 그림·색·모자·장식을 고르고, 못 고르면 태그 단어 사전으로 바탕을 고른 뒤 나머지는 이름과
- * 태그로 정한다. 다른 블로그나 이 블로그의 지금 그림과 같은 조합이면 다른 조합으로 바꾼다.
+ * 태그로 정한다. 다른 블로그나 이 블로그의 지금 그림과 같은 조합이면 다른 조합으로 바꾼다. 대표 이미지가 없을 때 보여 줄 픽셀 장면(BLG-15, D-119)도 같이
+ * 고르고, 배치 번호는 저장할 때마다 새로 뽑아 같은 장면이라도 블로그마다·태그를 바꿀 때마다 그림이 달라진다.
  */
 @Service
 public class MascotService {
@@ -72,7 +76,7 @@ public class MascotService {
     }
   }
 
-  /** 마스코트가 없는 블로그를 채운다. 기존 블로그와, 고르다 서버가 꺼진 블로그용. */
+  /** 마스코트나 장면이 없는 블로그를 채운다. 기존 블로그와, 고르다 서버가 꺼진 블로그용. */
   @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT10M")
   @SchedulerLock(name = "mascotBackfill", lockAtMostFor = "PT9M")
   public void backfill() {
@@ -95,13 +99,18 @@ public class MascotService {
                 blogRepository
                     .findById(blogId)
                     .filter(Blog::isOpen)
-                    .map(b -> new Info(b.getName(), tagNames(b.getId()), b.getMascot()))
+                    .map(
+                        b ->
+                            new Info(
+                                b.getName(), tagNames(b.getId()), b.getMascot(), b.getCoverScene()))
                     .orElse(null));
     if (info == null) {
       return null;
     }
-    MascotDesign wanted =
+    ClaudeMascotClient.Art art =
         claude.choose(info.name(), info.tags()).orElseGet(() -> fallback(info.name(), info.tags()));
+    MascotDesign wanted = art.mascot();
+    CoverScene cover = withNewSeed(art.cover(), info.cover());
     // 한 번에 하나씩 만들기 때문에(worker, ShedLock) 읽고 저장하는 사이에 같은 조합이 끼어들지 않는다
     MascotDesign mascot =
         tx.execute(
@@ -112,7 +121,13 @@ public class MascotService {
                 taken.add(info.current().value()); // 태그를 바꾸면 새 그림
               }
               MascotDesign design = unique(wanted, taken);
-              blogRepository.findById(blogId).ifPresent(b -> b.changeMascot(design));
+              blogRepository
+                  .findById(blogId)
+                  .ifPresent(
+                      b -> {
+                        b.changeMascot(design);
+                        b.changeCoverScene(cover);
+                      });
               return design;
             });
     return mascot;
@@ -126,10 +141,51 @@ public class MascotService {
     }
   }
 
-  /** 단어 사전으로 바탕을 고르고 색·모자·장식은 이름과 태그로 정한다. 같은 입력이면 같은 조합. */
-  static MascotDesign fallback(String name, List<String> tags) {
+  /** 단어 사전으로 바탕을 고르고 색·모자·장식과 장면의 시간·날씨·색은 이름과 태그로 정한다. 장면은 바탕 그림에 맞춘다. */
+  static ClaudeMascotClient.Art fallback(String name, List<String> tags) {
     int seed = (name == null ? "" : name).hashCode() * 31 + tags.hashCode();
-    return MascotDesign.ofVariant(KeywordMascotPicker.pick(name, tags), seed);
+    Mascot base = KeywordMascotPicker.pick(name, tags);
+    CoverScene.Time[] times = CoverScene.Time.values();
+    CoverScene.Weather[] weathers = CoverScene.Weather.values();
+    CoverScene.Palette[] palettes = CoverScene.Palette.values();
+    int h = Math.floorMod(seed / 7, 1 << 20);
+    return new ClaudeMascotClient.Art(
+        MascotDesign.ofVariant(base, seed),
+        new CoverScene(
+            sceneFor(base),
+            times[h % times.length],
+            // 날씨는 절반쯤 맑게
+            h / 4 % 2 == 0 ? CoverScene.Weather.CLEAR : weathers[h / 8 % weathers.length],
+            palettes[h / 64 % palettes.length],
+            0));
+  }
+
+  static CoverScene.Scene sceneFor(Mascot base) {
+    return switch (base) {
+      case COMPUTER -> CoverScene.Scene.DESK;
+      case CAMERA -> CoverScene.Scene.PHOTO;
+      case BOOK, OWL -> CoverScene.Scene.STUDY;
+      case PLANE -> CoverScene.Scene.SEA;
+      case HEADPHONES, FROG -> CoverScene.Scene.STAGE;
+      case GAMEPAD -> CoverScene.Scene.GAME;
+      case COFFEE -> CoverScene.Scene.CAFE;
+      case CAKE -> CoverScene.Scene.BAKERY;
+      case BEAR -> CoverScene.Scene.KITCHEN;
+      case PENGUIN -> CoverScene.Scene.SNOWFIELD;
+      case BIRD -> CoverScene.Scene.SKY;
+      case DOG, FOX -> CoverScene.Scene.PARK;
+      case CAT, RABBIT -> CoverScene.Scene.GARDEN;
+      case HAMSTER -> CoverScene.Scene.NIGHT_CITY;
+    };
+  }
+
+  /** 배치 번호를 새로 뽑는다. 지금 장면과 같은 번호는 피한다. */
+  static CoverScene withNewSeed(CoverScene chosen, CoverScene current) {
+    int seed;
+    do {
+      seed = ThreadLocalRandom.current().nextInt(CoverScene.SEEDS);
+    } while (current != null && current.seed() == seed);
+    return new CoverScene(chosen.scene(), chosen.time(), chosen.weather(), chosen.palette(), seed);
   }
 
   /** 쓰고 있는 조합이면 같은 바탕 안에서 비어 있는 조합으로 바꾼다. 모두 차 있으면 원래 조합을 그대로 쓴다. */
@@ -155,5 +211,5 @@ public class MascotService {
     worker.shutdownNow();
   }
 
-  private record Info(String name, List<String> tags, MascotDesign current) {}
+  private record Info(String name, List<String> tags, MascotDesign current, CoverScene cover) {}
 }

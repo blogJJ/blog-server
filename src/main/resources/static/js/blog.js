@@ -49,6 +49,15 @@
     if (blog.coverImage) {
       $('cover').src = blog.coverImage;
     }
+    // 대표 이미지가 없으면 서버가 고른 움직이는 픽셀 장면 (BLG-15, D-119)
+    var hasScene = !blog.coverImage && !!window.PixelCover;
+    $('cover-scene').hidden = !hasScene;
+    if (hasScene) {
+      window.PixelCover.render(
+        $('cover-scene').querySelector('canvas'),
+        window.PixelCover.fromValue(blog.coverScene, blog.slug, blog.mascot)
+      );
+    }
     $('description').textContent = blog.description || '';
     $('tags').replaceChildren(ui.tagList(blog.tags));
     $('visibility').hidden = blog.visibility === 'PUBLIC';
@@ -73,9 +82,9 @@
     var canManage = v.canEditInfo || v.canManageMembers;
     $('manage').hidden = !canManage;
     $('manage').href = ui.blogUrl(blog.slug) + '/admin';
-    $('cover-wrap').hidden = !blog.coverImage && !canManage;
+    $('cover-wrap').hidden = !blog.coverImage && !hasScene && !canManage;
     $('report-blog').hidden = !v.loggedIn || v.role === 'OWNER';
-    $('cover-wrap').classList.toggle('has-cover', !!blog.coverImage);
+    $('cover-wrap').classList.toggle('has-cover', !!blog.coverImage || hasScene);
 
     $('share-box').hidden = !blog.shareKey;
     if (blog.shareKey) {

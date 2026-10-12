@@ -43,8 +43,21 @@ class MascotServiceTest {
                 "select mascot from blogs where id = ?", String.class, blog.getId()))
         .isEqualTo(design.value())
         .matches("bear\\.[a-z]+\\.[a-z]+\\.[a-z]+");
+    assertThat(
+            jdbc.queryForObject(
+                "select cover_scene from blogs where id = ?", String.class, blog.getId()))
+        .matches("kitchen\\.[a-z]+\\.[a-z]+\\.[a-z]+\\.\\d+");
     assertThat(blogRepository.findIdsWithoutMascot(PageRequest.of(0, 10_000)))
         .doesNotContain(blog.getId());
+  }
+
+  @Test
+  void blogWithoutCoverSceneIsFilledAgain() {
+    Blog blog = newBlog("이름", List.of());
+    mascotService.assign(blog.getId());
+    jdbc.update("update blogs set cover_scene = null where id = ?", blog.getId());
+    assertThat(blogRepository.findIdsWithoutMascot(PageRequest.of(0, 10_000)))
+        .contains(blog.getId());
   }
 
   @Test
@@ -64,7 +77,15 @@ class MascotServiceTest {
     Blog blog = newBlog("민준의 식탁", List.of("집밥"));
     MascotDesign before = mascotService.assign(blog.getId());
 
+    String coverBefore =
+        jdbc.queryForObject(
+            "select cover_scene from blogs where id = ?", String.class, blog.getId());
+
     assertThat(mascotService.assign(blog.getId()).value()).isNotEqualTo(before.value());
+    assertThat(
+            jdbc.queryForObject(
+                "select cover_scene from blogs where id = ?", String.class, blog.getId()))
+        .isNotEqualTo(coverBefore);
   }
 
   @Test

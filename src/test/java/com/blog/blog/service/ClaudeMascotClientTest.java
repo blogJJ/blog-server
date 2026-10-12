@@ -2,6 +2,7 @@ package com.blog.blog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.blog.blog.domain.CoverScene;
 import com.blog.blog.domain.Mascot;
 import com.blog.blog.domain.MascotDesign;
 import com.sun.net.httpserver.HttpServer;
@@ -38,17 +39,25 @@ class ClaudeMascotClientTest {
     start(
         200,
         response(
-            "{\"base\":\"OWL\",\"tone\":\"SKY\",\"hat\":\"BERET\",\"charm\":\"STAR\"}",
+            "{\"base\":\"OWL\",\"tone\":\"SKY\",\"hat\":\"BERET\",\"charm\":\"STAR\","
+                + "\"scene\":\"STUDY\",\"time\":\"NIGHT\",\"weather\":\"RAIN\",\"palette\":\"MINT\"}",
             "end_turn"));
     ClaudeMascotClient client = client();
 
     assertThat(client.choose("공부방", List.of("자격증", "스터디")))
         .contains(
-            new MascotDesign(
-                Mascot.OWL,
-                MascotDesign.Tone.SKY,
-                MascotDesign.Hat.BERET,
-                MascotDesign.Charm.STAR));
+            new ClaudeMascotClient.Art(
+                new MascotDesign(
+                    Mascot.OWL,
+                    MascotDesign.Tone.SKY,
+                    MascotDesign.Hat.BERET,
+                    MascotDesign.Charm.STAR),
+                new CoverScene(
+                    CoverScene.Scene.STUDY,
+                    CoverScene.Time.NIGHT,
+                    CoverScene.Weather.RAIN,
+                    CoverScene.Palette.MINT,
+                    0)));
     assertThat(lastBody.get())
         .contains("claude-opus-5-5")
         .contains("공부방")

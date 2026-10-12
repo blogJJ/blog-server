@@ -11,6 +11,7 @@
     <script src="/js/layout.js" defer></script>
     <script src="/js/session.js" defer></script>
     <script src="/js/mascot.js" defer></script>
+    <script src="/js/pixel-cover.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
     <script src="/js/form-dialog.js" defer></script>
     <script src="/js/report.js" defer></script>
@@ -31,6 +32,7 @@
         <!-- 블로그 관리 버튼은 대표 이미지 오른쪽 아래에 둔다. 이미지가 없으면 이 줄 오른쪽 끝 -->
         <div class="blog-cover-wrap" id="cover-wrap" hidden>
           <img class="blog-cover" id="cover" alt="" hidden />
+          <div class="blog-cover blog-cover--scene" id="cover-scene" hidden><canvas aria-hidden="true"></canvas></div>
           <a class="button blog-cover-wrap__manage" id="manage" hidden>블로그 관리</a>
         </div>
         <header class="blog-hero">

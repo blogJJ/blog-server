@@ -48,6 +48,11 @@ public class Blog extends BaseTimeEntity {
   @Column(length = 40)
   private MascotDesign mascot;
 
+  /** 대표 이미지가 없을 때 보여 줄 픽셀 장면. null이면 아직 안 만듦 (BLG-15, D-119) */
+  @Convert(converter = CoverSceneConverter.class)
+  @Column(length = 60)
+  private CoverScene coverScene;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private BlogVisibility visibility = BlogVisibility.PUBLIC;
@@ -136,6 +141,10 @@ public class Blog extends BaseTimeEntity {
     this.mascot = mascot;
   }
 
+  public void changeCoverScene(CoverScene coverScene) {
+    this.coverScene = coverScene;
+  }
+
   /** 폐쇄 예정으로 바꾼다 (BLG-09, D-12). 예정 시각은 서비스가 정한다(누른 날짜 + 7일 04:00). */
   public void scheduleClose(LocalDateTime at, CloseReason reason) {
     this.status = BlogStatus.CLOSING;
@@ -205,6 +214,10 @@ public class Blog extends BaseTimeEntity {
 
   public MascotDesign getMascot() {
     return mascot;
+  }
+
+  public CoverScene getCoverScene() {
+    return coverScene;
   }
 
   public BlogVisibility getVisibility() {

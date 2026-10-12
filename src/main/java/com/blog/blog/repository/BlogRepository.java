@@ -120,9 +120,9 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
           + " else b.postCount + :delta end where b.id = :id")
   void addPostCount(@Param("id") Long id, @Param("delta") int delta);
 
-  /** 마스코트를 아직 안 고른 블로그 (BLG-14, D-116). 폐쇄된 블로그는 뺀다. */
+  /** 마스코트나 픽셀 장면을 아직 안 만든 블로그 (BLG-14, BLG-15, D-116, D-119). 폐쇄된 블로그는 뺀다. */
   @Query(
-      "select b.id from Blog b where b.mascot is null"
+      "select b.id from Blog b where (b.mascot is null or b.coverScene is null)"
           + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED order by b.id")
   List<Long> findIdsWithoutMascot(Pageable pageable);
 

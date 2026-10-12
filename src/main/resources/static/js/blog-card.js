@@ -43,6 +43,14 @@
       cover.alt = '';
       cover.loading = 'lazy';
       a.appendChild(cover);
+    } else if (window.PixelCover) {
+      // 대표 이미지가 없으면 서버가 고른 움직이는 픽셀 장면 (BLG-15, D-119)
+      var scene = el('div', 'blog-card__cover blog-card__scene');
+      var canvas = document.createElement('canvas');
+      canvas.setAttribute('aria-hidden', 'true');
+      scene.appendChild(canvas);
+      a.appendChild(scene);
+      window.PixelCover.render(canvas, window.PixelCover.fromValue(blog.coverScene, blog.slug, blog.mascot));
     }
     var title = el('div', 'blog-card__title');
     if (window.Mascot) {

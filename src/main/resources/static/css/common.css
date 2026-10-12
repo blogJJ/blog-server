@@ -927,6 +927,21 @@ main {
   margin-top: 8px;
 }
 
+/* 대표 이미지가 없을 때의 픽셀 장면. canvas는 pixel-cover.js가 폭에 맞춰 정수 배로 키운다 (D-119) */
+.blog-cover--scene {
+  max-height: none;
+  overflow: hidden;
+  line-height: 0;
+  background: var(--color-surface);
+}
+
+.blog-card__scene {
+  height: auto;
+  overflow: hidden;
+  line-height: 0;
+  background: var(--color-surface);
+}
+
 /* 대표 이미지 오른쪽 아래 블로그 관리 버튼 */
 .blog-cover-wrap {
   position: relative;
