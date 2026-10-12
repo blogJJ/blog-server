@@ -107,9 +107,6 @@
     $('leave').hidden = true;
     state.textContent = '';
 
-    if (user && user.role === 'ADMIN') {
-      return; // 메인 관리자는 참여하지 않는다 (D-90)
-    }
     if (v.role) {
       state.textContent =
         v.role === 'OWNER' ? '내가 만든 블로그예요.' : ui.ROLE[v.role] + (v.role === 'MANAGER' ? '으로' : '로') + ' 참여 중';

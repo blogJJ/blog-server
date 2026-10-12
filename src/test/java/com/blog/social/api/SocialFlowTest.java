@@ -72,9 +72,10 @@ class SocialFlowTest {
     call(a, post("/api/users/" + a.getId() + "/follow"), null).andExpect(status().isBadRequest());
     call(null, post("/api/users/" + b.getId() + "/follow"), null)
         .andExpect(status().isUnauthorized());
+    // 메인 관리자도 팔로우한다 (D-122)
     call(admin(), post("/api/users/" + b.getId() + "/follow"), null)
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("ADMIN_NOT_ALLOWED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.following").value(true));
   }
 
   @Test

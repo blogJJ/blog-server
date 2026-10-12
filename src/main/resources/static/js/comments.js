@@ -37,7 +37,7 @@
   }
 
   function canWrite() {
-    return user && user.role !== 'ADMIN';
+    return !!user;
   }
 
   function start() {

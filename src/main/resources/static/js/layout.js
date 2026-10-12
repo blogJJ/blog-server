@@ -101,9 +101,8 @@
     var items = [bell, nickname];
     if (user.role === 'ADMIN') {
       items.push(link('/admin/', 'button', '관리')); // 메인 관리자 화면 (T126)
-    } else {
-      items.push(link('/my-blogs.html', 'button', '내 블로그'));
     }
+    items.push(link('/my-blogs.html', 'button', '내 블로그'));
     items.push(link('/me.html', 'button', '내 정보'), logout);
     menu.replaceChildren.apply(menu, items);
     loadNotifications();

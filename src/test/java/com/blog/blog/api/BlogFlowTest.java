@@ -110,12 +110,14 @@ class BlogFlowTest {
   }
 
   @Test
-  void adminCannotCreate() throws Exception {
+  void adminCreatesWithoutLimit() throws Exception {
     User admin = newUser();
     jdbc.update("update users set role = 'ADMIN' where id = ?", admin.getId());
-    call(admin, post("/api/blogs"), blogBody(slug(), "PUBLIC", "OPEN", List.of()))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("ADMIN_NOT_ALLOWED"));
+    // 메인 관리자는 블로그를 만들 수 있고 개수 제한이 없다 (D-122)
+    for (int i = 0; i < 4; i++) {
+      call(admin, post("/api/blogs"), blogBody(slug(), "PUBLIC", "OPEN", List.of()))
+          .andExpect(status().isCreated());
+    }
   }
 
   @Test

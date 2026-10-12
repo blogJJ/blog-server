@@ -118,8 +118,9 @@ class CommentLikeFlowTest {
     call(owner, post(url), commentBody("가".repeat(501), null)).andExpect(status().isBadRequest());
     call(owner, post(url), commentBody("가".repeat(500), null)).andExpect(status().isCreated());
     call(null, post(url), commentBody("비회원", null)).andExpect(status().isUnauthorized());
+    // 메인 관리자도 댓글을 단다 (D-122)
     call(newAdmin(), UserRole.ADMIN, post(url), commentBody("관리자", null))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isCreated());
 
     User suspended = newUser();
     jdbc.update(
@@ -221,7 +222,8 @@ class CommentLikeFlowTest {
     assertThat(count("select count(*) from post_likes where post_id = ?", postId)).isZero();
 
     call(null, post(url), null).andExpect(status().isUnauthorized());
-    call(newAdmin(), UserRole.ADMIN, post(url), null).andExpect(status().isForbidden());
+    // 메인 관리자도 좋아요를 누른다 (D-122)
+    call(newAdmin(), UserRole.ADMIN, post(url), null).andExpect(status().isOk());
   }
 
   @Test

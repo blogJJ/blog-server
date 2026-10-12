@@ -24,10 +24,12 @@ public interface MainPostRepository extends Repository<Post, Long> {
 
   String PUBLIC_BLOG = " and b.visibility = com.blog.blog.domain.BlogVisibility.PUBLIC";
 
-  /** 공개 블로그이거나 내가 멤버인 블로그. 비공개로 바뀐 블로그는 멤버가 아닌 구독자에게서 빠진다 (D-50). */
+  /** 공개 블로그이거나 내가 멤버인 블로그. 비공개로 바뀐 블로그는 멤버가 아닌 구독자에게서 빠진다 (D-50). 메인 관리자는 모든 블로그의 글을 본다 (D-122). */
   String VISIBLE_TO_ME =
       " and (b.visibility = com.blog.blog.domain.BlogVisibility.PUBLIC"
-          + " or exists (select m.id from BlogMember m where m.blog = b and m.user.id = :me))";
+          + " or exists (select m.id from BlogMember m where m.blog = b and m.user.id = :me)"
+          + " or exists (select u.id from User u where u.id = :me"
+          + " and u.role = com.blog.auth.domain.UserRole.ADMIN))";
 
   String FOLLOWING =
       " and p.authorHidden = false"

@@ -11,6 +11,8 @@ import com.blog.blog.repository.MemberSanctionRepository;
 import com.blog.common.domain.Suspensions;
 import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
+import com.blog.common.security.BlogAuthz;
+import com.blog.common.security.CurrentUser;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <ul>
  *   <li>공개: 누구나. 일부 공개: 공유 링크로 온 사람과 멤버. 비공개: 멤버만.
+ *   <li>메인 관리자는 멤버가 아니어도 일부 공개·비공개 블로그를 본다 (D-122). 숨김·폐쇄된 블로그는 관리자에게도 404다(관리자 화면에서 본다).
  *   <li>숨김(ADM-02)·폐쇄된 블로그는 없는 블로그처럼 404. 폐쇄 예정은 평소처럼 보인다 (D-67).
  *   <li>그 블로그에서 정지된 멤버(BLG-13)는 끝나는 날짜를 알려 주고 막는다.
  *   <li>블로그장이 계정 정지 중이면 블로그 맨 위에 "블로그장 정지 중 (끝나는 날짜)" 공지를 붙인다 (T122, ADM-08, D-100). 관리 권한은
@@ -94,13 +97,20 @@ public class BlogAccessService {
     boolean allowed =
         switch (blog.getVisibility()) {
           case PUBLIC -> true;
-          case LINK_ONLY -> member || viaLink;
-          case PRIVATE -> member;
+          case LINK_ONLY -> member || viaLink || isAdmin(viewerId);
+          case PRIVATE -> member || isAdmin(viewerId);
         };
     if (!allowed) {
       throw new BusinessException(ErrorCode.FORBIDDEN, deniedMessage(blog.getVisibility()));
     }
     return new Access(blog, membership, viaLink && !member);
+  }
+
+  /** 보는 사람이 지금 로그인한 메인 관리자인지 (D-122). 역할은 요청마다 DB로 읽은 값이라 따로 조회하지 않는다. */
+  private static boolean isAdmin(Long viewerId) {
+    return viewerId != null
+        && viewerId.equals(CurrentUser.id().orElse(null))
+        && BlogAuthz.isAdmin();
   }
 
   /**
