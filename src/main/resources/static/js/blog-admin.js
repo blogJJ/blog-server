@@ -304,6 +304,7 @@
     $('tab-reports').hidden = !v.canManageMembers;
     $('tab-blacklist').hidden = !v.canManageMembers;
     $('tab-close').hidden = !v.owner; // 위임·폐쇄는 블로그장만 (blog-admin-close.js)
+    $('tab-close').textContent = v.canTransfer ? '위임·폐쇄' : '폐쇄'; // 메인 관리자는 위임하지 않는다 (D-122)
     if (v.canEditInfo) {
       $('slug').textContent = '/blog/' + blog.slug;
       BlogForm.render($('common-fields'), blog);

@@ -47,8 +47,8 @@
     var user = Layout.user;
     var admin = user && user.role === 'ADMIN';
     $('edit').hidden = !v.me;
-    // 비회원에게도 팔로우 버튼을 보여 주고, 누르면 로그인으로 보낸다. 메인 관리자는 팔로우하지 않는다 (D-90)
-    $('follow').hidden = v.me || admin || (!!user && !v.canFollow);
+    // 비회원에게도 팔로우 버튼을 보여 주고, 누르면 로그인으로 보낸다. 메인 관리자도 팔로우한다 (D-122)
+    $('follow').hidden = v.me || (!!user && !v.canFollow);
     $('follow').textContent = v.following ? '팔로잉' : '팔로우';
     $('follow').classList.toggle('button--primary', !v.following);
     $('follow').setAttribute('aria-pressed', v.following ? 'true' : 'false');

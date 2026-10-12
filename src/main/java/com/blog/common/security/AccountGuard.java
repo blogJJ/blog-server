@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
  * 부른다.
  *
  * <ul>
- *   <li>메인 관리자(role = ADMIN): 블로그 만들기·참여·글쓰기·댓글·좋아요·팔로우를 하지 않는다 (D-90, SEC-09). 구독은 목록에 없어 막지 않는다.
+ *   <li>메인 관리자(role = ADMIN): 블로그 만들기·참여·글쓰기·댓글·좋아요를 하지 않는다 (D-90, SEC-09). 구독과 팔로우는 할 수 있다
+ *       (D-122).
  *   <li>계정 정지 중(users.suspended_until이 지금보다 뒤): 로그인과 읽기만. 글·댓글·좋아요·팔로우·구독·블로그 만들기·참여 신청을 못 한다
  *       (ADM-08).
  * </ul>
@@ -33,7 +34,7 @@ public class AccountGuard {
     WRITE_POST(false),
     WRITE_COMMENT(false),
     LIKE(false),
-    FOLLOW(false),
+    FOLLOW(true),
     SUBSCRIBE(true);
 
     private final boolean adminAllowed;

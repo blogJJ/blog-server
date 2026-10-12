@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -40,7 +41,7 @@ class AccountGuardTest {
   }
 
   @Test
-  void adminCannotTakePartInBlogsButCanSubscribe() {
+  void adminCannotTakePartInBlogsButCanSubscribeAndFollow() {
     User admin = user();
     ReflectionTestUtils.setField(admin, "role", UserRole.ADMIN);
 
@@ -49,6 +50,14 @@ class AccountGuardTest {
         .extracting("errorCode")
         .isEqualTo(ErrorCode.ADMIN_NOT_ALLOWED);
     assertThatCode(() -> guard.check(admin, Activity.SUBSCRIBE)).doesNotThrowAnyException();
+    // 팔로우도 된다 (D-122)
+    assertThatCode(() -> guard.check(admin, Activity.FOLLOW)).doesNotThrowAnyException();
+    for (Activity a :
+        List.of(Activity.CREATE_BLOG, Activity.JOIN_BLOG, Activity.WRITE_COMMENT, Activity.LIKE)) {
+      assertThatThrownBy(() -> guard.check(admin, a))
+          .extracting("errorCode")
+          .isEqualTo(ErrorCode.ADMIN_NOT_ALLOWED);
+    }
   }
 
   @Test

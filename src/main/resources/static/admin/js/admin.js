@@ -39,6 +39,7 @@
     HIDE_BLOG: '블로그 숨김',
     UNHIDE_BLOG: '블로그 숨김 해제',
     CLOSE_BLOG: '블로그 강제 폐쇄',
+    REVOKE_CLOSE_BLOG: '블로그 폐쇄 철회',
     HIDE_POST: '글 숨김',
     DELETE_POST: '글 삭제',
     RESTORE_POST: '글 복구',

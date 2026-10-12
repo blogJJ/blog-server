@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AdminBlogService {
 
+  private static final String FROM_BLOG_PAGE = "블로그 관리 화면에서 처리";
+
   /** 목록 한 줄 */
   public record BlogRow(
       Long id,
@@ -100,6 +102,27 @@ public class AdminBlogService {
     openBlog(blogId);
     closeService.scheduleClose(blogId, CloseReason.ADMIN, adminId);
     actionLogger.log(adminId, AdminAction.CLOSE_BLOG, AdminTargetType.BLOG, blogId, why);
+  }
+
+  /**
+   * 블로그 관리 화면에서 메인 관리자가 폐쇄를 누른다 (D-122). 관리자 강제 폐쇄(ADMIN)와 같게 처리하고 활동 기록을 남긴다. 화면에서 사유를 받지 않으므로 기록의
+   * 사유는 정해진 문구다.
+   */
+  @Transactional
+  public Blog closeFromBlogPage(Long blogId, Long adminId) {
+    openBlog(blogId);
+    Blog blog = closeService.scheduleClose(blogId, CloseReason.ADMIN, adminId);
+    actionLogger.log(adminId, AdminAction.CLOSE_BLOG, AdminTargetType.BLOG, blogId, FROM_BLOG_PAGE);
+    return blog;
+  }
+
+  /** 블로그 관리 화면에서 메인 관리자가 폐쇄를 철회한다 (D-122). 사유와 관계없이 철회하고 활동 기록을 남긴다. */
+  @Transactional
+  public Blog revokeCloseFromBlogPage(Long blogId, Long adminId) {
+    Blog blog = closeService.revokeClose(blogId, adminId, true);
+    actionLogger.log(
+        adminId, AdminAction.REVOKE_CLOSE_BLOG, AdminTargetType.BLOG, blogId, FROM_BLOG_PAGE);
+    return blog;
   }
 
   private Blog openBlog(Long blogId) {

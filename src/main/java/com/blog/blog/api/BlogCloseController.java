@@ -1,5 +1,7 @@
 package com.blog.blog.api;
 
+import com.blog.admin.service.AdminBlogService;
+import com.blog.auth.domain.UserRole;
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogStatus;
 import com.blog.blog.domain.CloseReason;
@@ -15,16 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 블로그 폐쇄·철회 (T088, BLG-09, D-12, D-19). 블로그장만(계정 정지 중이면 못 한다, D-100). 관리자 강제 폐쇄는 관리자 기능이 {@link
- * BlogCloseService}를 바로 부른다.
+ * BlogCloseService}를 바로 부른다. 메인 관리자가 이 화면에서 누르면 관리자 강제 폐쇄(ADMIN)로 처리하고 활동 기록을 남긴다 (D-122).
  */
 @RestController
 @RequestMapping("/api/blogs/{blogId}/close")
 public class BlogCloseController {
 
   private final BlogCloseService closeService;
+  private final AdminBlogService adminBlogService;
 
-  public BlogCloseController(BlogCloseService closeService) {
+  public BlogCloseController(BlogCloseService closeService, AdminBlogService adminBlogService) {
     this.closeService = closeService;
+    this.adminBlogService = adminBlogService;
   }
 
   /**
@@ -41,6 +45,9 @@ public class BlogCloseController {
   @PostMapping
   @PreAuthorize("@blogAuthz.isOwner(#blogId)")
   public CloseResponse close(@AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
+    if (user.role() == UserRole.ADMIN) {
+      return CloseResponse.of(adminBlogService.closeFromBlogPage(blogId, user.id()));
+    }
     return CloseResponse.of(closeService.scheduleClose(blogId, CloseReason.OWNER, user.id()));
   }
 
@@ -48,6 +55,9 @@ public class BlogCloseController {
   @PostMapping("/revoke")
   @PreAuthorize("@blogAuthz.isOwner(#blogId)")
   public CloseResponse revoke(@AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
+    if (user.role() == UserRole.ADMIN) {
+      return CloseResponse.of(adminBlogService.revokeCloseFromBlogPage(blogId, user.id()));
+    }
     return CloseResponse.of(closeService.revokeClose(blogId, user.id()));
   }
 }

@@ -186,6 +186,30 @@ class BlogAuthzTest {
   }
 
   @Test
+  void mainAdminManagesEveryOpenBlogButIsNotAMemberOrRealOwner() {
+    User admin = newUser("adm");
+    jdbc.update("update users set role = 'ADMIN' where id = ?", admin.getId());
+    loginAs(admin, UserRole.ADMIN);
+
+    assertThat(blogAuthz.isOwner(blogA.getId())).isTrue();
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "EDIT_INFO")).isTrue();
+    assertThat(blogAuthz.hasPermission(blogB.getId(), "MANAGE_POSTS")).isTrue();
+    assertThat(blogAuthz.canHandleReports(blogA.getId())).isTrue();
+    assertThat(blogAuthz.isMember(blogA.getId())).isFalse();
+    assertThat(blogAuthz.isRealOwner(blogA.getId())).isFalse();
+
+    // 폐쇄된 블로그와 없는 블로그는 관리자도 false (D-122)
+    jdbc.update("update blogs set status = 'CLOSED' where id = ?", blogA.getId());
+    assertThat(blogAuthz.isOwner(blogA.getId())).isFalse();
+    assertThat(blogAuthz.hasPermission(blogA.getId(), "EDIT_INFO")).isFalse();
+    assertThat(blogAuthz.isOwner(Long.MAX_VALUE)).isFalse();
+
+    // 블로그장 본인은 위임도 할 수 있다
+    loginAs(outsider);
+    assertThat(blogAuthz.isRealOwner(blogB.getId())).isTrue();
+  }
+
+  @Test
   void preAuthorizeUsesBlogAuthz() {
     loginAs(owner);
     assertThat(guardedService.closeBlog(blogA.getId())).isEqualTo("closed");
@@ -195,11 +219,15 @@ class BlogAuthzTest {
   }
 
   private void loginAs(User user) {
-    AuthUser principal = new AuthUser(user.getId(), UserRole.USER);
+    loginAs(user, UserRole.USER);
+  }
+
+  private void loginAs(User user, UserRole role) {
+    AuthUser principal = new AuthUser(user.getId(), role);
     SecurityContextHolder.getContext()
         .setAuthentication(
             UsernamePasswordAuthenticationToken.authenticated(
-                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+                principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))));
   }
 
   private User newUser(String prefix) {
