@@ -1,6 +1,6 @@
 /*
  * 블로그 관리 화면 (T056): 참여 신청 탭(멤버 관리 권한), 정보 수정 탭(정보 수정 권한, T053), 공유 링크 새로 만들기(T046),
- * 카테고리 탭(정보 수정 권한, T066).
+ * 카테고리 탭(정보 수정 권한, T066). 위임·폐쇄 탭(블로그장만)은 blog-admin-close.js가 그린다.
  * 탭은 권한이 있는 것만 보인다. 권한은 서버가 요청마다 다시 확인한다.
  */
 (function () {
@@ -303,6 +303,7 @@
     $('tab-members').hidden = !v.canManageMembers;
     $('tab-reports').hidden = !v.canManageMembers;
     $('tab-blacklist').hidden = !v.canManageMembers;
+    $('tab-close').hidden = !v.owner; // 위임·폐쇄는 블로그장만 (blog-admin-close.js)
     if (v.canEditInfo) {
       $('slug').textContent = '/blog/' + blog.slug;
       BlogForm.render($('common-fields'), blog);

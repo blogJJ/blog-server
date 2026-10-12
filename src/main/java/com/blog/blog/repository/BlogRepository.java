@@ -2,11 +2,15 @@ package com.blog.blog.repository;
 
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogVisibility;
+import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -74,6 +78,29 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
       "update Blog b set b.subscriberCount = case when b.subscriberCount + :delta < 0 then 0"
           + " else b.subscriberCount + :delta end where b.id = :id")
   void addSubscriberCount(@Param("id") Long id, @Param("delta") int delta);
+
+  /** 04:00 배치: 폐쇄 예정 시각이 지난 블로그 */
+  @Query(
+      "select b.id from Blog b where b.status = com.blog.blog.domain.BlogStatus.CLOSING"
+          + " and b.closeScheduledAt <= :now order by b.id")
+  List<Long> findDueToClose(@Param("now") LocalDateTime now);
+
+  /** 04:00 배치: 아직 예정 시각 전인 폐쇄 예정 블로그 (3일 전·1일 전 알림) */
+  @Query(
+      "select b.id from Blog b where b.status = com.blog.blog.domain.BlogStatus.CLOSING"
+          + " and b.closeScheduledAt > :now order by b.id")
+  List<Long> findClosingAfter(@Param("now") LocalDateTime now);
+
+  /** 회원 탈퇴 전 확인: 이 회원이 블로그장인 운영 중·폐쇄 예정 블로그 (USR-05, D-15, D-18) */
+  @Query(
+      "select b from Blog b where b.owner.id = :ownerId"
+          + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED order by b.id")
+  List<Blog> findOpenOwnedBy(@Param("ownerId") Long ownerId);
+
+  /** 위임·폐쇄할 때 같은 블로그의 요청을 줄 세운다 */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select b from Blog b where b.id = :id")
+  Optional<Blog> findByIdForUpdate(@Param("id") Long id);
 
   /** 멤버 수를 DB에서 바로 늘린다. 동시에 여러 명이 들어와도 빠지지 않는다. */
   @Modifying(flushAutomatically = true)

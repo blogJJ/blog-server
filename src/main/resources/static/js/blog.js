@@ -1,5 +1,5 @@
 /*
- * 블로그 첫 화면 /blog/{주소} (T055, BLG-01, BLG-04).
+ * 블로그 첫 화면 /blog/{주소} (T055, BLG-01, BLG-04). 멤버는 블로그를 떠날 수 있다 (T091, BLG-07).
  * 일부 공개 블로그는 공유 링크의 ?share= 값을 API에 그대로 넘긴다. 참여 버튼은 보는 사람의 상태(viewer)로 정한다.
  * 구독하기 버튼(T110, SOC-01, D-50): 누르면 구독, 다시 누르면 취소. 일부 공개는 링크로 들어온 회원만 구독할 수 있어 share 값을 같이 보낸다.
  */
@@ -88,6 +88,7 @@
     join.hidden = true;
     join.disabled = false;
     cancel.hidden = true;
+    $('leave').hidden = true;
     state.textContent = '';
 
     if (user && user.role === 'ADMIN') {
@@ -96,6 +97,7 @@
     if (v.role) {
       state.textContent =
         v.role === 'OWNER' ? '내가 만든 블로그예요.' : ui.ROLE[v.role] + (v.role === 'MANAGER' ? '으로' : '로') + ' 참여 중';
+      $('leave').hidden = v.role === 'OWNER'; // 블로그장은 위임·폐쇄해야 떠날 수 있다 (BLG-07)
       return;
     }
     if (v.joinRequestStatus === 'PENDING') {
@@ -220,6 +222,20 @@
     }
   }
 
+  /** 블로그 떠나기 (T091, BLG-07). 쓴 글은 "탈퇴한 계정"으로 바뀐다 (D-33) */
+  async function onLeave() {
+    if (!window.confirm("'" + blog.name + "' 블로그를 떠날까요? 이 블로그에 쓴 글은 작성자가 \"탈퇴한 계정\"으로 바뀌어요.")) {
+      return;
+    }
+    try {
+      await Api.post('/api/blogs/' + blog.id + '/leave');
+      Api.toast('블로그를 떠났어요.');
+      await load();
+    } catch (e) {
+      Api.showError(e);
+    }
+  }
+
   async function onCopy() {
     try {
       await navigator.clipboard.writeText($('share-url').value);
@@ -237,6 +253,7 @@
     $('join').addEventListener('click', onJoin);
     $('subscribe').addEventListener('click', onSubscribe);
     $('cancel-join').addEventListener('click', onCancel);
+    $('leave').addEventListener('click', onLeave);
     $('copy-share').addEventListener('click', onCopy);
     load();
   });

@@ -13,9 +13,10 @@
     <script src="/js/blog-form.js" defer></script>
     <script src="/js/blog-admin.js" defer></script>
     <script src="/js/blog-admin-members.js" defer></script>
+    <script src="/js/blog-admin-close.js" defer></script>
   </head>
   <body>
-    <!-- 블로그 관리 /blog/{주소}/admin: 참여 신청 탭, 정보 수정 탭 (T056, BLG-05, T053), 카테고리 탭 (T066, BRD-03), 멤버·신고·블랙리스트 탭 (T083) -->
+    <!-- 블로그 관리 /blog/{주소}/admin: 참여 신청 탭, 정보 수정 탭 (T056, BLG-05, T053), 카테고리 탭 (T066, BRD-03), 멤버·신고·블랙리스트 탭 (T083), 위임·폐쇄 탭 (T093, BLG-08, BLG-09) -->
     <main>
       <div class="blocked" id="blocked" hidden>
         <h1>관리 화면을 열 수 없어요</h1>
@@ -33,6 +34,7 @@
           <button class="tabs__item" type="button" role="tab" data-tab="reports" id="tab-reports" hidden>신고</button>
           <button class="tabs__item" type="button" role="tab" data-tab="blacklist" id="tab-blacklist" hidden>블랙리스트</button>
           <button class="tabs__item" type="button" role="tab" data-tab="categories" id="tab-categories" hidden>카테고리</button>
+          <button class="tabs__item" type="button" role="tab" data-tab="close" id="tab-close" hidden>위임·폐쇄</button>
         </div>
 
         <section class="tab-panel" id="panel-requests" hidden>
@@ -101,6 +103,29 @@
             <input type="text" id="category-name" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" />
             <button class="button button--primary" type="submit">추가</button>
           </form>
+        </section>
+
+        <section class="tab-panel" id="panel-close" hidden>
+          <div class="notice notice--danger" id="closing-notice" hidden></div>
+          <section id="transfer-box" hidden>
+            <h2 class="admin-subhead">블로그장 위임</h2>
+            <p class="field__hint">받는 멤버가 수락해야 넘어가요. 7일 안에 응답이 없으면 자동으로 취소돼요. 넘긴 뒤에는 일반 멤버로 남아요(받는 사람이 부블로그장이었으면 그 자리와 권한을 이어받아요).</p>
+            <p id="transfer-pending" hidden></p>
+            <form class="field__row" id="transfer-form" novalidate>
+              <select id="transfer-target" aria-label="위임할 멤버"></select>
+              <button class="button button--primary" type="submit">위임 요청</button>
+            </form>
+          </section>
+          <section id="close-box" hidden>
+            <h2 class="admin-subhead">블로그 폐쇄</h2>
+            <p class="field__hint" id="close-desc"></p>
+            <button class="button button--danger" type="button" id="close-blog">블로그 폐쇄</button>
+          </section>
+          <section id="revoke-box" hidden>
+            <h2 class="admin-subhead">폐쇄 철회</h2>
+            <p class="field__hint">철회하면 운영 중으로 돌아가고 멤버와 구독자에게 철회 알림이 가요. 폐쇄 예정 중에는 위임할 수 없어요. 위임하려면 먼저 철회해 주세요.</p>
+            <button class="button button--primary" type="button" id="revoke-close">폐쇄 철회</button>
+          </section>
         </section>
       </div>
     </main>

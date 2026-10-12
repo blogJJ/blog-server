@@ -126,6 +126,40 @@ public class Blog extends BaseTimeEntity {
     this.coverImage = coverImage;
   }
 
+  /** 폐쇄 예정으로 바꾼다 (BLG-09, D-12). 예정 시각은 서비스가 정한다(누른 날짜 + 7일 04:00). */
+  public void scheduleClose(LocalDateTime at, CloseReason reason) {
+    this.status = BlogStatus.CLOSING;
+    this.closeScheduledAt = at;
+    this.closeReason = reason;
+  }
+
+  /** 폐쇄 철회 (D-19). 운영 중으로 돌아간다. */
+  public void revokeClose() {
+    this.status = BlogStatus.ACTIVE;
+    this.closeScheduledAt = null;
+    this.closeReason = null;
+  }
+
+  /** 04:00 배치가 폐쇄한다. 30일 뒤 내용 삭제의 기준 시각을 남긴다 (D-86). */
+  public void markClosed(LocalDateTime now) {
+    this.status = BlogStatus.CLOSED;
+    this.closedAt = now;
+  }
+
+  /** 위임 수락 (BLG-08). blog_members의 OWNER 행도 같이 바꿔야 한다. */
+  public void changeOwner(User newOwner) {
+    this.owner = newOwner;
+  }
+
+  /** 폐쇄 30일 뒤 주소를 비워 다른 사람이 쓸 수 있게 한다 (D-86). */
+  public void clearSlug() {
+    this.slug = null;
+  }
+
+  public boolean isClosing() {
+    return status == BlogStatus.CLOSING;
+  }
+
   public Long getId() {
     return id;
   }

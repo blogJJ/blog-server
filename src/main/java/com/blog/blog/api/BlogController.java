@@ -9,6 +9,7 @@ import com.blog.blog.service.BlogQueryService.BlogSummary;
 import com.blog.blog.service.BlogQueryService.MyBlogs;
 import com.blog.blog.service.BlogService;
 import com.blog.blog.service.BlogService.BlogForm;
+import com.blog.blog.service.LeaveService;
 import com.blog.blog.service.ShareLinkService;
 import com.blog.board.service.ImageService;
 import com.blog.common.security.AuthUser;
@@ -30,7 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/** 블로그 API (T044~T049, T052, T053, BLG-01~03, BLG-06, BLG-10). */
+/** 블로그 API (T044~T049, T052, T053, T091, BLG-01~03, BLG-06, BLG-07, BLG-10). */
 @RestController
 public class BlogController {
 
@@ -38,16 +39,19 @@ public class BlogController {
   private final BlogQueryService queryService;
   private final ShareLinkService shareLinkService;
   private final ImageService imageService;
+  private final LeaveService leaveService;
 
   public BlogController(
       BlogService blogService,
       BlogQueryService queryService,
       ShareLinkService shareLinkService,
-      ImageService imageService) {
+      ImageService imageService,
+      LeaveService leaveService) {
     this.blogService = blogService;
     this.queryService = queryService;
     this.shareLinkService = shareLinkService;
     this.imageService = imageService;
+    this.leaveService = leaveService;
   }
 
   /** 만들기 요청. form 값에 주소(slug)를 더한다. */
@@ -143,6 +147,14 @@ public class BlogController {
   @PreAuthorize("@blogAuthz.hasPermission(#blogId, 'EDIT_INFO')")
   public ResponseEntity<Void> deleteCover(@PathVariable Long blogId) {
     imageService.deleteQuietly(blogService.changeCover(blogId, null));
+    return ResponseEntity.noContent().build();
+  }
+
+  /** 블로그 떠나기 (T091, BLG-07). 블로그장은 위임하거나 폐쇄해야 떠날 수 있다. 떠난 멤버의 글은 "탈퇴한 계정" (D-33) */
+  @PostMapping("/api/blogs/{blogId}/leave")
+  public ResponseEntity<Void> leave(
+      @AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
+    leaveService.leave(blogId, user.id());
     return ResponseEntity.noContent().build();
   }
 

@@ -38,6 +38,9 @@ public class PostQueryService {
   public static final int NOTICE_LIMIT = 5;
   public static final String HIDDEN_AUTHOR = "탈퇴한 계정";
 
+  /** 서비스를 탈퇴한 회원 (D-05). 블로그만 떠난 사람(HIDDEN_AUTHOR)과 구분한다. */
+  public static final String WITHDRAWN_AUTHOR = "탈퇴한 회원";
+
   /**
    * 목록 한 줄.
    *
@@ -257,17 +260,23 @@ public class PostQueryService {
     return rows;
   }
 
-  /** 블로그를 떠났거나 탈퇴한 작성자는 "탈퇴한 계정"으로 보인다 (BLG-11). */
+  /** 서비스를 탈퇴한 작성자는 "탈퇴한 회원"(D-05), 블로그를 떠났거나 강퇴된 작성자는 "탈퇴한 계정"으로 보인다 (BLG-07, BLG-11, D-33). */
   public static String authorName(Post post) {
     User author = post.getAuthor();
-    if (post.isAuthorHidden() || !author.isActive() || author.getNickname() == null) {
+    if (!author.isActive() || author.getNickname() == null) {
+      return WITHDRAWN_AUTHOR;
+    }
+    if (post.isAuthorHidden()) {
       return HIDDEN_AUTHOR;
     }
     return author.getNickname();
   }
 
-  /** 프로필로 갈 작성자 번호. "탈퇴한 계정"으로 보이는 글이면 null */
+  /** 프로필로 갈 작성자 번호. "탈퇴한 계정"·"탈퇴한 회원"으로 보이는 글이면 null */
   public static Long authorId(Post post) {
-    return HIDDEN_AUTHOR.equals(authorName(post)) ? null : post.getAuthor().getId();
+    String name = authorName(post);
+    return HIDDEN_AUTHOR.equals(name) || WITHDRAWN_AUTHOR.equals(name)
+        ? null
+        : post.getAuthor().getId();
   }
 }

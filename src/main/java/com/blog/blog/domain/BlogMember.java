@@ -88,6 +88,18 @@ public class BlogMember {
     this.managerSince = null;
   }
 
+  /** 위임을 받아 블로그장이 된다 (BLG-08). blogs.owner_id도 같이 바꿔야 한다. */
+  public void promoteToOwner() {
+    this.role = BlogMemberRole.OWNER;
+    this.managerSince = null;
+  }
+
+  /** 위임해 일반 멤버가 된다. 받은 사람이 부블로그장이었으면 부른 쪽이 이어서 부블로그장으로 올린다. */
+  public void demoteFromOwner() {
+    this.role = BlogMemberRole.MEMBER;
+    this.managerSince = null;
+  }
+
   public boolean isOwner() {
     return role == BlogMemberRole.OWNER;
   }

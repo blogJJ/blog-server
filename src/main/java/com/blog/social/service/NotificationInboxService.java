@@ -196,6 +196,9 @@ public class NotificationInboxService {
         yield slug == null ? null : "/blog/" + slug + "/posts/" + n.getTargetId();
       }
       case BLOG -> {
+        if (n.getType() == NotificationType.OWNER_TRANSFER_REQUEST) {
+          yield "/transfer.html"; // 위임 수락 화면 (T093)
+        }
         String slug = blogSlugs.get(n.getTargetId());
         if (slug == null) {
           yield null;
