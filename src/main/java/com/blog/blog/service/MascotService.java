@@ -34,8 +34,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class MascotService {
 
-  /** 블로그 이름이나 태그가 바뀌었다. 커밋 뒤에 마스코트를 다시 고른다. */
-  public record BlogInfoChanged(Long blogId) {}
+  /**
+   * 블로그 이름이나 태그가 바뀌었다. 커밋 뒤에 마스코트를 다시 고른다.
+   *
+   * @param created 새로 만든 블로그면 true. 이때만 대표 그림도 그린다 (T155, D-126)
+   */
+  public record BlogInfoChanged(Long blogId, boolean created) {}
 
   private static final Logger log = LoggerFactory.getLogger(MascotService.class);
   private static final int BACKFILL_BATCH = 20;
@@ -45,9 +49,10 @@ public class MascotService {
   private final BlogRepository blogRepository;
   private final BlogTagRepository blogTagRepository;
   private final ClaudeMascotClient claude;
+  private final CoverArtService coverArt;
   private final TransactionTemplate tx;
   private final boolean enabled;
-  // Claude 호출이 몰리지 않게 한 번에 하나씩 고른다
+  // Claude 호출이 몰리지 않게 한 번에 하나씩 고른다. 새 블로그의 대표 그림(CoverArtService)도 여기서 그린다
   private final ExecutorService worker =
       Executors.newSingleThreadExecutor(
           r -> {
@@ -60,11 +65,13 @@ public class MascotService {
       BlogRepository blogRepository,
       BlogTagRepository blogTagRepository,
       ClaudeMascotClient claude,
+      CoverArtService coverArt,
       PlatformTransactionManager transactionManager,
       @Value("${app.mascot.enabled:true}") boolean enabled) {
     this.blogRepository = blogRepository;
     this.blogTagRepository = blogTagRepository;
     this.claude = claude;
+    this.coverArt = coverArt;
     this.tx = new TransactionTemplate(transactionManager);
     this.enabled = enabled;
   }
@@ -72,7 +79,14 @@ public class MascotService {
   @TransactionalEventListener
   public void onBlogInfoChanged(BlogInfoChanged event) {
     if (enabled) {
-      worker.execute(() -> assignSafely(event.blogId()));
+      worker.execute(
+          () -> {
+            assignSafely(event.blogId());
+            // 마스코트와 픽셀 장면을 먼저 저장해 두고 오래 걸리는 그림은 그 뒤에 그린다
+            if (event.created()) {
+              coverArt.generateSafely(event.blogId());
+            }
+          });
     }
   }
 

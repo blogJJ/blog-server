@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class ImageService {
 
   public static final String URL_PREFIX = "/api/images/";
+  public static final String SVG_EXTENSION = "svg";
+  public static final String SVG_MIME_TYPE = "image/svg+xml";
 
   /** 올린 결과. url은 본문 마크다운에 그대로 넣는다. */
   public record Uploaded(Long id, String storedName, String url) {}
@@ -52,6 +55,20 @@ public class ImageService {
 
   public static String url(String storedName) {
     return storedName == null ? null : URL_PREFIX + storedName;
+  }
+
+  /**
+   * 보여 줄 때의 Content-Type. svg는 Claude가 그려 정리한 대표 그림(T155, D-126)만 있다. 올리기는 여전히 받지 않는다.
+   *
+   * @return 모르는 확장자면 빈 값
+   */
+  public static Optional<String> mimeType(String storedName) {
+    if (storedName != null && storedName.endsWith("." + SVG_EXTENSION)) {
+      return Optional.of(SVG_MIME_TYPE);
+    }
+    return storedName == null
+        ? Optional.empty()
+        : ImageType.byStoredName(storedName).map(ImageType::mimeType);
   }
 
   /** 글 이미지. 글을 저장하기 전에 올리므로 아직 어느 글에도 연결하지 않는다. */
@@ -91,7 +108,7 @@ public class ImageService {
   /** 보여 줄 이미지를 연다. 이름이 이상하거나 없으면 NOT_FOUND. */
   public InputStream open(String storedName) {
     try {
-      if (ImageType.byStoredName(storedName).isEmpty() || !storage.exists(storedName)) {
+      if (mimeType(storedName).isEmpty() || !storage.exists(storedName)) {
         throw new BusinessException(ErrorCode.NOT_FOUND);
       }
       return storage.open(storedName);

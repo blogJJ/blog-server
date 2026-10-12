@@ -113,7 +113,10 @@
           <section id="transfer-box" hidden>
             <h2 class="admin-subhead">블로그장 위임</h2>
             <p class="field__hint">받는 멤버가 수락해야 넘어가요. 7일 안에 응답이 없으면 자동으로 취소돼요. 넘긴 뒤에는 일반 멤버로 남아요(받는 사람이 부블로그장이었으면 그 자리와 권한을 이어받아요).</p>
-            <p id="transfer-pending" hidden></p>
+            <div class="field__row" id="transfer-pending" hidden>
+              <p id="transfer-pending-text"></p>
+              <button class="button" type="button" id="transfer-cancel">요청 취소</button>
+            </div>
             <form class="field__row" id="transfer-form" novalidate>
               <select id="transfer-target" aria-label="위임할 멤버"></select>
               <button class="button button--primary" type="submit">위임 요청</button>

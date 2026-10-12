@@ -110,13 +110,20 @@ probe() {
     wget -qO- -T 3 "http://${NEXT_HOST}:8080/actuator/health" 2>/dev/null | grep -q '"UP"'
 }
 
+# 확인 한 번에 컨테이너를 하나 띄우느라 몇 초씩 걸리므로 횟수가 아니라 시간(2분)으로 끊는다.
+# 기다리는 동안 출력이 없으면 ssh 연결이 끊기므로 20초마다 진행 상황을 찍는다
 healthy() {
-  for _ in $(seq 1 60); do
+  local deadline=$((SECONDS + 120)) next_note=$((SECONDS + 20))
+  while [ "$SECONDS" -lt "$deadline" ]; do
     if [ "$(docker inspect -f '{{.State.Running}}' "$NEXT_NAME" 2>/dev/null)" != "true" ]; then
       return 1
     fi
     if probe; then
       return 0
+    fi
+    if [ "$SECONDS" -ge "$next_note" ]; then
+      echo "   아직 뜨는 중 (${SECONDS}초)"
+      next_note=$((SECONDS + 20))
     fi
     sleep 2
   done

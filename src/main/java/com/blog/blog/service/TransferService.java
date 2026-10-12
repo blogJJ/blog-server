@@ -39,6 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       블로그장이 그 부블로그장 자리와 권한을 그대로 받는다.
  *   <li>받으면 블로그 개수 제한(BLG-10)을 넘는 회원은 수락할 수 없다. 받는 사람 행을 잠그고 센다 (D-68).
  *   <li>7일 안에 응답이 없으면 04:00 배치가 EXPIRED로 바꾼다 (D-31). 수락·거절·자동 취소는 블로그장에게 알린다.
+ *   <li>블로그장은 대기 중인 요청을 취소할 수 있고, 받는 멤버에게 알린다 (D-124).
  * </ul>
  */
 @Service
@@ -206,6 +207,24 @@ public class TransferService {
             + "님이 '"
             + transfer.getBlog().getName()
             + "' 블로그장 위임을 거절했어요.");
+  }
+
+  /** 블로그장이 대기 중인 요청을 취소한다 (D-124). 블로그장인지는 컨트롤러가 확인한다. */
+  @Transactional
+  public void cancelByOwner(Long blogId, Long ownerId) {
+    lockBlog(blogId);
+    BlogOwnerTransfer transfer =
+        transferRepository.findPendingByBlogId(blogId).stream()
+            .findFirst()
+            .orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "취소할 위임 요청이 없어요."));
+    transfer.cancel(now());
+    notificationService.notify(
+        transfer.getToUser().getId(),
+        ownerId,
+        NotificationType.OWNER_TRANSFER_RESULT,
+        NotificationTargetType.BLOG,
+        blogId,
+        "'" + transfer.getBlog().getName() + "' 블로그장 위임 요청이 취소되었어요.");
   }
 
   /**
