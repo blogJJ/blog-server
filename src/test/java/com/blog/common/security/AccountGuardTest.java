@@ -9,13 +9,11 @@ import com.blog.auth.domain.UserRole;
 import com.blog.auth.repository.UserRepository;
 import com.blog.common.domain.Suspensions;
 import com.blog.common.error.BusinessException;
-import com.blog.common.error.ErrorCode;
 import com.blog.common.security.AccountGuard.Activity;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -41,22 +39,13 @@ class AccountGuardTest {
   }
 
   @Test
-  void adminCannotTakePartInBlogsButCanSubscribeAndFollow() {
+  void adminCanDoEverything() {
     User admin = user();
     ReflectionTestUtils.setField(admin, "role", UserRole.ADMIN);
 
-    assertThatThrownBy(() -> guard.check(admin, Activity.WRITE_POST))
-        .isInstanceOf(BusinessException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.ADMIN_NOT_ALLOWED);
-    assertThatCode(() -> guard.check(admin, Activity.SUBSCRIBE)).doesNotThrowAnyException();
-    // 팔로우도 된다 (D-122)
-    assertThatCode(() -> guard.check(admin, Activity.FOLLOW)).doesNotThrowAnyException();
-    for (Activity a :
-        List.of(Activity.CREATE_BLOG, Activity.JOIN_BLOG, Activity.WRITE_COMMENT, Activity.LIKE)) {
-      assertThatThrownBy(() -> guard.check(admin, a))
-          .extracting("errorCode")
-          .isEqualTo(ErrorCode.ADMIN_NOT_ALLOWED);
+    // 메인 관리자도 일반 회원 활동을 모두 한다 (D-122)
+    for (Activity a : Activity.values()) {
+      assertThatCode(() -> guard.check(admin, a)).doesNotThrowAnyException();
     }
   }
 

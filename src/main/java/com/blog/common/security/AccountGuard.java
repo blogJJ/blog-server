@@ -15,8 +15,7 @@ import org.springframework.stereotype.Component;
  * 부른다.
  *
  * <ul>
- *   <li>메인 관리자(role = ADMIN): 블로그 만들기·참여·글쓰기·댓글·좋아요를 하지 않는다 (D-90, SEC-09). 구독과 팔로우는 할 수 있다
- *       (D-122).
+ *   <li>메인 관리자(role = ADMIN)도 일반 회원과 같은 활동을 모두 한다 (D-122, D-90을 바꿈).
  *   <li>계정 정지 중(users.suspended_until이 지금보다 뒤): 로그인과 읽기만. 글·댓글·좋아요·팔로우·구독·블로그 만들기·참여 신청을 못 한다
  *       (ADM-08).
  * </ul>
@@ -27,21 +26,15 @@ public class AccountGuard {
   private static final DateTimeFormatter UNTIL_FORMAT =
       DateTimeFormatter.ofPattern("yyyy년 M월 d일 HH:mm");
 
-  /** 막는 활동. adminAllowed는 메인 관리자에게 허용되는지. */
+  /** 계정 정지 중에 막는 활동 */
   public enum Activity {
-    CREATE_BLOG(false),
-    JOIN_BLOG(false),
-    WRITE_POST(false),
-    WRITE_COMMENT(false),
-    LIKE(false),
-    FOLLOW(true),
-    SUBSCRIBE(true);
-
-    private final boolean adminAllowed;
-
-    Activity(boolean adminAllowed) {
-      this.adminAllowed = adminAllowed;
-    }
+    CREATE_BLOG,
+    JOIN_BLOG,
+    WRITE_POST,
+    WRITE_COMMENT,
+    LIKE,
+    FOLLOW,
+    SUBSCRIBE
   }
 
   private final UserRepository userRepository;
@@ -64,9 +57,6 @@ public class AccountGuard {
 
   /** 이미 읽어 둔 회원으로 확인한다. */
   public void check(User user, Activity activity) {
-    if (user.isAdmin() && !activity.adminAllowed) {
-      throw new BusinessException(ErrorCode.ADMIN_NOT_ALLOWED);
-    }
     LocalDateTime now = LocalDateTime.now(clock);
     if (user.isSuspendedAt(now)) {
       throw new BusinessException(ErrorCode.ACCOUNT_SUSPENDED, suspendedMessage(user));

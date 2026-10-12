@@ -120,8 +120,7 @@
   });
 
   Layout.onUser(function (user) {
-    // 메인 관리자는 블로그를 만들지 않는다 (D-90)
-    $('new-blog').hidden = !user || user.role === 'ADMIN';
+    $('new-blog').hidden = !user;
     $('tabs').querySelector('[data-tab="following"]').hidden = !user;
     $('tabs').querySelector('[data-tab="subscribed"]').hidden = !user;
     load(); // 로그인 상태를 안 뒤에 읽어야 팔로우·구독 탭 안내가 맞다

@@ -81,9 +81,6 @@
   Layout.onUser(function (user) {
     if (!user) {
       window.location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
-    } else if (user.role === 'ADMIN') {
-      message('관리자 계정은 블로그를 만들 수 없어요.');
-      document.querySelector('#blog-form [type=submit]').disabled = true;
     }
   });
 })();

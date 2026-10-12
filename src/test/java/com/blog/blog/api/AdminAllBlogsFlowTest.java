@@ -173,7 +173,7 @@ class AdminAllBlogsFlowTest {
   }
 
   @Test
-  void adminReadsPrivateBlogsAndSubscribesButStillCannotWriteOrJoin() throws Exception {
+  void adminReadsPrivateBlogsSubscribesAndJoinsLikeAnyMember() throws Exception {
     User admin = newAdmin();
     User owner = newUser();
     User outsider = newUser();
@@ -189,12 +189,15 @@ class AdminAllBlogsFlowTest {
         .andExpect(jsonPath("$.canEdit").value(false))
         .andExpect(jsonPath("$.canDelete").value(true));
 
+    // 글은 멤버만 쓰므로 참여하지 않은 블로그에는 못 쓴다
     call(admin, post("/api/blogs/" + blogId + "/posts"), postBody())
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("ADMIN_NOT_ALLOWED"));
-    call(admin, post("/api/blogs/" + blogId + "/join"), null)
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("ADMIN_NOT_ALLOWED"));
+        .andExpect(status().isForbidden());
+    // 다른 블로그에 참여하면 그 블로그에서 글을 쓴다 (D-122)
+    long openBlog = createBlog(newUser(), slug(), "PUBLIC", "OPEN");
+    call(admin, post("/api/blogs/" + openBlog + "/join"), null)
+        .andExpect(status().is2xxSuccessful());
+    call(admin, post("/api/blogs/" + openBlog + "/posts"), postBody())
+        .andExpect(status().isCreated());
 
     // 일부 공개는 공유 링크 없이도 보고, 링크를 새로 만든다
     User linkOwner = newUser();

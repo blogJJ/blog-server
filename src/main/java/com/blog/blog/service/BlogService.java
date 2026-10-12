@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>주소: 영문 소문자·숫자·{@code -} 3~30자, 중복 불가, 예약어 불가. 만든 뒤에는 바꾸지 않는다 (D-70).
  *   <li>이름은 중복을 허용한다. 1~50자, 소개는 500자까지.
  *   <li>생성 개수: 공개(일부 공개 포함) {@code blog.limit.public}개(기본 3, 최대 5), 비공개 5개. 회원 행을 FOR UPDATE로 잠근 뒤
- *       세므로 동시에 눌러도 넘지 않는다 (D-68, SC-006). 공개 범위를 바꿀 때도 같은 제한을 본다.
+ *       세므로 동시에 눌러도 넘지 않는다 (D-68, SC-006). 공개 범위를 바꿀 때도 같은 제한을 본다. 메인 관리자는 제한이 없다 (D-122).
  *   <li>만든 회원은 blog_members에 OWNER로 들어간다.
  * </ul>
  */
@@ -272,6 +272,9 @@ public class BlogService {
 
   /** 생성 개수 제한 (BLG-10). 위임을 받을 때도 받는 사람 기준으로 같은 제한을 본다(TransferService). 부르기 전에 그 회원 행을 잠근다. */
   void checkLimit(Long ownerId, BlogVisibility visibility, Long excludeBlogId) {
+    if (userRepository.findById(ownerId).filter(User::isAdmin).isPresent()) {
+      return; // 메인 관리자는 개수 제한이 없다 (D-122)
+    }
     boolean priv = isPrivate(visibility);
     List<BlogVisibility> group =
         priv
