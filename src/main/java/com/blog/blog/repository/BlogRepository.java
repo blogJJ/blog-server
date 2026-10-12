@@ -137,6 +137,17 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
           + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED order by b.id")
   List<Long> findIdsWithoutMascot(Pageable pageable);
 
+  /**
+   * 섞기 모드(일곱째 칸 {@code 배경~계절})가 아닌 예전 픽셀 장면을 가진 블로그 (T158, D-129 확장). 한 번 새로 고르면 {@code ~}가 붙어 다시
+   * 나오지 않는다. 폐쇄된 블로그는 뺀다.
+   */
+  @Query(
+      value =
+          "select id from blogs where cover_scene is not null and cover_scene not like '%~%'"
+              + " and status <> 'CLOSED' order by id limit :limit",
+      nativeQuery = true)
+  List<Long> findIdsWithLegacyCover(@Param("limit") int limit);
+
   /** 다른 블로그가 쓰는 같은 바탕 그림의 마스코트 값 (D-118). 폐쇄된 블로그는 뺀다. */
   @Query(
       value =

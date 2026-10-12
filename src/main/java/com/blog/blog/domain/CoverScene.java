@@ -12,7 +12,8 @@ import java.util.Optional;
  * <p>섞기 모드(D-129)는 일곱째 칸에 배경(창밖·뒤 풍경)과 계절·행사를 {@code 배경~계절}로 적는다({@code
  * bedroom.night.clear.dusk.4821.-.sea~xmas}). 소품 주제가 없으면 여섯째 칸은 {@code -}, 배경이나 계절이 없으면 그쪽은
  * 비운다({@code ~bloom}, {@code desert~}). 일곱째 칸이 있으면 화면이 벽·바닥 재질, 가구 색, 마스코트 자세, 좌우 뒤집기도 배치 번호로 따로 골라
- * 겹친다. 일곱째 칸이 없는 예전 값은 그림이 그대로다. 가장 긴 값도 60자(blog.cover_scene)를 넘지 않는다.
+ * 겹친다. 큰 배치(창·가구·마스코트 자리를 띠째 옮기기), 창 모양, 먼 풍경 높이, 모니터·TV 화면도 배치 번호로 고른다(D-129 확장). 일곱째 칸이 없는 예전 값은
+ * 그림이 그대로다. 가장 긴 값도 60자(blog.cover_scene)를 넘지 않는다.
  */
 public record CoverScene(
     Scene scene,
@@ -140,7 +141,21 @@ public record CoverScene(
     JUNGLE,
     TULIP,
     CANYON,
-    LAKE
+    LAKE,
+    // D-129 확장(T158)에서 더한 배경
+    LAVA,
+    FALLS,
+    SANTO,
+    MILLS,
+    LILAC,
+    PALMS,
+    STORM,
+    ROOFS,
+    BRIDGE,
+    WHEAT,
+    BERG,
+    BAMBOO,
+    CASTLE
   }
 
   /** 섞기 모드에서 겹치는 계절·행사 장식 (D-129). 이름은 5자 이하. NONE은 저장하지 않는다. */

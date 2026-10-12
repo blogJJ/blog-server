@@ -115,6 +115,25 @@ public final class KeywordScenePicker {
     PROPS.put(Prop.TRAVEL, List.of("여행", "해외", "캠핑", "기차", "travel", "trip"));
 
     // 섞기 모드의 배경. 장소가 드러나는 단어가 먼저다(여행은 항구, 다이빙은 바닷속)
+    // D-129 확장(T158)에서 더한 배경. 뜻이 좁아 앞에서 본다('한강 야경'은 야경 빌딩보다 한강 다리).
+    // 한국어는 글자 포함으로 맞추므로 '성'(감성), '밀'(비밀), '다리'처럼 짧아 다른 말에 섞이는 단어는 넣지 않는다
+    BACKDROPS.put(Backdrop.LAVA, List.of("화산", "용암", "하와이", "volcano", "lava", "hawaii"));
+    BACKDROPS.put(Backdrop.FALLS, List.of("폭포", "계곡", "waterfall", "falls"));
+    BACKDROPS.put(Backdrop.SANTO, List.of("산토리니", "그리스", "지중해", "santorini", "greece", "greek"));
+    BACKDROPS.put(Backdrop.MILLS, List.of("풍력", "풍차", "대관령", "windmill", "wind"));
+    BACKDROPS.put(Backdrop.LILAC, List.of("라벤더", "프로방스", "lavender", "provence"));
+    BACKDROPS.put(
+        Backdrop.PALMS, List.of("야자수", "휴양지", "하와이안", "노을", "몰디브", "palm", "sunset", "resort"));
+    BACKDROPS.put(Backdrop.STORM, List.of("등대", "폭풍", "태풍", "lighthouse", "storm"));
+    BACKDROPS.put(Backdrop.ROOFS, List.of("한옥마을", "기와", "북촌", "전주한옥", "hanokvillage"));
+    BACKDROPS.put(Backdrop.BRIDGE, List.of("한강", "한강다리", "bridge", "hanriver"));
+    BACKDROPS.put(Backdrop.WHEAT, List.of("밀밭", "보리밭", "곡식", "추수", "wheat", "harvest"));
+    BACKDROPS.put(
+        Backdrop.BERG, List.of("빙하", "빙산", "남극", "북극", "알래스카", "glacier", "antarctica", "alaska"));
+    BACKDROPS.put(Backdrop.BAMBOO, List.of("대나무", "죽녹원", "담양", "bamboo"));
+    BACKDROPS.put(
+        Backdrop.CASTLE,
+        List.of("고성", "성곽", "궁전", "동화", "유럽", "디즈니", "castle", "palace", "europe"));
     BACKDROPS.put(Backdrop.UNDER, List.of("다이빙", "스쿠버", "스노클링", "바닷속", "해양", "diving", "scuba"));
     BACKDROPS.put(
         Backdrop.AURORA, List.of("오로라", "북유럽", "아이슬란드", "핀란드", "노르웨이", "aurora", "iceland"));

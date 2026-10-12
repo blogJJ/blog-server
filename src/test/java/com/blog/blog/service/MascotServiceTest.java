@@ -6,6 +6,7 @@ import com.blog.auth.domain.User;
 import com.blog.auth.repository.UserRepository;
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogVisibility;
+import com.blog.blog.domain.CoverScene;
 import com.blog.blog.domain.JoinPolicy;
 import com.blog.blog.domain.Mascot;
 import com.blog.blog.domain.MascotDesign;
@@ -112,6 +113,69 @@ class MascotServiceTest {
     assertThat(mascotService.assign(blog.getId())).isNull();
     assertThat(blogRepository.findIdsWithoutMascot(PageRequest.of(0, 10_000)))
         .doesNotContain(blog.getId());
+  }
+
+  @Test
+  void legacyCoverIsReplacedOnceWithMixedCover() {
+    // T158(D-129 확장): 섞기 모드가 아닌 예전 장면은 예약 작업이 한 번 새로 고른다. 마스코트와 대표 이미지는 그대로다
+    Blog legacy = newBlog("이름", List.of("화산"));
+    Blog mixed = newBlog("이름", List.of());
+    Blog closed = newBlog("이름", List.of());
+    jdbc.update(
+        "update blogs set mascot = 'cat.mint.beret.heart', cover_image = '/uploads/a.png',"
+            + " cover_scene = 'study.night.rain.mint.4821' where id = ?",
+        legacy.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'park.day.clear.warm.7.-.sea~bloom' where id = ?",
+        mixed.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'study.day.clear.warm.1', status = 'CLOSED' where id = ?",
+        closed.getId());
+
+    // 다른 테스트가 남긴 블로그가 있어도 모두 지나갈 때까지 돈다
+    while (mascotService.refreshLegacyCovers() > 0) {}
+
+    String cover = coverOf(legacy.getId());
+    // 장면을 고르는 단어가 없어 지금과 다른 장면, 배경은 태그('화산')에서 고른다
+    assertThat(cover).matches("[a-z-]+\\.[a-z]+\\.[a-z]+\\.[a-z]+\\.\\d+\\.[a-z-]+\\.lava~[a-z]*");
+    assertThat(cover).doesNotStartWith("study.");
+    assertThat(
+            jdbc.queryForObject(
+                "select mascot from blogs where id = ?", String.class, legacy.getId()))
+        .isEqualTo("cat.mint.beret.heart");
+    assertThat(
+            jdbc.queryForObject(
+                "select cover_image from blogs where id = ?", String.class, legacy.getId()))
+        .isEqualTo("/uploads/a.png");
+    assertThat(coverOf(mixed.getId())).isEqualTo("park.day.clear.warm.7.-.sea~bloom");
+    assertThat(coverOf(closed.getId())).isEqualTo("study.day.clear.warm.1");
+    assertThat(blogRepository.findIdsWithLegacyCover(10_000))
+        .doesNotContain(legacy.getId(), mixed.getId(), closed.getId());
+
+    // 한 번 바꾼 값은 다시 고르지 않는다
+    mascotService.refreshLegacyCovers();
+    assertThat(coverOf(legacy.getId())).isEqualTo(cover);
+  }
+
+  @Test
+  void legacyCoverWithoutTagsAlwaysGetsABackdrop() {
+    Blog blog = newBlog("이름", List.of());
+    jdbc.update(
+        "update blogs set cover_scene = 'kitchen.day.clear.warm.12.food' where id = ?",
+        blog.getId());
+
+    while (mascotService.refreshLegacyCovers() > 0) {}
+
+    CoverScene cover = CoverScene.parse(coverOf(blog.getId())).orElseThrow();
+    assertThat(cover.mixed()).isTrue();
+    assertThat(cover.backdrop()).isNotNull();
+    assertThat(cover.scene()).isNotEqualTo(CoverScene.Scene.KITCHEN);
+    // 태그에 주제가 없으면 지금 소품 주제를 그대로 둔다
+    assertThat(cover.prop()).isEqualTo(CoverScene.Prop.FOOD);
+  }
+
+  private String coverOf(Long blogId) {
+    return jdbc.queryForObject("select cover_scene from blogs where id = ?", String.class, blogId);
   }
 
   private Blog newBlog(String name, List<String> tags) {

@@ -144,6 +144,30 @@ class CoverSceneTest {
   }
 
   @Test
+  void backdropAndEventNamesStayShort() {
+    // 가장 긴 장면(space-station)에 6자 배경, 5자 계절을 붙여야 60자에 맞는다 (T158에서 배경 13개 추가)
+    for (CoverScene.Backdrop b : CoverScene.Backdrop.values()) {
+      assertThat(CoverScene.key(b)).hasSizeLessThanOrEqualTo(6);
+    }
+    for (CoverScene.Event e : CoverScene.Event.values()) {
+      assertThat(CoverScene.key(e)).hasSizeLessThanOrEqualTo(5);
+    }
+    CoverScene longest =
+        new CoverScene(
+                CoverScene.Scene.SPACE_STATION,
+                CoverScene.Time.SUNSET,
+                CoverScene.Weather.PETALS,
+                CoverScene.Palette.PASTEL,
+                99_999,
+                CoverScene.Prop.TRAVEL)
+            .withLayers(CoverScene.Backdrop.BAMBOO, CoverScene.Event.FROST);
+    assertThat(longest.value())
+        .isEqualTo("space-station.sunset.petals.pastel.99999.travel.bamboo~frost")
+        .hasSize(60);
+    assertThat(CoverScene.parse(longest.value())).contains(longest);
+  }
+
+  @Test
   void longestMixedValueFitsTheColumn() {
     // blogs.cover_scene VARCHAR(60). 모든 장면·배경·계절에 가장 긴 시간·날씨·색·번호·주제를 붙여도 60자 이하
     int longest = 0;
