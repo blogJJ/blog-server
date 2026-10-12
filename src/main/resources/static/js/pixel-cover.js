@@ -4,6 +4,8 @@
  * 192x80 논리 해상도 프레임버퍼에 직접 픽셀을 칠한 뒤, 시간대 주변광과
  * 램프/창문 빛을 디더링된 단계로 입히고 정수 배율로 캔버스에 올린다.
  * 같은 spec이면 항상 같은 그림, seed가 다르면 소품·팔레트·구름이 달라진다.
+ * 장면 28개, 색 8개. 장면마다 소품 칸(벽 장식, 선반 소품, 바닥 소품, 작은 동물 등)을 따로 골라
+ * 경우의 수를 곱으로 늘리고, spec.prop(태그에서 고른 소품 주제)이 있으면 그 주제의 소품을 먼저 고른다 (T158, D-129).
  *
  * 공개 API: window.PixelCover
  */
@@ -167,11 +169,52 @@
       sea: '바다·여행',
       snowfield: '운동·겨울',
       garden: '일상·감성',
-      'night-city': '기본(도시의 밤)'
+      'night-city': '기본(도시의 밤)',
+      library: '도서관',
+      rooftop: '옥상 정원',
+      campsite: '캠핑',
+      mountain: '등산·산',
+      train: '기차 여행',
+      aquarium: '수족관',
+      atelier: '그림·화실',
+      workshop: '공방·만들기',
+      'flower-shop': '꽃집',
+      observatory: '별·천문대',
+      bedroom: '아늑한 방',
+      'street-market': '시장·길거리 음식',
+      riverside: '강변',
+      greenhouse: '온실·식물'
     },
     time: { dawn: '새벽', day: '낮', sunset: '노을', night: '밤' },
     weather: { clear: '맑음', cloudy: '흐림', rain: '비', snow: '눈', petals: '벚꽃', leaves: '낙엽' },
-    palette: { warm: '따뜻한 나무', mint: '민트', berry: '베리', dusk: '보랏빛 황혼', cream: '크림 모노' },
+    palette: {
+      warm: '따뜻한 나무',
+      mint: '민트',
+      berry: '베리',
+      dusk: '보랏빛 황혼',
+      cream: '크림 모노',
+      ocean: '바다빛',
+      forest: '숲',
+      pastel: '파스텔'
+    },
+    // 태그에서 고른 소품 주제. 저장값 여섯째 칸(study.night.rain.mint.4821.cat)이고 없으면 배치 번호만으로 고른다 (D-129)
+    prop: {
+      cat: '고양이',
+      dog: '강아지',
+      bird: '새',
+      plant: '식물',
+      flower: '꽃',
+      book: '책',
+      coffee: '커피·차',
+      music: '음악',
+      art: '그림',
+      sport: '운동',
+      food: '음식',
+      star: '별',
+      travel: '여행',
+      game: '게임',
+      code: '개발'
+    },
     mascot: {
       bear: '곰',
       cat: '고양이',
@@ -198,6 +241,10 @@
   var WEATHERS = Object.keys(LABELS.weather);
   var PALETTES = Object.keys(LABELS.palette);
   var MASCOT_KEYS = Object.keys(LABELS.mascot);
+  var PROPS = Object.keys(LABELS.prop);
+  // 처음 14개 장면과 5개 색. 저장값이 없는 블로그는 주소로 장면을 정하는데(specFor), 목록이 늘어도 그 그림이 바뀌지 않게 이 목록에서만 고른다
+  var LEGACY_SCENES = SCENES.slice(0, 14);
+  var LEGACY_PALETTES = PALETTES.slice(0, 5);
   var ANIMALS = ['bear', 'cat', 'dog', 'rabbit', 'fox', 'penguin', 'bird', 'frog', 'hamster', 'owl'];
 
   var PAL = {
@@ -230,6 +277,24 @@
       wood: '#d9bf98', woodD: '#9a8060', woodL: '#ecdcbf', accent: '#c98f6b', accent2: '#8fa08a',
       metal: '#aea698', metalD: '#786f64', leaf: '#9aae84', leafD: '#6f8560', paper: '#fffbf2',
       ink: '#5e4e40', rug: '#d4a989'
+    },
+    ocean: {
+      wall: '#d3e6f2', wallD: '#a9cbe2', trim: '#5f8fb4', floor: '#c9a97e', floorD: '#a3845c',
+      wood: '#d2b48a', woodD: '#8f7254', woodL: '#ead3ad', accent: '#2f7fb8', accent2: '#f2a65a',
+      metal: '#9fb0bf', metalD: '#5a6b7c', leaf: '#4fa88a', leafD: '#2f7a66', paper: '#f7fbff',
+      ink: '#2c3e50', rug: '#4a90c2'
+    },
+    forest: {
+      wall: '#dfe6cf', wallD: '#bcc9a4', trim: '#6f8a55', floor: '#8a6a48', floorD: '#6a4e34',
+      wood: '#a87c50', woodD: '#6e4e32', woodL: '#c9a374', accent: '#c8643c', accent2: '#e0b84a',
+      metal: '#9aa092', metalD: '#5c6256', leaf: '#5e9a48', leafD: '#3a6a34', paper: '#fbf8ea',
+      ink: '#33402c', rug: '#a85a3a'
+    },
+    pastel: {
+      wall: '#f6eef8', wallD: '#e2d4ea', trim: '#b9a3cf', floor: '#e8d2c4', floorD: '#ccb0a0',
+      wood: '#f0dcc8', woodD: '#c4a690', woodL: '#fbeee0', accent: '#f4a3b8', accent2: '#8fcbe4',
+      metal: '#c4c0d0', metalD: '#8e8aa2', leaf: '#9fd4a8', leafD: '#6fae84', paper: '#fffcfd',
+      ink: '#6a5a78', rug: '#f0b8c8'
     }
   };
 
@@ -509,6 +574,7 @@
     }
     this.sunX = R.r(0.2, 0.8);
     this.moonFull = R.ch(0.3);
+    this.hint = spec.prop || null;
   }
 
   function tone(env, c) {
@@ -1117,6 +1183,8 @@
       g.r(x + 3, yb - 13, 1, 2, P.leafD);
       g.p(x, yb - 16, '#ff8fb0');
       g.p(x - 1, yb - 16, '#ffc0d4');
+    } else if (PLANTS2.indexOf(kind) >= 0) {
+      plant2(g, env, x, yb, kind, t, salt);
     } else if (kind === 'tall') {
       for (var b = 0; b < 5; b++) {
         var bx = x - 3 + b * 1.5;
@@ -1655,6 +1723,7 @@
       openBook(g, env, L, bx, 44, t);
       lamp(g, env, bx + 33, 50, { color: P[L.lampC], r: 40 });
       mug(g, env, bx + 43, 51, P.paper, t, env.time !== 'day');
+      moreOf(g, env, L, t, 'study');
       if (L.spot === 'shelf') mascot(g, env, 160, 57, t, { flip: true });
       else mascot(g, env, 2, 51, t);
       if (env.weather === 'petals' || env.weather === 'leaves') {
@@ -1789,6 +1858,7 @@
       mug(g, env, 132, 53, P[L.mugC], t, true);
       plant(g, env, 22, 52, L.deskPlant, t, 2);
       lamp(g, env, 170, 52, { color: P[L.lampC] });
+      moreOf(g, env, L, t, 'desk');
       if (L.spot === 'desk') mascot(g, env, 36, 52, t);
     }
   };
@@ -1950,6 +2020,7 @@
       g.line(181, 42, 182, 33, P.woodD);
       g.ell(176, 33, 1, 1, P.woodD);
       g.r(181, 31, 3, 2, P.woodD);
+      moreOf(g, env, L, t, 'kitchen');
       mascot(g, env, 150, 51, t, { flip: true });
     }
   };
@@ -2090,6 +2161,7 @@
       g.p(87, 44, P.accent);
       g.p(86, 43, P.accent);
       g.p(86, 44, '#ffe27a');
+      moreOf(g, env, L, t, 'cafe');
       if (L.spot === 'chair') mascot(g, env, 15, 60, t, { flip: false });
       else mascot(g, env, 100, 49, t, { flip: true });
     }
@@ -2206,6 +2278,7 @@
       }
       var px = mod(t * 1.3 + (env.seed % 97) * 3, W + 90) - 40;
       plane(g, env, px, L.py + rnd(Math.sin(t * 0.15) * 1.2), t);
+      moreOf(g, env, L, t, 'sky');
       drawLayer(L.near, env.cloudL, env.cloudD);
       for (var c2 = 0; c2 < 9; c2++) {
         var cx2 = mod(c2 * 26 - t * 0.2, W + 30) - 15;
@@ -2305,6 +2378,7 @@
       }
       plant(g, env, 170, 71, 'bush', t, 3);
       plant(g, env, 182, 71, 'tall', t, 6);
+      moreOf(g, env, L, t, 'night-city');
       mascot(g, env, 30, 71, t, { sleep: false });
       weather(g, env, 0, 0, W, H, t);
     }
@@ -2437,6 +2511,7 @@
         g.em = 0;
       }
       mascot(g, env, 100, 56, t, { sleep: false });
+      moreOf(g, env, L, t, 'stage');
       g.light(96, 30, 70, [1, 0.85, 0.7], 0.3);
     }
   };
@@ -2507,6 +2582,7 @@
         g.p(fx, fy, [P.accent, '#ffffff', '#ffd25a', P.accent2][f % 4]);
         g.p(fx, fy + 1, P.leafD);
       }
+      moreOf(g, env, L, t, 'photo');
       // tripod + camera
       var cx = 150;
       g.line(cx, 50, cx - 8, 77, P.ink);
@@ -2626,6 +2702,7 @@
       g.ell(30, 66, 15, 9, mix(cc, P.ink, 0.3));
       g.ell(29, 64, 13, 8, cc);
       g.ell(24, 60, 5, 3, mix(cc, WHITE, 0.3));
+      moreOf(g, env, L, t, 'game');
       plant(g, env, 170, 60, 'tall', t, 2);
       mascot(g, env, 23, 64, t, { sleep: false });
     }
@@ -2678,6 +2755,7 @@
       g.em = 0;
       clouds(g, env, 0, 0, W, 34, t);
       distant(g, env, 0, 22, W, 26, 'trees', t);
+      moreOf(g, env, L, t, 'park', 0);
       var grass = snow ? hx('#eef3fa') : P.leaf;
       var grassD = snow ? hx('#ccd8ea') : P.leafD;
       for (y = 46; y < H; y++) {
@@ -2738,6 +2816,7 @@
           g.p(lx + (mod(t + l, 4) < 2 ? 1 : 0), ly + (mod(t + l, 4) < 2 ? 0 : 1), P.leaf);
         }
       }
+      moreOf(g, env, L, t, 'park');
       mascot(g, env, 131, 56, t);
       weather(g, env, 0, 0, W, H, t);
     }
@@ -2910,6 +2989,7 @@
       g.line(163, 45, 171, 38, '#e8b86a');
       g.ell(146, 49, 4, 2, '#c8843a');
       g.r(143, 48, 6, 1, '#e8b86a');
+      moreOf(g, env, L, t, 'bakery');
       mascot(g, env, 116, 52, t, { sleep: false });
     }
   };
@@ -2958,6 +3038,7 @@
         }
         g.em = 0;
       }
+      moreOf(g, env, L, t, 'sea', 0);
       // sailboat
       var bx = L.boatX + mod(t * 0.15, 40);
       var bob = mod(t, 8) < 4 ? 0 : 1;
@@ -3008,6 +3089,7 @@
         g.p(gx - 2, gy + (up ? -1 : 1), '#d6d6e0');
         g.p(gx + 2, gy + (up ? -1 : 1), '#d6d6e0');
       }
+      moreOf(g, env, L, t, 'sea');
       mascot(g, env, 145, 74, t, { sleep: false });
       weather(g, env, 0, 0, W, H, t);
     }
@@ -3046,6 +3128,7 @@
         var my = 22 + Math.abs(mod(x + env.seed % 40, 70) - 35) * 0.5;
         for (y = fl(my); y < 46; y++) g.p(x, y, y < my + 4 ? '#f6f8fc' : mc);
       }
+      moreOf(g, env, L, t, 'snowfield', 0);
       var s1 = hx('#eef3fa');
       var s2 = hx('#d8e2f0');
       var s3 = hx('#c0cee4');
@@ -3067,6 +3150,7 @@
           g.p(pcx + x, pcy + y, Math.abs(x) >= hw - 1 ? '#8ab8d8' : ice);
         }
       }
+      moreOf(g, env, L, t, 'snowfield');
       var ang = t * 0.12;
       var skx = pcx + rnd(Math.cos(ang) * 30);
       var sky2 = pcy + rnd(Math.sin(ang) * 4);
@@ -3148,9 +3232,3545 @@
           g.r(bx + 1, by - 1, 1, 2, bc);
         }
       }
+      moreOf(g, env, L, t, 'garden');
       mascot(g, env, 91, 50, t);
     }
   };
+
+  // ------------------------------------------------- more props (T158, D-129)
+  //
+  // 장면마다 따로 고르는 칸(벽 장식, 선반 소품, 바닥 소품, 작은 동물, 앞쪽 소품 등)을 두고 칸마다 여러 그림 중
+  // 하나를 고른다. 칸끼리 따로 고르므로 경우의 수가 곱으로 늘어난다. 원래 있던 장면은 setup의 난수 순서를
+  // 건드리지 않도록 xr()로 따로 뽑은 난수를 쓰고, 칸마다 '비움'도 고를 수 있어 예전 그림이 그대로 남는 배치도 있다.
+
+  function xr(env, salt) {
+    return makeRand((Math.imul(env.spec.seed ^ 0x5bd1e995, 2654435761) + Math.imul(salt + 1, 40503)) >>> 0);
+  }
+
+  var CUPS = ['mug', 'tea', 'iced', 'bottle', 'teapot', 'glass'];
+  var TRINKETS = ['vase', 'candle', 'frame', 'figure', 'radio', 'hourglass', 'snowglobe', 'trophy', 'pencils', 'alarm', 'books', 'fruit', 'succulent', 'speaker'];
+  var WALL_ART = ['poster', 'pennant', 'wreath', 'calendar', 'mirror', 'cork', 'photos', 'clock', 'picture', 'map', 'plates', 'neon', 'shelf', 'banner'];
+  var FLOOR_THINGS = ['bigplant', 'basket', 'stool', 'boxes', 'guitar', 'umbrella', 'catbed', 'floorlamp', 'books', 'pouf', 'bag', 'skate'];
+  var CRITTERS = ['kitty', 'pup', 'bird', 'snail', 'squirrel', 'duck', 'bunny', 'hedgehog', 'butterfly', 'ladybug', 'chick', 'mouse'];
+  var PLANTS2 = ['monstera', 'succulent', 'sunflower', 'tulip', 'snake', 'fern', 'herb', 'bonsai'];
+  var MOTIFS = ['heart', 'star', 'mountain', 'wave', 'note', 'planet', 'flower', 'moon', 'cat', 'sun'];
+
+  // 태그 소품 주제(spec.prop)마다 칸별로 먼저 고를 그림. 주제가 있으면 칸마다 3분의 2쯤 이 목록에서 고른다
+  var HINT = {
+    cat: { critter: ['kitty'], trinket: ['figure'], floor: ['catbed', 'basket'], motif: ['cat', 'heart'], wall: ['poster', 'photos'] },
+    dog: { critter: ['pup'], floor: ['basket', 'bag'], motif: ['heart', 'sun'], wall: ['photos', 'poster'] },
+    bird: { critter: ['bird', 'duck', 'chick'], motif: ['sun', 'heart'], fly: ['flock', 'kite'], wall: ['poster', 'wreath'] },
+    plant: { plant: ['monstera', 'snake', 'fern', 'succulent', 'bonsai', 'herb'], trinket: ['succulent', 'vase'], floor: ['bigplant'], critter: ['snail', 'ladybug', 'butterfly'], wall: ['wreath'], motif: ['flower'] },
+    flower: { plant: ['tulip', 'sunflower', 'flower'], trinket: ['vase'], critter: ['butterfly', 'ladybug'], motif: ['flower'], wall: ['wreath', 'poster'], floor: ['bigplant'] },
+    book: { trinket: ['books', 'pencils', 'hourglass', 'frame'], floor: ['books', 'stool'], wall: ['calendar', 'map', 'shelf'], motif: ['moon', 'star'] },
+    coffee: { cup: ['mug', 'tea', 'iced', 'teapot'], trinket: ['candle', 'books'], wall: ['plates', 'poster'], motif: ['heart'] },
+    music: { trinket: ['radio', 'speaker'], floor: ['guitar'], motif: ['note'], wall: ['poster', 'neon'] },
+    art: { trinket: ['frame', 'pencils', 'vase'], wall: ['picture', 'photos', 'poster'], motif: ['flower', 'moon', 'mountain'], floor: ['stool'] },
+    sport: { trinket: ['trophy', 'alarm'], cup: ['bottle'], floor: ['skate', 'bag'], motif: ['star', 'sun'], wall: ['pennant', 'banner'] },
+    food: { trinket: ['fruit'], cup: ['teapot', 'glass', 'tea'], wall: ['plates', 'calendar'], motif: ['heart', 'sun'], floor: ['basket'] },
+    star: { trinket: ['snowglobe', 'hourglass', 'candle'], motif: ['star', 'moon', 'planet'], wall: ['neon', 'poster'], fly: ['lanterns'] },
+    travel: { floor: ['bag', 'umbrella'], wall: ['map', 'photos'], fly: ['plane', 'balloon'], motif: ['mountain', 'wave'], trinket: ['frame', 'snowglobe'] },
+    game: { trinket: ['figure', 'speaker', 'trophy'], wall: ['neon', 'poster'], motif: ['star', 'heart'], floor: ['pouf', 'boxes'] },
+    code: { trinket: ['pencils', 'alarm', 'speaker'], cup: ['mug', 'iced'], wall: ['calendar', 'cork'], motif: ['star', 'planet'], floor: ['boxes', 'bag'] }
+  };
+
+  // 칸 하나를 고른다. 소품 주제가 없으면 R.pick과 같다(난수도 같은 만큼 쓴다)
+  function hintOf(R, env, slot, arr, v) {
+    var h = env.hint && HINT[env.hint] && HINT[env.hint][slot];
+    if (!h) return v;
+    var ok = h.filter(function (k) {
+      return arr.indexOf(k) >= 0;
+    });
+    return ok.length && R.ch(0.65) ? R.pick(ok) : v;
+  }
+  function hp(R, env, slot, arr) {
+    return hintOf(R, env, slot, arr, R.pick(arr));
+  }
+  function hopt(R, env, slot, arr, none) {
+    return hintOf(R, env, slot, arr, R.ch(none) ? 'none' : R.pick(arr));
+  }
+
+  // 원래 plant()의 새 종류. 화분은 plant()가 그린다
+  function plant2(g, env, x, yb, kind, t, salt) {
+    var P = env.P;
+    var sw = Math.sin(t * 0.25 + x) > 0.6 ? 1 : 0;
+    var i;
+    var k;
+    if (kind === 'monstera') {
+      g.r(x, yb - 12, 1, 5, P.leafD);
+      g.line(x, yb - 9, x - 4, yb - 13, P.leafD);
+      g.line(x, yb - 9, x + 4, yb - 14, P.leafD);
+      g.ell(x - 4 + sw, yb - 15, 3, 2, P.leaf);
+      g.ell(x + 4, yb - 16, 3, 3, P.leafD);
+      g.ell(x, yb - 18, 3, 2, P.leaf);
+      g.p(x - 5 + sw, yb - 15, P.wall);
+      g.p(x + 3, yb - 16, P.leaf);
+      g.p(x + 5, yb - 17, P.wall);
+      g.p(x - 1, yb - 19, P.leafL);
+      g.p(x - 3 + sw, yb - 16, P.leafL);
+    } else if (kind === 'succulent') {
+      g.ell(x, yb - 8, 3, 1, P.leafD);
+      g.ell(x, yb - 9, 2, 1, P.leaf);
+      g.p(x - 3, yb - 9, P.leaf);
+      g.p(x + 3, yb - 9, P.leaf);
+      g.p(x, yb - 11, P.leafL);
+      g.p(x - 1, yb - 10, P.leafL);
+      g.p(x + 2, yb - 10, mix(P.leaf, P.accent, 0.4));
+    } else if (kind === 'sunflower') {
+      g.r(x, yb - 17, 1, 10, P.leafD);
+      g.p(x + 1, yb - 11, P.leaf);
+      g.p(x + 2, yb - 12, P.leaf);
+      g.p(x - 1, yb - 13, P.leaf);
+      var sy = yb - 20 + sw;
+      g.ell(x, sy, 3, 3, '#f6c63a');
+      g.p(x, sy - 4, '#f6c63a');
+      g.p(x, sy + 4, '#f6c63a');
+      g.p(x - 4, sy, '#f6c63a');
+      g.p(x + 4, sy, '#f6c63a');
+      g.ell(x, sy, 1, 1, '#7a4a2a');
+    } else if (kind === 'tulip') {
+      var tc = ['#e8483a', '#f6a0c0', '#f6d04a', P.accent];
+      for (i = 0; i < 3; i++) {
+        var fx = x - 2 + i * 2;
+        var fh = 5 + fl(hash(salt || 2, i) * 4);
+        g.r(fx, yb - 6 - fh, 1, fh, P.leafD);
+        var c = tc[(i + (salt || 0)) % tc.length];
+        g.r(fx - 1, yb - 9 - fh, 3, 2, c);
+        g.p(fx - 1, yb - 10 - fh, c);
+        g.p(fx + 1, yb - 10 - fh, c);
+        g.p(fx, yb - 9 - fh, mix(c, WHITE, 0.35));
+      }
+      g.p(x - 3, yb - 8, P.leaf);
+      g.p(x + 3, yb - 9, P.leaf);
+    } else if (kind === 'snake') {
+      var hs = [9, 13, 11, 8];
+      for (i = 0; i < 4; i++) {
+        var bx = x - 2 + i * 1.3;
+        for (k = 0; k < hs[i]; k++) g.p(rnd(bx), yb - 7 - k, k === hs[i] - 1 ? P.leafL : (k % 3 === 0 ? '#c8c860' : (i % 2 ? P.leafD : P.leaf)));
+      }
+    } else if (kind === 'fern') {
+      for (i = -2; i <= 2; i++) {
+        for (k = 0; k < 7; k++) {
+          var px = x + i * k * 0.55 + (i === 0 ? 0 : sw * 0.4);
+          var py = yb - 8 - k + Math.abs(i) * k * 0.28;
+          g.p(px, py, k % 2 ? P.leaf : P.leafD);
+          if (k > 1 && k % 2 === 0) g.p(px + (i < 0 ? -1 : 1), py + 1, P.leafL);
+        }
+      }
+    } else if (kind === 'herb') {
+      g.ell(x, yb - 9, 4, 2, P.leafD);
+      for (i = 0; i < 6; i++) g.p(x - 3 + i + (i % 2), yb - 11 + (i % 3), i % 2 ? P.leafL : P.leaf);
+      g.p(x, yb - 12, P.leaf);
+    } else {
+      // bonsai
+      g.line(x, yb - 7, x - 2, yb - 10, P.woodD);
+      g.line(x - 2, yb - 10, x + 2, yb - 13, P.woodD);
+      g.ell(x - 3, yb - 13, 3, 1, P.leafD);
+      g.ell(x + 3, yb - 15, 3, 1, P.leaf);
+      g.p(x - 4, yb - 14, P.leafL);
+      g.p(x + 2, yb - 16, P.leafL);
+    }
+  }
+
+  function cupOf(g, env, kind, x, yb, c, t) {
+    var P = env.P;
+    if (kind === 'mug') {
+      mug(g, env, x, yb, c, t, env.time !== 'day');
+    } else if (kind === 'tea') {
+      g.r(x - 1, yb - 1, 9, 1, P.paperD);
+      g.r(x, yb - 5, 7, 4, c);
+      g.r(x, yb - 5, 7, 1, mix(c, WHITE, 0.4));
+      g.r(x + 1, yb - 5, 5, 1, '#c8843a');
+      g.r(x + 1, yb - 2, 5, 1, mix(c, P.ink, 0.25));
+      g.p(x + 7, yb - 4, c);
+      g.p(x + 7, yb - 3, mix(c, P.ink, 0.25));
+      steam(g, x + 3, yb - 6, t, 8, x + 1);
+    } else if (kind === 'iced') {
+      g.r(x, yb - 8, 6, 8, mix('#e8f4fa', P.wall, 0.3));
+      g.r(x, yb - 6, 6, 6, '#c88a5a');
+      g.r(x, yb - 6, 6, 1, '#f0dcc0');
+      g.r(x + 1, yb - 5, 2, 2, '#f4fbff');
+      g.r(x + 3, yb - 3, 2, 2, '#e8f6ff');
+      g.r(x + 4, yb - 11, 1, 5, P.accent);
+      g.p(x + 5, yb - 11, P.accent);
+      g.br(x - 1, yb, 8, 1, P.ink, 0.2);
+    } else if (kind === 'bottle') {
+      g.r(x + 1, yb - 10, 3, 10, P.accent2);
+      g.r(x + 1, yb - 10, 1, 10, P.accent2L);
+      g.r(x + 2, yb - 12, 1, 2, P.metalD);
+      g.r(x + 1, yb - 7, 3, 3, P.paper);
+      g.br(x, yb, 6, 1, P.ink, 0.2);
+    } else if (kind === 'teapot') {
+      g.ell(x + 4, yb - 4, 4, 3, c);
+      g.r(x + 1, yb - 1, 7, 1, mix(c, P.ink, 0.3));
+      g.p(x + 2, yb - 6, mix(c, WHITE, 0.45));
+      g.r(x + 3, yb - 8, 3, 1, mix(c, P.ink, 0.2));
+      g.p(x + 4, yb - 9, mix(c, P.ink, 0.3));
+      g.p(x + 9, yb - 5, c);
+      g.p(x + 10, yb - 6, c);
+      g.p(x - 1, yb - 5, mix(c, P.ink, 0.3));
+      g.p(x - 1, yb - 3, mix(c, P.ink, 0.3));
+      g.br(x, yb, 10, 1, P.ink, 0.2);
+      steam(g, x + 10, yb - 7, t, 6, x + 3);
+    } else {
+      // wine glass of juice
+      g.r(x + 1, yb - 9, 5, 4, mix('#e8f4fa', P.wall, 0.3));
+      g.r(x + 1, yb - 7, 5, 2, P.accent);
+      g.p(x + 1, yb - 9, WHITE);
+      g.r(x + 3, yb - 5, 1, 4, mix('#e8f4fa', P.ink, 0.15));
+      g.r(x + 1, yb - 1, 5, 1, mix('#e8f4fa', P.ink, 0.15));
+    }
+  }
+
+  // 선반·책상 위 작은 소품. 폭 10px, 높이 12px 안쪽
+  function trinket(g, env, kind, x, yb, t) {
+    var P = env.P;
+    var i;
+    g.br(x - 1, yb, 10, 1, P.ink, 0.18);
+    if (kind === 'vase') {
+      g.r(x + 2, yb - 6, 4, 6, P.accent2);
+      g.r(x + 1, yb - 4, 6, 3, P.accent2);
+      g.r(x + 2, yb - 6, 1, 5, P.accent2L);
+      g.r(x + 6, yb - 4, 1, 3, P.accent2D);
+      g.line(x + 3, yb - 7, x + 1, yb - 11, P.leafD);
+      g.line(x + 4, yb - 7, x + 6, yb - 12, P.leafD);
+      g.p(x + 1, yb - 12, P.accent);
+      g.p(x, yb - 11, P.accent);
+      g.p(x + 6, yb - 13, '#ffd25a');
+      g.p(x + 7, yb - 12, '#ffd25a');
+      g.p(x + 4, yb - 10, P.paper);
+    } else if (kind === 'candle') {
+      g.r(x + 1, yb - 2, 6, 2, P.metalD);
+      g.r(x + 3, yb - 8, 3, 6, P.paper);
+      g.r(x + 5, yb - 8, 1, 6, P.paperD);
+      g.p(x + 4, yb - 9, P.ink);
+      var f = mod(t + x, 3);
+      g.em = 1;
+      g.p(x + 4, yb - 10, '#ffd34a');
+      g.p(x + 4 + (f === 1 ? 1 : 0), yb - 11, f === 0 ? '#fff4c0' : '#ffb03a');
+      g.em = 0;
+      if (env.time !== 'day') g.light(x + 4, yb - 10, 18, [1, 0.75, 0.4], 0.5 * (f === 2 ? 0.85 : 1), { n: 3 });
+    } else if (kind === 'frame') {
+      g.r(x, yb - 10, 8, 10, P.woodD);
+      g.r(x + 1, yb - 9, 6, 7, '#bfe0ee');
+      g.r(x + 1, yb - 4, 6, 2, P.leaf);
+      g.r(x + 3, yb - 7, 2, 3, P.accent);
+      g.p(x + 3, yb - 8, '#ffd0a0');
+      g.p(x + 4, yb - 8, '#ffd0a0');
+      g.r(x + 6, yb - 2, 2, 2, P.woodDD);
+    } else if (kind === 'figure') {
+      var fc = mix(P.paper, P.accent2, 0.25);
+      g.r(x + 1, yb - 2, 7, 2, P.woodD);
+      g.r(x + 2, yb - 6, 5, 4, fc);
+      g.r(x + 2, yb - 9, 5, 3, fc);
+      g.p(x + 2, yb - 10, fc);
+      g.p(x + 6, yb - 10, fc);
+      g.p(x + 3, yb - 8, P.ink);
+      g.p(x + 5, yb - 8, P.ink);
+      g.p(x + 7, yb - 4, fc);
+      g.p(x + 8, yb - 5, fc);
+      g.r(x + 6, yb - 6, 1, 4, mix(fc, P.ink, 0.2));
+    } else if (kind === 'radio') {
+      g.r(x, yb - 7, 9, 7, P.accent);
+      g.r(x, yb - 7, 9, 1, P.accentL);
+      g.r(x + 1, yb - 5, 4, 4, P.accentD);
+      for (i = 0; i < 2; i++) g.r(x + 1, yb - 4 + i * 2, 4, 1, mix(P.accentD, P.ink, 0.3));
+      g.r(x + 6, yb - 5, 2, 1, P.paper);
+      g.p(x + 6, yb - 3, P.paper);
+      g.line(x + 7, yb - 8, x + 9, yb - 12, P.metalD);
+      if (mod(t, 8) < 4) {
+        g.p(x + 10, yb - 9, P.accent2);
+        g.p(x + 11, yb - 11, P.accent2);
+      }
+    } else if (kind === 'hourglass') {
+      g.r(x + 1, yb - 1, 7, 1, P.woodD);
+      g.r(x + 1, yb - 11, 7, 1, P.woodD);
+      var sand = mod(t, 40);
+      for (i = 0; i < 4; i++) {
+        g.r(x + 2 + i * 0.5, yb - 10 + i, 5 - i, 1, i * 10 >= sand ? '#f0d08a' : mix('#e8f4fa', P.wall, 0.3));
+        g.r(x + 2 + (3 - i) * 0.5, yb - 5 + i, 2 + i, 1, (3 - i) * 10 < sand ? '#f0d08a' : mix('#e8f4fa', P.wall, 0.3));
+      }
+      g.p(x + 4, yb - 6, '#f0d08a');
+      g.r(x + 1, yb - 10, 1, 9, P.woodD);
+      g.r(x + 7, yb - 10, 1, 9, P.woodD);
+    } else if (kind === 'snowglobe') {
+      g.r(x + 1, yb - 3, 7, 3, P.woodD);
+      g.r(x + 1, yb - 3, 7, 1, P.woodL);
+      g.ell(x + 4, yb - 7, 3, 3, mix('#d8eef8', P.wall, 0.2));
+      g.r(x + 3, yb - 6, 3, 2, P.leafD);
+      g.p(x + 4, yb - 8, P.leafD);
+      for (i = 0; i < 3; i++) g.p(x + 2 + mod(i * 2 + fl(t / 3), 5), yb - 9 + mod(i * 3 + t, 5), WHITE);
+      g.p(x + 2, yb - 9, WHITE);
+    } else if (kind === 'trophy') {
+      g.r(x + 2, yb - 2, 5, 2, P.woodD);
+      g.r(x + 4, yb - 5, 1, 3, '#d8a838');
+      g.r(x + 2, yb - 10, 5, 4, '#f0c84a');
+      g.r(x + 3, yb - 6, 3, 1, '#d8a838');
+      g.p(x + 1, yb - 9, '#f0c84a');
+      g.p(x + 7, yb - 9, '#f0c84a');
+      g.p(x + 3, yb - 9, '#fff0a0');
+    } else if (kind === 'pencils') {
+      g.r(x + 2, yb - 6, 5, 6, P.metal);
+      g.r(x + 2, yb - 6, 1, 6, P.metalL);
+      g.line(x + 3, yb - 7, x + 2, yb - 11, P.accent);
+      g.line(x + 4, yb - 7, x + 5, yb - 12, '#f6c63a');
+      g.line(x + 5, yb - 7, x + 7, yb - 10, P.accent2);
+      g.p(x + 5, yb - 13, P.ink);
+    } else if (kind === 'alarm') {
+      g.ell(x + 4, yb - 5, 3, 3, P.accent);
+      g.ell(x + 4, yb - 5, 2, 2, P.paper);
+      g.p(x + 4, yb - 6, P.ink);
+      g.p(x + 5, yb - 5, P.ink);
+      var rg = mod(t, 30) < 3 ? 1 : 0;
+      g.p(x + 1 - rg, yb - 9, P.metalD);
+      g.p(x + 7 + rg, yb - 9, P.metalD);
+      g.p(x + 2, yb - 1, P.ink);
+      g.p(x + 6, yb - 1, P.ink);
+    } else if (kind === 'books') {
+      g.r(x, yb - 9, 2, 9, P.books[0]);
+      g.r(x + 2, yb - 10, 2, 10, P.books[2]);
+      g.line(x + 5, yb - 1, x + 8, yb - 9, P.books[4]);
+      g.line(x + 6, yb - 1, x + 9, yb - 9, P.books[4]);
+      g.line(x + 4, yb - 1, x + 7, yb - 9, mix(P.books[4], P.ink, 0.3));
+    } else if (kind === 'fruit') {
+      g.r(x, yb - 3, 9, 3, P.paper);
+      g.r(x + 1, yb - 1, 7, 1, P.paperD);
+      g.ell(x + 2, yb - 4, 1, 1, '#e8483a');
+      g.ell(x + 5, yb - 5, 2, 2, '#f6a03a');
+      g.ell(x + 7, yb - 4, 1, 1, '#9ad04a');
+      g.p(x + 5, yb - 8, P.leafD);
+    } else if (kind === 'succulent') {
+      g.r(x + 1, yb - 4, 7, 4, P.pot);
+      g.r(x + 1, yb - 4, 7, 1, P.potL);
+      plant2(g, env, x + 4, yb + 4, 'succulent', t, 1);
+    } else {
+      // speaker
+      g.r(x + 1, yb - 10, 7, 10, '#34343f');
+      g.ell(x + 4, yb - 3, 2, 2, '#55556a');
+      g.p(x + 4, yb - 3, '#1a1820');
+      g.ell(x + 4, yb - 8, 1, 1, '#55556a');
+      g.em = 1;
+      if (env.time !== 'day') g.p(x + 7, yb - 10, mod(t, 6) < 3 ? '#6aff8a' : '#2a8a3a');
+      g.em = 0;
+    }
+  }
+
+  function motif(g, kind, x, y, c, c2) {
+    var S = {
+      heart: ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'],
+      star: ['...#...', '..###..', '#######', '.#####.', '.##.##.', '#.....#'],
+      mountain: ['...#...', '..###..', '.##*##.', '##***##', '#*****#', '*******'],
+      wave: ['..###..', '.#...#.', '#..#..#', '..#.#..', '*******', '*******'],
+      note: ['..####', '..#..#', '..#..#', '###.##', '##.###', '##.##.'],
+      planet: ['...##..', '.#####.', '*#####*', '.#####.', '..###..', '.......'],
+      flower: ['.#.#.', '#####', '.#*#.', '#####', '.#.#.', '..*..'],
+      moon: ['..###.', '.##...', '##....', '##....', '.##...', '..###.'],
+      cat: ['#...#.', '##.##.', '#####.', '#*#*#.', '#####.', '.###..'],
+      sun: ['#..#..#', '.#####.', '.#####.', '#######', '.#####.', '#..#..#']
+    };
+    g.spr(x, y, S[kind] || S.heart, { '#': c, '*': c2 });
+  }
+
+  // 벽 장식. (x, y)부터 대략 18x18 칸
+  function wallArt(g, env, kind, x, y, t, salt) {
+    var P = env.P;
+    var i;
+    var R2 = makeRand((env.seed * 31 + (salt || 0) * 977 + 5) >>> 0);
+    if (kind === 'poster') {
+      var bg = R2.pick([P.accent2, P.accent, P.paper, P.leaf, mix(P.ink, P.accent2, 0.3)]);
+      var fg = bg === P.paper ? P.accent : (bg === P.accent ? P.paper : R2.pick([P.accent, P.paper, '#ffd25a']));
+      g.r(x, y, 14, 18, P.paper);
+      g.r(x + 1, y + 1, 12, 16, bg);
+      motif(g, hp(R2, env, 'motif', MOTIFS), x + 3, y + 4, fg, mix(fg, P.ink, 0.25));
+      g.r(x + 3, y + 13, 8, 1, mix(bg, fg, 0.6));
+      g.r(x + 4, y + 15, 6, 1, mix(bg, fg, 0.4));
+      g.p(x + 6, y, P.metalD);
+      g.br(x + 1, y + 18, 14, 1, P.ink, 0.15);
+    } else if (kind === 'pennant') {
+      var pc = R2.pick([P.accent, P.accent2, P.leaf]);
+      g.r(x, y + 2, 1, 10, P.woodD);
+      for (i = 0; i < 6; i++) g.r(x + 1, y + 2 + i, 16 - i * 2.6, 1, i === 0 ? mix(pc, WHITE, 0.3) : pc);
+      for (i = 6; i < 10; i++) g.r(x + 1, y + 2 + i - 6 + 5, Math.max(1, 3 - (i - 6)), 1, pc);
+      g.r(x + 4, y + 4, 5, 1, P.paper);
+    } else if (kind === 'wreath') {
+      for (i = 0; i < 20; i++) {
+        var a = (i / 20) * 2 * PI;
+        var wx = x + 8 + rnd(Math.cos(a) * 6);
+        var wy = y + 8 + rnd(Math.sin(a) * 6);
+        g.r(wx - 1, wy - 1, 2, 2, i % 2 ? P.leafD : P.leaf);
+        if (i % 5 === 0) g.p(wx, wy, P.accent);
+      }
+      g.r(x + 6, y + 13, 5, 2, P.accent);
+      g.p(x + 6, y + 15, P.accent);
+      g.p(x + 10, y + 15, P.accent);
+    } else if (kind === 'calendar') {
+      g.r(x + 1, y + 2, 14, 16, P.paper);
+      g.r(x + 1, y + 2, 14, 4, P.accent);
+      g.p(x + 4, y + 1, P.metalD);
+      g.p(x + 11, y + 1, P.metalD);
+      for (var cy = 0; cy < 4; cy++) {
+        for (var cx = 0; cx < 5; cx++) g.p(x + 3 + cx * 2.5, y + 8 + cy * 2.5, cy === 1 && cx === 2 ? P.accent : P.paperDD);
+      }
+      g.br(x + 2, y + 18, 14, 1, P.ink, 0.15);
+    } else if (kind === 'mirror') {
+      g.ell(x + 8, y + 9, 6, 8, P.woodL);
+      g.ell(x + 8, y + 9, 5, 7, mix('#d8eef6', P.wall, 0.3));
+      g.line(x + 5, y + 10, x + 8, y + 5, WHITE);
+      g.line(x + 7, y + 13, x + 11, y + 7, mix(WHITE, '#d8eef6', 0.5));
+    } else if (kind === 'cork') {
+      g.r(x, y + 2, 18, 14, P.woodD);
+      g.r(x + 1, y + 3, 16, 12, '#c8955a');
+      for (i = 0; i < 12; i++) g.p(x + 1 + fl(hash(salt || 3, i) * 16), y + 3 + fl(hash(salt || 3, i + 30) * 12), '#a87a42');
+      g.r(x + 2, y + 4, 5, 5, '#ffe27a');
+      g.r(x + 9, y + 5, 6, 4, P.paper);
+      g.r(x + 4, y + 10, 6, 4, '#a8e6cf');
+      g.r(x + 11, y + 10, 4, 4, '#ffb3c6');
+      g.p(x + 4, y + 4, P.accent);
+      g.p(x + 12, y + 5, P.accent2);
+      g.p(x + 6, y + 10, P.accent);
+    } else if (kind === 'photos') {
+      for (i = 0; i < 3; i++) {
+        var px = x + i * 6;
+        var py = y + 3 + (i % 2) * 3;
+        g.r(px, py, 6, 7, P.paper);
+        g.r(px + 1, py + 1, 4, 4, [P.accent2L, '#bfe0ee', P.accentL][i]);
+        g.p(px + 2, py + 3, [P.leaf, P.accent, P.leafD][i]);
+        g.p(px + 3, py + 2, [P.leaf, P.accent, P.leafD][i]);
+      }
+      g.line(x - 1, y + 2, x + 19, y + 2, P.ink);
+    } else if (kind === 'clock') {
+      clock(g, env, x + 8, y + 8, 6, t);
+    } else if (kind === 'picture') {
+      picture(g, env, x, y + 2, 18, 14);
+    } else if (kind === 'map') {
+      g.r(x, y + 2, 18, 13, mix(P.paper, '#e8d8a8', 0.5));
+      g.r(x, y + 2, 18, 1, P.woodD);
+      g.r(x, y + 14, 18, 1, P.woodD);
+      g.ell(x + 5, y + 7, 3, 2, P.leaf);
+      g.ell(x + 12, y + 10, 4, 2, P.leaf);
+      g.p(x + 14, y + 5, P.leaf);
+      for (i = 0; i < 6; i++) g.p(x + 6 + i, y + 9 + (i % 2), P.accent);
+      g.p(x + 12, y + 10, P.accentD);
+    } else if (kind === 'plates') {
+      for (i = 0; i < 3; i++) {
+        var pr = i === 1 ? 4 : 3;
+        var pcx = x + 3 + i * 6;
+        var pcy = y + 8 + (i === 1 ? -2 : 2);
+        disc(g, pcx, pcy, pr, P.paper);
+        disc(g, pcx, pcy, pr - 1, [P.accent2L, P.accentL, P.accent2L][i]);
+        g.p(pcx, pcy, P.paper);
+      }
+    } else if (kind === 'neon') {
+      var nc = R2.pick(['#ff7eb0', '#7fd8ff', '#ffd47a', '#a6f0a0']);
+      g.r(x, y + 3, 18, 13, mix(P.ink, '#1a1a2a', 0.5));
+      g.em = 1;
+      motif(g, hp(R2, env, 'motif', ['heart', 'star', 'moon', 'note']), x + 6, y + 6, mod(t, 30) === 0 ? mix(nc, P.ink, 0.5) : nc, nc);
+      g.em = 0;
+      if (env.time !== 'day') g.light(x + 9, y + 9, 22, [1, 0.7, 0.9], 0.35, { n: 3 });
+    } else if (kind === 'shelf') {
+      g.r(x - 2, y + 14, 22, 2, P.woodL);
+      g.r(x - 2, y + 16, 22, 1, P.woodD);
+      trinket(g, env, R2.pick(['vase', 'succulent', 'frame', 'trophy', 'snowglobe']), x - 1, y + 14, t);
+      trinket(g, env, R2.pick(['books', 'candle', 'figure', 'hourglass', 'alarm']), x + 10, y + 14, t);
+    } else {
+      // garland banner
+      for (i = 0; i < 20; i++) {
+        var sag = rnd(Math.sin((i / 19) * PI) * 3);
+        g.p(x - 1 + i, y + 3 + sag, P.ink);
+        if (i % 5 === 2) {
+          var bc = [P.accent, P.accent2, P.paper, '#ffd25a'][fl(i / 5) % 4];
+          for (var r = 0; r < 4; r++) g.r(x - 3 + i + r, y + 4 + sag + r, 5 - r * 2, 1, bc);
+        }
+      }
+    }
+  }
+
+  // 바닥에 두는 큰 소품. 폭 16px, 높이 28px 안쪽
+  function floorThing(g, env, kind, x, yb, t) {
+    var P = env.P;
+    var i;
+    g.br(x - 1, yb, 16, 1, P.ink, 0.22);
+    if (kind === 'bigplant') {
+      g.r(x + 2, yb - 9, 11, 9, P.pot);
+      g.r(x + 1, yb - 10, 13, 2, P.potL);
+      g.r(x + 11, yb - 8, 2, 8, P.potD);
+      var sw = Math.sin(t * 0.2 + x) > 0.5 ? 1 : 0;
+      g.line(x + 7, yb - 10, x + 3, yb - 18, P.leafD);
+      g.line(x + 7, yb - 10, x + 11, yb - 20, P.leafD);
+      g.line(x + 7, yb - 10, x + 7, yb - 24, P.leafD);
+      g.ell(x + 2 + sw, yb - 19, 4, 3, P.leaf);
+      g.ell(x + 12, yb - 21, 4, 3, P.leafD);
+      g.ell(x + 7, yb - 26, 4, 3, P.leaf);
+      g.p(x + 1 + sw, yb - 20, P.wall);
+      g.p(x + 13, yb - 22, P.wall);
+      g.p(x + 6, yb - 27, P.leafL);
+      g.p(x + 3 + sw, yb - 21, P.leafL);
+    } else if (kind === 'basket') {
+      g.r(x + 1, yb - 7, 13, 7, P.woodL);
+      for (i = 0; i < 13; i += 2) g.r(x + 1 + i, yb - 7, 1, 7, P.wood);
+      g.r(x + 1, yb - 7, 13, 1, P.woodD);
+      g.ell(x + 5, yb - 8, 2, 2, P.accent);
+      g.ell(x + 9, yb - 9, 2, 2, P.accent2);
+      g.line(x + 9, yb - 9, x + 14, yb - 3, P.accent2);
+      g.p(x + 4, yb - 9, P.accentL);
+    } else if (kind === 'stool') {
+      g.r(x + 2, yb - 12, 11, 2, P.woodL);
+      g.r(x + 2, yb - 10, 11, 1, P.woodD);
+      g.line(x + 3, yb - 9, x + 2, yb - 1, P.woodD);
+      g.line(x + 11, yb - 9, x + 12, yb - 1, P.woodD);
+      g.r(x + 3, yb - 5, 9, 1, P.woodD);
+      trinket(g, env, 'succulent', x + 3, yb - 12, t);
+    } else if (kind === 'boxes') {
+      g.r(x, yb - 8, 12, 8, '#c8955a');
+      g.r(x, yb - 8, 12, 1, '#e0b47a');
+      g.r(x + 5, yb - 8, 2, 8, '#e8d8a8');
+      g.r(x + 3, yb - 15, 9, 7, '#d8a86a');
+      g.r(x + 3, yb - 15, 9, 1, '#f0c88a');
+      g.r(x + 7, yb - 15, 1, 7, '#e8d8a8');
+      g.r(x + 1, yb - 5, 3, 2, P.paper);
+    } else if (kind === 'guitar') {
+      var gc = P.woodL;
+      g.ell(x + 7, yb - 4, 5, 4, gc);
+      g.ell(x + 7, yb - 10, 4, 3, gc);
+      g.ell(x + 7, yb - 7, 1, 1, '#2a1a14');
+      g.r(x + 6, yb - 26, 2, 14, P.woodD);
+      g.r(x + 5, yb - 28, 4, 3, P.woodDD);
+      g.r(x + 5, yb - 2, 5, 1, P.woodD);
+    } else if (kind === 'umbrella') {
+      g.r(x + 3, yb - 9, 8, 9, P.metalD);
+      g.r(x + 3, yb - 9, 8, 1, P.metal);
+      g.line(x + 5, yb - 9, x + 4, yb - 22, P.accent);
+      g.r(x + 3, yb - 24, 2, 3, P.accent);
+      g.line(x + 9, yb - 9, x + 10, yb - 19, P.accent2);
+      g.r(x + 9, yb - 21, 3, 3, P.accent2D);
+      g.r(x + 9, yb - 20, 1, 3, P.accent2);
+    } else if (kind === 'catbed') {
+      g.ell(x + 7, yb - 3, 7, 3, P.accent2D);
+      g.ell(x + 7, yb - 3, 5, 2, P.paperD);
+      critter(g, env, 'kitty', x + 3, yb - 2, t, false, true);
+    } else if (kind === 'floorlamp') {
+      g.r(x + 3, yb - 2, 9, 2, P.metalD);
+      g.r(x + 7, yb - 26, 1, 24, P.metalD);
+      for (i = 0; i < 5; i++) g.r(x + 5 - i * 0.6, yb - 32 + i, 5 + i * 1.2, 1, i === 4 ? P.paperD : P.paper);
+      g.em = 1;
+      g.r(x + 4, yb - 27, 7, 1, env.time === 'day' ? '#f6efd8' : '#fff1c2');
+      g.em = 0;
+      g.light(x + 7, yb - 26, 40, env.T.lamp, env.lampK * 0.9, { top: yb - 28 });
+    } else if (kind === 'books') {
+      bookStack(g, env, x, yb, 4, x + 3);
+    } else if (kind === 'pouf') {
+      g.ell(x + 7, yb - 4, 7, 4, P.accent);
+      g.ell(x + 7, yb - 6, 6, 2, P.accentL);
+      for (i = 0; i < 4; i++) g.p(x + 3 + i * 3, yb - 3, P.accentD);
+    } else if (kind === 'bag') {
+      g.r(x + 2, yb - 10, 11, 10, P.accent2);
+      g.r(x + 2, yb - 10, 11, 2, P.accent2L);
+      g.r(x + 4, yb - 6, 7, 4, P.accent2D);
+      g.line(x + 4, yb - 10, x + 6, yb - 14, P.accent2D);
+      g.line(x + 11, yb - 10, x + 9, yb - 14, P.accent2D);
+      g.r(x + 6, yb - 14, 4, 1, P.accent2D);
+    } else {
+      // skateboard leaning on the wall
+      g.line(x + 4, yb - 1, x + 10, yb - 22, P.accent);
+      g.line(x + 5, yb - 1, x + 11, yb - 22, P.accent);
+      g.line(x + 6, yb - 1, x + 12, yb - 22, P.accentD);
+      g.r(x + 2, yb - 4, 2, 2, P.metalD);
+      g.r(x + 9, yb - 20, 2, 2, P.metalD);
+    }
+  }
+
+  // 작은 동물. 마스코트와 따로 장면 구석에서 움직인다. (x, yb)는 왼쪽 아래
+  function critter(g, env, kind, x, yb, t, flip, sleep) {
+    var P = env.P;
+    var f = flip ? -1 : 1;
+    var ox = flip ? x + 8 : x;
+    function q(dx, dy, c) {
+      g.p(ox + dx * f, yb + dy, c);
+    }
+    function rr(dx, dy, w, h, c) {
+      for (var j = 0; j < h; j++) {
+        for (var i = 0; i < w; i++) q(dx + i, dy + j, c);
+      }
+    }
+    var step = mod(t, 4) < 2 ? 0 : 1;
+    var c;
+    var cD;
+    if (kind === 'kitty' || kind === 'pup') {
+      c = kind === 'kitty' ? hx(['#e8a050', '#6a6a78', '#f4ece0', '#3a3036'][env.seed % 4]) : hx(['#c8955a', '#f4ece0', '#8a6a4a'][env.seed % 3]);
+      cD = mix(c, P.ink, 0.35);
+      if (sleep || env.time === 'night') {
+        rr(0, -3, 8, 3, c);
+        rr(1, -4, 6, 1, c);
+        rr(5, -5, 3, 2, c);
+        q(5, -6, kind === 'kitty' ? c : cD);
+        q(7, -6, kind === 'kitty' ? c : cD);
+        q(6, -4, cD);
+        rr(0, -1, 8, 1, cD);
+        q(-1, -2, c);
+        q(-1, -3, c);
+      } else {
+        var tail = mod(t, 12) < 6 ? 0 : 1;
+        rr(0, -4, 6, 3, c);
+        rr(5, -7, 4, 4, c);
+        q(5, -8, kind === 'kitty' ? c : cD);
+        q(8, -8, kind === 'kitty' ? c : cD);
+        if (kind === 'pup') {
+          q(5, -6, cD);
+          q(8, -6, cD);
+        }
+        q(6, -6, P.ink);
+        q(8, -6, P.ink);
+        q(9, -5, kind === 'pup' ? P.ink : c);
+        rr(0, -1, 1, 1, cD);
+        rr(2, -1, 1, 1, cD);
+        rr(4, -1, 1, 1, cD);
+        q(-1, -4 - tail, c);
+        q(-2, -5 - tail, c);
+        if (kind === 'pup') q(-1, -5, c);
+      }
+    } else if (kind === 'bird') {
+      var hop = mod(t + x, 14) < 2 ? 1 : 0;
+      c = hx(['#5a8ad0', '#e8483a', '#f6c63a', '#8a6a4a'][env.seed % 4]);
+      rr(0, -3 - hop, 4, 2, c);
+      rr(3, -5 - hop, 2, 2, c);
+      q(5, -4 - hop, '#f0a23a');
+      q(4, -5 - hop, P.ink);
+      q(-1, -3 - hop, mix(c, P.ink, 0.3));
+      rr(1, -2 - hop, 2, 1, mix(c, WHITE, 0.4));
+      q(1, -1, '#f0a23a');
+      q(3, -1, '#f0a23a');
+    } else if (kind === 'snail') {
+      var crawl = fl(mod(t * 0.1, 6));
+      rr(crawl, -1, 8, 1, '#c8b8a0');
+      q(crawl + 7, -2, '#c8b8a0');
+      q(crawl + 7, -3, '#c8b8a0');
+      q(crawl + 8, -4, P.ink);
+      g.ell(ox + (crawl + 3) * f, yb - 3, 2, 2, '#b8784a');
+      q(crawl + 3, -3, '#e8b87a');
+    } else if (kind === 'squirrel') {
+      c = hx('#b8683a');
+      var flick = mod(t, 10) < 5 ? 0 : 1;
+      rr(2, -4, 4, 3, c);
+      rr(5, -6, 3, 3, c);
+      q(6, -7, c);
+      q(6, -5, P.ink);
+      q(8, -5, c);
+      rr(0, -8 - flick, 2, 6, mix(c, WHITE, 0.15));
+      rr(1, -9 - flick, 2, 2, mix(c, WHITE, 0.15));
+      q(3, -1, mix(c, P.ink, 0.3));
+      q(5, -1, mix(c, P.ink, 0.3));
+      q(6, -3, '#a87a42');
+    } else if (kind === 'duck') {
+      var bob = mod(t + x, 8) < 4 ? 0 : 1;
+      c = hx('#f4f4f0');
+      rr(0, -3 + bob, 6, 3, c);
+      rr(4, -6 + bob, 3, 3, hx('#3a8a5a'));
+      q(7, -5 + bob, '#f0a23a');
+      q(8, -5 + bob, '#f0a23a');
+      q(5, -5 + bob, P.ink);
+      q(-1, -3 + bob, c);
+      rr(1, -2 + bob, 3, 1, mix(c, '#8a8aa0', 0.4));
+    } else if (kind === 'bunny') {
+      c = hx(['#f4f0ea', '#c8a888', '#8a8a96'][env.seed % 3]);
+      var hp = mod(t + x, 16) < 3 ? 1 : 0;
+      rr(0, -4 - hp, 6, 4, c);
+      rr(5, -6 - hp, 3, 3, c);
+      q(5, -9 - hp, c);
+      q(5, -8 - hp, c);
+      q(7, -9 - hp, c);
+      q(7, -8 - hp, c);
+      q(6, -5 - hp, P.ink);
+      q(-1, -3 - hp, WHITE);
+    } else if (kind === 'hedgehog') {
+      rr(0, -3, 7, 3, '#8a6a4a');
+      for (var s = 0; s < 7; s += 2) q(s, -4, '#5a4030');
+      rr(6, -2, 2, 2, '#e8c8a0');
+      q(8, -2, P.ink);
+      q(7, -3, P.ink);
+    } else if (kind === 'butterfly') {
+      var ph = t * 0.15 + x;
+      var bx = x + 4 + Math.sin(ph) * 6;
+      var by = yb - 8 + Math.sin(ph * 1.7) * 4;
+      var open = mod(t, 2) === 0;
+      c = [P.accent, '#ffd25a', P.accent2L][env.seed % 3];
+      g.p(bx, by, P.ink);
+      g.p(bx, by + 1, P.ink);
+      if (open) {
+        g.r(bx - 2, by - 1, 2, 2, c);
+        g.r(bx + 1, by - 1, 2, 2, c);
+      } else {
+        g.r(bx - 1, by - 1, 1, 2, c);
+        g.r(bx + 1, by - 1, 1, 2, c);
+      }
+    } else if (kind === 'ladybug') {
+      var lx = fl(mod(t * 0.2, 10));
+      rr(lx, -2, 3, 2, '#e8483a');
+      q(lx + 3, -2, P.ink);
+      q(lx + 1, -2, P.ink);
+      q(lx + 1, -1, P.ink);
+    } else if (kind === 'chick') {
+      var pk = mod(t + x, 10) < 2 ? 1 : 0;
+      rr(0, -3, 4, 3, '#ffd84a');
+      rr(2, -5 + pk, 3, 2, '#ffd84a');
+      q(5, -4 + pk, '#f08a3a');
+      q(3, -5 + pk, P.ink);
+      q(1, -2, '#f6c03a');
+    } else {
+      // mouse
+      var run = fl(mod(t * 0.4, 14));
+      rr(run, -3, 4, 3, '#a8a0a8');
+      q(run + 4, -2, '#a8a0a8');
+      q(run + 5, -2, '#f0a0b0');
+      q(run + 2, -4, '#f0a0b0');
+      q(run + 3, -2, P.ink);
+      q(run - 1, -1, '#c8a0a8');
+      q(run - 2, -1, '#c8a0a8');
+      q(run - 3, -2, '#c8a0a8');
+    }
+  }
+
+  // ---- outdoor pieces
+
+  function skyTop(g, env, h, t, ch) {
+    g.em = 1;
+    skyBg(g, env, 0, 0, W, h);
+    stars(g, env, 0, 0, W, h - 4, t);
+    celestial(g, env, 0, 0, W, h);
+    g.em = 0;
+    clouds(g, env, 0, 0, W, ch || fl(h * 0.7), t);
+  }
+
+  var STREET = ['bench', 'mailbox', 'hydrant', 'bike', 'sign', 'lantern', 'bin', 'vending', 'barrel', 'scooter', 'phone', 'cart'];
+
+  function streetThing(g, env, kind, x, yb, t) {
+    var P = env.P;
+    var i;
+    g.br(x - 1, yb, 18, 1, P.ink, 0.22);
+    if (kind === 'bench') {
+      g.r(x, yb - 6, 18, 2, P.woodL);
+      g.r(x, yb - 10, 18, 2, P.woodL);
+      g.r(x, yb - 4, 18, 1, P.woodD);
+      g.r(x + 2, yb - 4, 1, 4, P.metalD);
+      g.r(x + 15, yb - 4, 1, 4, P.metalD);
+      g.r(x + 1, yb - 11, 1, 7, P.metalD);
+      g.r(x + 16, yb - 11, 1, 7, P.metalD);
+    } else if (kind === 'mailbox') {
+      g.r(x + 6, yb - 8, 2, 8, P.woodD);
+      g.r(x + 2, yb - 14, 10, 6, P.accent);
+      g.r(x + 2, yb - 15, 10, 1, P.accentL);
+      g.r(x + 3, yb - 12, 6, 1, P.accentD);
+      g.r(x + 11, yb - 18, 1, 5, P.metalD);
+      g.r(x + 12, yb - 18, 3, 2, '#ffd25a');
+    } else if (kind === 'hydrant') {
+      g.r(x + 4, yb - 9, 7, 9, '#e8483a');
+      g.r(x + 5, yb - 11, 5, 2, '#e8483a');
+      g.r(x + 6, yb - 12, 3, 1, '#c8382a');
+      g.r(x + 2, yb - 7, 2, 2, '#c8382a');
+      g.r(x + 11, yb - 7, 2, 2, '#c8382a');
+      g.r(x + 4, yb - 9, 1, 9, '#ff7a6a');
+      g.r(x + 3, yb - 1, 9, 1, '#a8281a');
+    } else if (kind === 'bike') {
+      var wc = P.ink;
+      for (i = 0; i < 16; i++) {
+        var a = (i / 16) * 2 * PI;
+        g.p(x + 3 + rnd(Math.cos(a) * 3), yb - 4 + rnd(Math.sin(a) * 3), wc);
+        g.p(x + 14 + rnd(Math.cos(a) * 3), yb - 4 + rnd(Math.sin(a) * 3), wc);
+      }
+      g.line(x + 3, yb - 4, x + 8, yb - 4, P.accent);
+      g.line(x + 8, yb - 4, x + 12, yb - 9, P.accent);
+      g.line(x + 3, yb - 4, x + 6, yb - 9, P.accent);
+      g.line(x + 6, yb - 9, x + 12, yb - 9, P.accent);
+      g.line(x + 12, yb - 9, x + 14, yb - 4, P.accent);
+      g.line(x + 8, yb - 4, x + 6, yb - 10, P.accent);
+      g.r(x + 5, yb - 11, 3, 1, P.ink);
+      g.line(x + 12, yb - 9, x + 11, yb - 12, P.metalD);
+      g.r(x + 10, yb - 12, 3, 1, P.metalD);
+      g.r(x + 12, yb - 11, 4, 2, P.woodL);
+    } else if (kind === 'sign') {
+      g.r(x + 7, yb - 20, 1, 20, P.woodD);
+      g.r(x + 1, yb - 19, 12, 4, P.woodL);
+      g.p(x + 13, yb - 18, P.woodL);
+      g.p(x + 13, yb - 17, P.woodL);
+      g.p(x + 14, yb - 17, P.woodL);
+      g.r(x + 3, yb - 14, 12, 4, P.wood);
+      g.p(x + 2, yb - 13, P.wood);
+      g.p(x + 2, yb - 12, P.wood);
+      g.r(x + 3, yb - 18, 7, 1, P.woodD);
+      g.r(x + 6, yb - 13, 7, 1, P.woodD);
+    } else if (kind === 'lantern') {
+      g.r(x + 7, yb - 22, 2, 22, P.metalD);
+      g.r(x + 5, yb - 1, 6, 1, P.metalD);
+      g.r(x + 4, yb - 27, 8, 1, P.metalD);
+      g.r(x + 5, yb - 26, 6, 4, env.time === 'day' ? mix('#e8e8dc', P.metal, 0.3) : '#fff1c2');
+      g.r(x + 5, yb - 28, 6, 1, P.metalD);
+      g.r(x + 7, yb - 30, 2, 2, P.metalD);
+      if (env.time !== 'day') {
+        g.em = 1;
+        g.r(x + 6, yb - 25, 4, 2, '#fff8d8');
+        g.em = 0;
+        halo(g, x + 8, yb - 24, 2, 5, '#ffe9a8', 0.5);
+      }
+      g.light(x + 8, yb - 22, 34, env.T.lamp, env.lampK * 0.9, { top: yb - 26 });
+    } else if (kind === 'bin') {
+      g.r(x + 4, yb - 11, 9, 11, P.leafD);
+      g.r(x + 3, yb - 12, 11, 2, P.leaf);
+      for (i = 0; i < 4; i++) g.r(x + 5 + i * 2, yb - 9, 1, 8, mix(P.leafD, P.ink, 0.25));
+    } else if (kind === 'vending') {
+      g.r(x + 1, yb - 24, 14, 24, P.accent);
+      g.r(x + 1, yb - 24, 14, 1, P.accentL);
+      g.em = 1;
+      g.r(x + 3, yb - 22, 8, 14, '#e8f4fa');
+      for (var vy = 0; vy < 3; vy++) {
+        for (var vx = 0; vx < 3; vx++) g.r(x + 4 + vx * 2.5, yb - 21 + vy * 5, 2, 3, [P.accent2, '#f6c63a', '#e8483a'][(vx + vy) % 3]);
+      }
+      g.em = 0;
+      g.r(x + 12, yb - 20, 2, 4, P.accentD);
+      g.r(x + 3, yb - 6, 8, 3, '#2a2a33');
+      if (env.time !== 'day') g.light(x + 7, yb - 14, 26, [0.85, 0.95, 1], 0.5, { n: 3 });
+    } else if (kind === 'barrel') {
+      g.r(x + 3, yb - 8, 11, 8, P.woodD);
+      g.r(x + 3, yb - 7, 11, 1, P.metalD);
+      g.r(x + 3, yb - 3, 11, 1, P.metalD);
+      g.ell(x + 8, yb - 10, 6, 2, P.leafD);
+      var fc = [P.accent, '#ffd25a', P.paper, P.accent2];
+      for (i = 0; i < 6; i++) g.p(x + 3 + i * 2, yb - 11 - (i % 2), fc[i % 4]);
+    } else if (kind === 'scooter') {
+      g.ell(x + 3, yb - 2, 2, 2, P.ink);
+      g.ell(x + 14, yb - 2, 2, 2, P.ink);
+      g.r(x + 3, yb - 5, 11, 2, P.accent2);
+      g.ell(x + 10, yb - 7, 4, 2, P.accent2);
+      g.r(x + 8, yb - 9, 5, 1, P.ink);
+      g.line(x + 3, yb - 5, x + 2, yb - 13, P.metalD);
+      g.r(x, yb - 14, 5, 1, P.metalD);
+    } else if (kind === 'phone') {
+      g.r(x + 3, yb - 26, 11, 26, '#d8382a');
+      g.r(x + 3, yb - 26, 11, 1, '#ff6a5a');
+      g.r(x + 5, yb - 22, 7, 18, env.time === 'day' ? '#bfe0ee' : '#fff1c2');
+      for (i = 0; i < 4; i++) g.r(x + 5, yb - 22 + i * 5, 7, 1, '#a8281a');
+      g.r(x + 8, yb - 22, 1, 18, '#a8281a');
+      g.r(x + 5, yb - 25, 7, 2, '#2a2a33');
+    } else {
+      // food cart
+      g.r(x, yb - 12, 18, 9, P.paper);
+      g.r(x, yb - 12, 18, 1, P.paperD);
+      g.r(x, yb - 4, 18, 1, P.paperDD);
+      g.ell(x + 4, yb - 2, 2, 2, P.ink);
+      g.ell(x + 14, yb - 2, 2, 2, P.ink);
+      g.r(x + 1, yb - 22, 1, 10, P.metalD);
+      g.r(x + 16, yb - 22, 1, 10, P.metalD);
+      for (i = 0; i < 20; i++) g.p(x - 1 + i, yb - 23, (i >> 1) & 1 ? P.accent : P.paper);
+      for (i = 0; i < 20; i++) g.p(x - 1 + i, yb - 22, (i >> 1) & 1 ? P.accent : P.paper);
+      g.r(x + 4, yb - 14, 4, 2, '#e8a050');
+      g.r(x + 10, yb - 14, 4, 2, '#e8483a');
+      steam(g, x + 6, yb - 15, t, 7, x);
+    }
+  }
+
+  var BOATS = ['sail', 'row', 'ferry', 'kayak', 'yacht', 'swan', 'fishing'];
+
+  // 물 위의 배. (x, y)는 물에 닿는 왼쪽
+  function boat(g, env, kind, x, y, t) {
+    var P = env.P;
+    var r;
+    var bob = mod(t + x, 8) < 4 ? 0 : 1;
+    y += bob;
+    if (kind === 'sail') {
+      g.r(x, y, 14, 2, P.woodD);
+      g.r(x + 1, y + 2, 12, 1, P.woodDD);
+      g.r(x + 6, y - 14, 1, 14, P.woodDD);
+      for (r = 0; r < 12; r++) g.r(x + 7, y - 13 + r, rnd(r * 0.55) + 1, 1, r % 4 === 2 ? P.accent2 : P.paper);
+      for (r = 0; r < 9; r++) g.r(x + 5 - rnd(r * 0.45), y - 10 + r, rnd(r * 0.45) + 1, 1, P.paperD);
+    } else if (kind === 'row') {
+      g.r(x + 1, y - 2, 12, 2, P.accent);
+      g.r(x, y - 3, 14, 1, P.accentL);
+      g.r(x + 2, y, 10, 1, P.accentD);
+      var oar = mod(t, 12) < 6 ? 0 : 1;
+      g.line(x + 4, y - 3, x - 2, y + 1 - oar, P.woodD);
+      g.line(x + 10, y - 3, x + 16, y + 1 - oar, P.woodD);
+    } else if (kind === 'ferry') {
+      g.r(x, y - 3, 26, 3, P.paper);
+      g.r(x + 1, y, 24, 1, P.accent2D);
+      g.r(x + 4, y - 7, 17, 4, P.paper);
+      g.r(x + 4, y - 7, 17, 1, P.paperD);
+      for (r = 0; r < 5; r++) g.r(x + 6 + r * 3, y - 6, 2, 2, env.time === 'night' ? '#ffd36e' : '#4f6f9f');
+      g.r(x + 9, y - 11, 3, 4, P.accent);
+      g.r(x + 9, y - 11, 3, 1, P.ink);
+      g.r(x, y - 2, 26, 1, P.accent);
+    } else if (kind === 'kayak') {
+      g.r(x + 2, y - 1, 12, 1, '#f6c63a');
+      g.r(x, y, 16, 1, '#e8a83a');
+      g.r(x + 7, y - 3, 2, 2, P.accent2);
+      g.p(x + 7, y - 4, '#ffd0a0');
+      var pa = mod(t, 8) < 4;
+      g.line(x + 3, y - (pa ? 5 : 1), x + 12, y - (pa ? 1 : 5), P.ink);
+    } else if (kind === 'yacht') {
+      g.r(x, y - 2, 22, 2, P.paper);
+      g.r(x + 2, y, 18, 1, P.metalD);
+      g.r(x + 5, y - 5, 12, 3, P.paper);
+      g.r(x + 7, y - 4, 8, 1, '#4f6f9f');
+      g.r(x + 8, y - 7, 6, 2, P.paperD);
+      g.r(x, y - 1, 22, 1, P.accent2);
+    } else if (kind === 'swan') {
+      g.ell(x + 5, y - 2, 4, 2, '#f8f8f4');
+      g.r(x + 8, y - 8, 1, 6, '#f8f8f4');
+      g.r(x + 8, y - 9, 2, 1, '#f8f8f4');
+      g.p(x + 10, y - 9, '#f0a23a');
+      g.p(x + 9, y - 9, P.ink);
+      g.r(x + 2, y - 4, 3, 1, '#e0e0e8');
+    } else {
+      // fishing boat with cabin
+      g.r(x, y - 3, 18, 3, P.accent2);
+      g.r(x + 1, y, 16, 1, P.accent2D);
+      g.r(x, y - 3, 18, 1, P.accent2L);
+      g.r(x + 9, y - 8, 6, 5, P.paper);
+      g.r(x + 10, y - 7, 2, 2, '#4f6f9f');
+      g.r(x + 9, y - 9, 6, 1, P.accent);
+      g.r(x + 4, y - 14, 1, 11, P.woodD);
+      g.line(x + 4, y - 14, x - 3, y - 6, P.ink);
+    }
+  }
+
+  var FAR = ['windmill', 'lighthouse', 'wheel', 'tower', 'castle', 'church', 'turbines', 'house'];
+
+  // 멀리 보이는 건물. (x, yb)는 땅에 닿는 가운데
+  function farThing(g, env, kind, x, yb, t) {
+    var P = env.P;
+    var c = tone(env, mix(env.skyLow, P.wallD, 0.45));
+    var cD = mix(c, P.ink, 0.3);
+    var i;
+    if (kind === 'windmill') {
+      g.r(x - 2, yb - 14, 5, 14, c);
+      g.r(x - 3, yb - 4, 7, 4, c);
+      g.r(x - 1, yb - 16, 3, 2, cD);
+      var a0 = t * 0.12;
+      for (i = 0; i < 4; i++) {
+        var a = a0 + (i * PI) / 2;
+        g.line(x, yb - 15, x + rnd(Math.cos(a) * 9), yb - 15 + rnd(Math.sin(a) * 9), cD);
+      }
+    } else if (kind === 'lighthouse') {
+      for (i = 0; i < 20; i++) g.r(x - 2 - fl(i / 7), yb - 20 + i, 5 + fl(i / 7) * 2, 1, fl(i / 4) % 2 ? tone(env, P.accent) : tone(env, P.paper));
+      g.r(x - 2, yb - 24, 5, 4, cD);
+      g.em = 1;
+      g.r(x - 1, yb - 23, 3, 2, env.time === 'day' ? '#e8e8dc' : '#fff1a0');
+      g.em = 0;
+      if (env.time !== 'day') {
+        var sweep = Math.sin(t * 0.1);
+        for (var k = 2; k < 26; k++) g.b(x + rnd(sweep * k), yb - 22 + rnd(k * 0.05), '#fff6c8', 0.45 * (1 - k / 26));
+      }
+    } else if (kind === 'wheel') {
+      var rr = 11;
+      g.line(x, yb - rr - 2, x - 5, yb, cD);
+      g.line(x, yb - rr - 2, x + 5, yb, cD);
+      for (i = 0; i < 28; i++) {
+        var aa = (i / 28) * 2 * PI;
+        g.p(x + rnd(Math.cos(aa) * rr), yb - rr - 2 + rnd(Math.sin(aa) * rr), c);
+      }
+      for (i = 0; i < 8; i++) {
+        var ab = (i / 8) * 2 * PI + t * 0.03;
+        var ex = x + rnd(Math.cos(ab) * rr);
+        var ey = yb - rr - 2 + rnd(Math.sin(ab) * rr);
+        g.line(x, yb - rr - 2, ex, ey, cD);
+        g.r(ex - 1, ey, 3, 2, tone(env, [P.accent, P.accent2, '#ffd25a'][i % 3]));
+      }
+    } else if (kind === 'tower') {
+      g.line(x - 6, yb, x, yb - 28, c);
+      g.line(x + 6, yb, x, yb - 28, c);
+      g.r(x - 4, yb - 10, 9, 1, c);
+      g.r(x - 2, yb - 18, 5, 1, c);
+      g.line(x - 5, yb - 2, x + 4, yb - 10, cD);
+      g.line(x + 5, yb - 2, x - 4, yb - 10, cD);
+      g.em = 1;
+      if (mod(t, 10) < 5) g.p(x, yb - 29, '#ff4a4a');
+      g.em = 0;
+    } else if (kind === 'castle') {
+      g.r(x - 10, yb - 10, 21, 10, c);
+      g.r(x - 12, yb - 16, 5, 16, c);
+      g.r(x + 8, yb - 16, 5, 16, c);
+      g.r(x - 3, yb - 18, 7, 8, c);
+      for (i = 0; i < 3; i++) {
+        g.p(x - 12 + i * 2, yb - 17, c);
+        g.p(x + 8 + i * 2, yb - 17, c);
+      }
+      g.r(x - 13, yb - 18, 7, 2, tone(env, P.accent));
+      g.r(x + 7, yb - 18, 7, 2, tone(env, P.accent));
+      g.r(x - 1, yb - 4, 3, 4, cD);
+      g.r(x, yb - 24, 1, 6, cD);
+      g.r(x + 1, yb - 24, 3, 2, tone(env, P.accent2));
+    } else if (kind === 'church') {
+      g.r(x - 6, yb - 9, 13, 9, c);
+      for (i = 0; i < 5; i++) g.r(x - 6 + i, yb - 9 - i, 13 - i * 2, 1, cD);
+      g.r(x + 3, yb - 20, 4, 11, c);
+      g.r(x + 4, yb - 23, 2, 3, cD);
+      g.r(x + 4, yb - 25, 2, 1, cD);
+      g.r(x + 4, yb - 16, 2, 2, env.time === 'day' ? cD : env.litC);
+    } else if (kind === 'turbines') {
+      for (var tb = 0; tb < 3; tb++) {
+        var tx = x - 14 + tb * 14;
+        var th = 18 + (tb % 2) * 4;
+        g.r(tx, yb - th, 1, th, c);
+        var a1 = t * 0.08 + tb * 1.3;
+        for (i = 0; i < 3; i++) {
+          var a2 = a1 + (i * 2 * PI) / 3;
+          g.line(tx, yb - th, tx + rnd(Math.cos(a2) * 6), yb - th + rnd(Math.sin(a2) * 6), c);
+        }
+      }
+    } else {
+      g.r(x - 6, yb - 7, 12, 7, c);
+      for (i = 0; i < 5; i++) g.r(x - 7 + i, yb - 8 - i, 14 - i * 2, 1, tone(env, P.accent));
+      g.r(x - 4, yb - 5, 2, 2, env.time === 'day' ? cD : env.litC);
+      g.r(x + 1, yb - 4, 2, 4, cD);
+      g.r(x + 3, yb - 12, 2, 4, cD);
+      if (env.time !== 'day') puffs(g, x + 4, yb - 14, t, 2, 14, x);
+    }
+  }
+
+  var FLYERS = ['kite', 'balloon', 'flock', 'plane', 'blimp', 'lanterns', 'none'];
+
+  function flyer(g, env, kind, x, y, t) {
+    var P = env.P;
+    var i;
+    if (kind === 'kite') {
+      var kx = x + rnd(Math.sin(t * 0.1) * 3);
+      var ky = y + rnd(Math.sin(t * 0.13) * 2);
+      for (i = 0; i < 4; i++) {
+        g.r(kx - i, ky + i, i * 2 + 1, 1, i < 2 ? P.accent : P.accent2);
+        g.r(kx - 3 + i, ky + 4 + i, 7 - i * 2, 1, i < 1 ? P.accent2 : P.accent);
+      }
+      for (i = 0; i < 14; i++) {
+        var tx = kx + rnd(Math.sin(i * 0.6 + t * 0.3) * 1.5);
+        g.p(tx, ky + 8 + i, i % 4 === 2 ? P.accent : P.ink);
+      }
+    } else if (kind === 'balloon') {
+      var bx = x + rnd(Math.sin(t * 0.05) * 2);
+      var by = y + rnd(Math.sin(t * 0.07) * 2);
+      g.ell(bx, by, 4, 5, P.accent2);
+      g.r(bx - 1, by - 5, 2, 11, P.paper);
+      g.p(bx - 2, by - 3, WHITE);
+      g.line(bx - 2, by + 5, bx - 1, by + 8, P.woodD);
+      g.line(bx + 2, by + 5, bx + 1, by + 8, P.woodD);
+      g.r(bx - 1, by + 8, 3, 2, P.woodD);
+    } else if (kind === 'flock') {
+      for (i = 0; i < 5; i++) {
+        var fx = mod(x + t * 0.45 + Math.abs(i - 2) * -4, W + 30) - 15;
+        var fy = y + Math.abs(i - 2) * 2 + i;
+        var up = mod(t + i, 4) < 2;
+        var bc = env.time === 'night' ? '#c8ccee' : '#4a4060';
+        g.p(fx, fy, bc);
+        g.p(fx - 1, fy + (up ? -1 : 1), bc);
+        g.p(fx + 1, fy + (up ? -1 : 1), bc);
+      }
+    } else if (kind === 'plane') {
+      var px = mod(x + t * 0.9, W + 30) - 15;
+      g.r(px, y, 7, 1, '#f4f4f8');
+      g.p(px + 7, y, '#c3cbe0');
+      g.r(px + 3, y - 1, 2, 1, '#f4f4f8');
+      g.r(px + 3, y + 1, 2, 1, '#c3cbe0');
+      g.p(px, y - 1, P.accent);
+      for (i = 1; i < 18; i++) if (bay(px - i, y) < 0.6 * (1 - i / 18)) g.b(px - i, y, WHITE, 0.6);
+      if (env.time !== 'day' && mod(t, 6) < 2) {
+        g.em = 1;
+        g.p(px + 3, y + 1, '#ff4a4a');
+        g.em = 0;
+      }
+    } else if (kind === 'blimp') {
+      var lx = mod(x + t * 0.2, W + 40) - 20;
+      g.ell(lx, y, 9, 3, P.metalL);
+      g.r(lx - 9, y + 1, 18, 1, P.metal);
+      g.r(lx - 3, y + 3, 6, 2, P.accent);
+      g.r(lx - 11, y - 3, 2, 6, P.accent);
+      g.r(lx - 4, y - 1, 8, 1, P.accent2);
+    } else if (kind === 'lanterns') {
+      if (env.time === 'day') return;
+      g.em = 1;
+      for (i = 0; i < 5; i++) {
+        var ly = mod(y + 30 - t * (0.2 + i * 0.03) + i * 13, 50) - 4;
+        var lxx = x - 20 + i * 11 + rnd(Math.sin(t * 0.1 + i) * 2);
+        g.r(lxx, ly, 2, 3, '#ffb04a');
+        g.p(lxx, ly, '#ffe08a');
+        g.p(lxx + 1, ly + 3, '#ff7a3a');
+      }
+      g.em = 0;
+    }
+  }
+
+  // 위로 늘어진 전구 줄
+  function stringLights(g, env, y, t, amp, step, cols) {
+    var P = env.P;
+    cols = cols || ['#ffd36e', '#ff8a9a', '#8ad8ff'];
+    for (var x = 0; x < W; x++) {
+      var sag = rnd(Math.abs(Math.sin((x / 48) * PI)) * amp);
+      g.p(x, y + sag, P.ink);
+      if (x % step === step >> 1) {
+        g.em = 1;
+        var lc = cols[fl(x / step) % cols.length];
+        g.p(x, y + 1 + sag, mod(fl(x / step) + fl(t / 4), 5) === 0 ? mix(lc, WHITE, 0.6) : lc);
+        g.em = 0;
+      }
+    }
+  }
+
+  function awning(g, env, x, y, w, c1, c2, rows) {
+    rows = rows || 4;
+    for (var yy = 0; yy < rows; yy++) {
+      for (var xx = 0; xx < w; xx++) g.p(x + xx, y + yy, (fl(xx / 3) & 1) ? c1 : c2);
+    }
+    for (var sx = 0; sx < w; sx += 3) {
+      var c = (fl(sx / 3) & 1) ? c1 : c2;
+      g.r(x + sx, y + rows, 3, 1, c);
+      g.p(x + sx + 1, y + rows + 1, c);
+    }
+    g.br(x, y + rows + 1, w, 1, env.P.ink, 0.2);
+  }
+
+  function grass(g, env, y0, y1, salt) {
+    var P = env.P;
+    var snow = env.weather === 'snow';
+    var gc = snow ? hx('#eef3fa') : P.leaf;
+    var gD = snow ? hx('#ccd8ea') : P.leafD;
+    for (var y = y0; y < y1; y++) {
+      for (var x = 0; x < W; x++) g.p(x, y, (x * 7 + y * 13 + (salt || 0)) % 17 === 0 ? gD : gc);
+    }
+  }
+
+  function flowerDots(g, env, x0, y0, w, h, n, salt) {
+    var P = env.P;
+    var cols = env.weather === 'snow' ? ['#ffffff'] : [P.accent, '#ffffff', '#ffd25a', P.accent2];
+    for (var k = 0; k < n; k++) {
+      var fx = x0 + fl(hash(env.seed + salt, k) * w);
+      var fy = y0 + fl(hash(env.seed + salt, k + 99) * h);
+      g.p(fx, fy, cols[k % cols.length]);
+    }
+  }
+
+  function water(g, env, y0, y1, t, deepC, shallowC) {
+    var deep = deepC || mix(env.skyMid, '#1a4a8a', 0.6);
+    var sh = shallowC || hx('#4ab8c8');
+    for (var y = y0; y < y1; y++) {
+      var f = clamp((y - y0) / Math.max(1, y1 - y0 - 1), 0, 1);
+      var c = mix(deep, sh, f * 0.6);
+      g.r(0, y, W, 1, c);
+      if (y & 1) {
+        for (var k = 0; k < 3; k++) {
+          var dl = 2 + fl(hash(y, k) * 4);
+          var dx = mod(hash(k, y) * W + t * (0.2 + f * 0.5) * (k & 1 ? 1 : -1), W);
+          g.r(dx, y, dl, 1, mix(c, WHITE, 0.3));
+        }
+      }
+    }
+  }
+
+  // ---- new scenes (T158, D-129)
+
+  function banker(g, env, x, yb) {
+    var P = env.P;
+    var sc = mix('#2f7a52', P.leafD, 0.3);
+    g.r(x - 3, yb - 1, 7, 1, '#c8a040');
+    g.r(x - 2, yb - 2, 5, 1, '#e0bc58');
+    g.r(x, yb - 7, 1, 5, '#c8a040');
+    g.r(x - 5, yb - 9, 11, 2, sc);
+    g.r(x - 4, yb - 10, 9, 1, mix(sc, WHITE, 0.3));
+    g.em = 1;
+    g.r(x - 4, yb - 7, 9, 1, env.time === 'day' ? '#f6efd8' : '#fff1c2');
+    g.em = 0;
+    g.light(x, yb - 6, 36, env.T.lamp, env.lampK, { top: yb - 8 });
+  }
+
+  SC.library = {
+    still: 6,
+    setup: function (env, R) {
+      var wpos = R.pick([8, 78, 148]);
+      return {
+        wx: wpos,
+        shape: R.pick(['arch', 'arch', 'rect', 'round']),
+        view: R.pick(['trees', 'hills', 'city']),
+        cover: R.pick(['accent', 'accent2', 'leafD', 'woodD']),
+        ladder: R.ch(0.6),
+        lx: R.i(0, 1),
+        lampK: R.pick(['banker', 'banker', 'plain', 'candle']),
+        itemA: R.pick(['stack', 'globe', 'cup', 'trinket', 'none']),
+        itemB: R.pick(['stack', 'cup', 'trinket', 'quill', 'none']),
+        tr: hp(R, env, 'trinket', TRINKETS),
+        cup: hp(R, env, 'cup', CUPS),
+        top: R.pick(['clock', 'plaque', 'none', 'clock']),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'mouse', 'bird', 'none']),
+        rug: R.pick(['rug', 'accent2', 'accent', 'leafD']),
+        pend: R.pick(['pendant', 'none', 'pendant']),
+        floor: hp(R, env, 'floor', ['bigplant', 'books', 'basket', 'none', 'stool']),
+        spot: R.pick(['table', 'floor'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      room(g, env, { wallStyle: 0 }, 64);
+      var wx = L.wx;
+      var ww = 36;
+      // shelves fill the wall except the window column
+      var segs = [];
+      if (wx > 10) segs.push([2, wx - 6]);
+      if (wx + ww + 6 < W - 10) segs.push([wx + ww + 6, W - 2]);
+      for (var s = 0; s < segs.length; s++) {
+        var a = segs[s][0];
+        var b = segs[s][1];
+        var n = Math.max(1, rnd((b - a) / 44));
+        var sw = (b - a) / n;
+        for (var k = 0; k < n; k++) bookshelf(g, env, rnd(a + k * sw) + 1, 3, rnd(sw) - 2, 62, t);
+      }
+      win(g, env, wx, 10, ww, 40, t, { shape: L.shape, panes: 4, view: L.view, sill: true });
+      if (L.top === 'clock') clock(g, env, wx + 18, 4, 4, t);
+      else if (L.top === 'plaque') {
+        g.r(wx + 8, 2, 20, 6, P.woodD);
+        g.r(wx + 9, 3, 18, 4, '#d8b050');
+        textRow(g, wx + 11, 5, 14, env.seed, 1, P.woodDD);
+      }
+      if (L.ladder) {
+        var lx = L.lx === 0 ? (wx > 60 ? 30 : 120) : (wx > 120 ? 50 : 168);
+        g.line(lx, 2, lx + 8, 64, P.woodDD);
+        g.line(lx + 7, 2, lx + 15, 64, P.woodDD);
+        for (var ry = 6; ry < 62; ry += 6) g.r(lx + rnd(ry / 7.7) + 1, ry, 7, 1, P.woodL);
+        g.r(lx - 2, 2, 20, 1, P.metalD);
+      }
+      g.ell(96, 72, 78, 6, P[L.rug]);
+      g.ell(96, 72, 74, 5, mix(P[L.rug], WHITE, 0.2));
+      for (var rx = 24; rx < 170; rx += 6) g.p(rx, 72, mix(P[L.rug], P.ink, 0.25));
+      if (L.pend === 'pendant') {
+        [52, 140].forEach(function (px) {
+          g.r(px, 0, 1, 8, P.ink);
+          g.ell(px, 10, 4, 2, P.accentD);
+          g.em = 1;
+          g.r(px - 2, 12, 5, 1, env.time === 'day' ? '#f6efd8' : '#fff1c2');
+          g.em = 0;
+        });
+      }
+      // long reading table
+      g.br(26, 49, 140, 1, P.ink, 0.15);
+      g.r(26, 50, 140, 2, P.woodL);
+      g.r(26, 52, 140, 2, P.woodD);
+      g.r(30, 54, 132, 3, P.woodDD);
+      g.r(30, 54, 3, 24, P.woodDD);
+      g.r(159, 54, 3, 24, P.woodDD);
+      g.r(31, 57, 1, 21, P.woodD);
+      g.r(160, 57, 1, 21, P.woodD);
+      openBook(g, env, L, 96, 39, t);
+      if (L.lampK === 'banker') {
+        banker(g, env, 62, 50);
+        banker(g, env, 132, 50);
+      } else if (L.lampK === 'plain') {
+        lamp(g, env, 64, 50, { color: P.accent2, r: 40, h: 8 });
+      } else {
+        trinket(g, env, 'candle', 60, 50, t);
+        trinket(g, env, 'candle', 128, 50, t);
+      }
+      function item(kind, x) {
+        if (kind === 'stack') bookStack(g, env, x - 4, 50, 3 + (x % 2), x);
+        else if (kind === 'globe') {
+          g.r(x - 1, 48, 6, 2, P.woodD);
+          g.r(x + 1, 46, 2, 2, P.metalD);
+          g.ell(x + 2, 41, 4, 4, '#5ea3d6');
+          g.p(x, 40, '#7fc07a');
+          g.p(x + 1, 39, '#7fc07a');
+          g.p(x + 3, 42, '#7fc07a');
+          g.p(x + 4, 41, '#7fc07a');
+          g.line(x - 2, 44, x + 5, 37, P.metalD);
+        } else if (kind === 'cup') cupOf(g, env, L.cup, x, 50, P.paper, t);
+        else if (kind === 'trinket') trinket(g, env, L.tr, x, 50, t);
+        else if (kind === 'quill') {
+          g.r(x, 47, 5, 3, '#2a2a33');
+          g.line(x + 2, 46, x + 6, 38, P.paper);
+          g.line(x + 3, 46, x + 7, 39, P.paperD);
+        }
+      }
+      item(L.itemA, 38);
+      item(L.itemB, 146);
+      if (L.floor !== 'none') floorThing(g, env, L.floor, wx > 120 ? 6 : 172, 77, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, 80, 77, t, false);
+      if (L.spot === 'table') mascot(g, env, 108, 50, t, { flip: true });
+      else mascot(g, env, 40, 76, t);
+    }
+  };
+
+  function planter(g, env, kind, x, yb, w, t) {
+    var P = env.P;
+    var i;
+    g.r(x, yb - 8, w, 8, P.woodD);
+    g.r(x, yb - 8, w, 1, P.woodL);
+    for (i = 3; i < w; i += 6) g.r(x + i, yb - 7, 1, 7, P.woodDD);
+    g.r(x + 1, yb - 9, w - 2, 1, '#6a4a32');
+    var n = fl(w / 6);
+    for (i = 0; i < n; i++) {
+      var px = x + 3 + i * 6;
+      if (kind === 'tomato') {
+        g.r(px, yb - 20, 1, 11, P.woodL);
+        g.ell(px, yb - 14, 2, 4, P.leafD);
+        g.p(px - 1, yb - 12, '#e8483a');
+        g.p(px + 1, yb - 15, '#e8483a');
+        g.p(px, yb - 17, '#f6803a');
+      } else if (kind === 'lettuce') {
+        g.ell(px, yb - 11, 2, 2, P.leaf);
+        g.p(px - 1, yb - 12, P.leafL);
+        g.p(px + 1, yb - 10, P.leafD);
+      } else if (kind === 'flowers') {
+        g.r(px, yb - 14, 1, 5, P.leafD);
+        var c = [P.accent, '#ffd25a', P.paper, P.accent2][(i + env.seed) % 4];
+        g.p(px, yb - 15, c);
+        g.p(px - 1, yb - 14, c);
+        g.p(px + 1, yb - 14, c);
+        g.p(px, yb - 13, c);
+        g.p(px, yb - 14, '#ffe27a');
+      } else if (kind === 'herbs') {
+        g.ell(px, yb - 11, 2, 2, P.leafD);
+        g.p(px, yb - 13, P.leafL);
+        g.p(px - 2, yb - 11, P.leaf);
+      } else {
+        plant2(g, env, px, yb - 2, 'sunflower', t, i);
+      }
+    }
+  }
+
+  SC.rooftop = {
+    still: 4,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        crops: [R.pick(['tomato', 'lettuce', 'flowers', 'herbs', 'sunflower']), R.pick(['tomato', 'lettuce', 'flowers', 'herbs', 'sunflower'])],
+        furn: R.pick(['parasol', 'deckchair', 'hammock', 'bench', 'swing']),
+        mid: R.pick(['pots', 'grill', 'telescope', 'bike', 'none']),
+        back: R.pick(['tank', 'ac', 'antenna', 'none']),
+        lights: R.ch(0.65),
+        laundry: R.ch(0.4),
+        critter: hp(R, env, 'critter', ['bird', 'kitty', 'none', 'bird']),
+        fly: hp(R, env, 'fly', FLYERS),
+        umb: R.pick(['accent', 'accent2', 'leaf']),
+        pots: [hp(R, env, 'plant', PLANTS2), R.pick(['bush', 'flower', 'cactus']), hp(R, env, 'plant', PLANTS2)]
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      skyTop(g, env, 58, t, 30);
+      flyer(g, env, L.fly, 60, 14, t);
+      distant(g, env, 0, 18, W, 40, 'city', t);
+      // neighbour building tops behind the rail
+      var nb = mix(env.skyLow, '#5d6788', 0.5);
+      g.r(0, 34, 26, 24, nb);
+      g.r(166, 30, 26, 28, nb);
+      for (x = 4; x < 24; x += 5) g.r(x, 38, 3, 3, env.time === 'day' ? mix(nb, WHITE, 0.2) : env.litC);
+      for (x = 170; x < 190; x += 5) g.r(x, 34, 3, 3, env.time === 'day' ? mix(nb, WHITE, 0.2) : env.litC);
+      if (L.back === 'tank') {
+        g.r(140, 28, 14, 12, P.woodD);
+        g.r(140, 28, 14, 1, P.woodL);
+        g.r(139, 27, 16, 1, P.metalD);
+        g.r(142, 40, 1, 14, P.metalD);
+        g.r(151, 40, 1, 14, P.metalD);
+      } else if (L.back === 'ac') {
+        g.r(136, 44, 20, 12, P.metal);
+        g.r(136, 44, 20, 1, P.metalL);
+        g.ell(146, 50, 4, 4, P.metalD);
+        var fa = mod(t, 2);
+        g.line(146 - 3 + fa, 50 - 3, 146 + 3 - fa, 50 + 3, P.metal);
+      } else if (L.back === 'antenna') {
+        g.r(150, 22, 1, 34, P.metalD);
+        g.r(146, 26, 9, 1, P.metalD);
+        g.r(147, 30, 7, 1, P.metalD);
+        g.em = 1;
+        if (mod(t, 10) < 5) g.p(150, 21, '#ff4a4a');
+        g.em = 0;
+      }
+      // deck and railing
+      g.r(0, 58, W, 22, P.woodD);
+      for (var y = 58; y < H; y += 3) g.r(0, y, W, 1, mix(P.woodD, P.ink, 0.25));
+      for (y = 59; y < H; y += 3) {
+        for (x = mod(y * 13, 29); x < W; x += 29) g.r(x, y, 1, 2, mix(P.woodD, P.ink, 0.25));
+      }
+      g.r(0, 58, W, 1, P.woodL);
+      g.r(0, 46, W, 2, P.metal);
+      g.r(0, 47, W, 1, P.metalD);
+      for (x = 2; x < W; x += 10) g.r(x, 48, 1, 10, P.metalD);
+      if (L.laundry) {
+        for (x = 30; x < 90; x++) g.p(x, 26 + rnd(Math.sin(((x - 30) / 60) * PI) * 3), P.ink);
+        g.r(29, 24, 1, 34, P.woodDD);
+        g.r(90, 24, 1, 34, P.woodDD);
+        var cl = [P.accent, P.paper, P.accent2, '#ffd25a'];
+        for (var c = 0; c < 4; c++) {
+          var cx = 36 + c * 13;
+          var cy = 27 + rnd(Math.sin(((cx - 30) / 60) * PI) * 3);
+          var flap = mod(t + c * 3, 10) < 5 ? 0 : 1;
+          g.r(cx, cy, 7, 8 - (c % 2) * 2, cl[c]);
+          g.r(cx + 7, cy + flap, 1, 6 - (c % 2) * 2, mix(cl[c], P.ink, 0.2));
+          g.r(cx, cy, 7, 1, mix(cl[c], WHITE, 0.3));
+        }
+      }
+      if (L.lights) {
+        for (x = 0; x < W; x++) {
+          var sag = rnd(Math.abs(Math.sin((x / 64) * PI)) * 6);
+          g.p(x, 18 + sag, P.ink);
+          if (x % 9 === 4) {
+            g.em = 1;
+            g.p(x, 19 + sag, mod(fl(x / 9) + fl(t / 4), 5) === 0 ? '#fff6c0' : '#ffd36e');
+            g.em = 0;
+          }
+        }
+      }
+      planter(g, env, L.crops[0], 6, 70, 32, t);
+      planter(g, env, L.crops[1], 150, 72, 36, t);
+      var fx = 96;
+      if (L.furn === 'parasol') {
+        var uc = P[L.umb];
+        g.r(fx + 10, 36, 1, 32, P.metalD);
+        for (var r = 0; r < 6; r++) {
+          var uw = rnd(18 * Math.sqrt(1 - Math.pow((5 - r) / 6, 2)));
+          for (var ux = -uw; ux <= uw; ux++) g.p(fx + 10 + ux, 32 + r, fl((ux + 18) / 6) % 2 ? uc : P.paper);
+        }
+        g.r(fx - 2, 62, 24, 2, P.paper);
+        g.r(fx + 9, 64, 3, 8, P.metalD);
+        cupOf(g, env, 'iced', fx + 2, 62, P.paper, t);
+      } else if (L.furn === 'deckchair') {
+        g.line(fx, 72, fx + 14, 58, P.woodL);
+        g.line(fx + 16, 72, fx + 6, 62, P.woodL);
+        for (var d = 0; d < 12; d++) g.r(fx + 1 + d, 70 - d, 4, 1, (d >> 1) & 1 ? P.accent : P.paper);
+      } else if (L.furn === 'hammock') {
+        g.r(fx - 10, 40, 2, 32, P.woodDD);
+        g.r(fx + 34, 40, 2, 32, P.woodDD);
+        var sw2 = rnd(Math.sin(t * 0.15) * 1.5);
+        for (x = 0; x < 42; x++) {
+          var hy = 46 + rnd(Math.sin((x / 41) * PI) * 12) + (x > 6 && x < 36 ? sw2 : 0);
+          g.p(fx - 8 + x, hy, P.accent2);
+          g.p(fx - 8 + x, hy + 1, (x >> 1) & 1 ? P.accent2D : P.paper);
+        }
+      } else if (L.furn === 'bench') {
+        streetThing(g, env, 'bench', fx, 70, t);
+      } else {
+        g.r(fx - 2, 20, 30, 2, P.woodDD);
+        g.r(fx - 2, 22, 2, 50, P.woodDD);
+        g.r(fx + 26, 22, 2, 50, P.woodDD);
+        var sw3 = rnd(Math.sin(t * 0.2) * 2);
+        g.line(fx + 6, 22, fx + 6 + sw3, 56, P.ink);
+        g.line(fx + 18, 22, fx + 18 + sw3, 56, P.ink);
+        g.r(fx + 4 + sw3, 56, 17, 2, P.woodL);
+      }
+      if (L.mid === 'pots') {
+        plant(g, env, 58, 72, L.pots[0], t, 1);
+        plant(g, env, 68, 74, L.pots[1], t, 2);
+        plant(g, env, 78, 72, L.pots[2], t, 3);
+      } else if (L.mid === 'grill') {
+        g.ell(66, 62, 7, 4, '#2a2a33');
+        g.r(59, 59, 15, 1, P.metalD);
+        g.line(61, 65, 59, 73, '#2a2a33');
+        g.line(71, 65, 73, 73, '#2a2a33');
+        puffs(g, 66, 56, t, 3, 16, 5);
+      } else if (L.mid === 'telescope') {
+        g.line(66, 58, 60, 73, P.ink);
+        g.line(66, 58, 72, 73, P.ink);
+        g.line(60, 56, 74, 48, P.metalL);
+        g.line(60, 57, 74, 49, P.metal);
+        g.line(61, 58, 74, 50, P.metalD);
+      } else if (L.mid === 'bike') {
+        streetThing(g, env, 'bike', 56, 73, t);
+      }
+      if (L.critter !== 'none') critter(g, env, L.critter, L.critter === 'bird' ? 120 : 40, L.critter === 'bird' ? 46 : 76, t, L.critter === 'bird');
+      mascot(g, env, 130, 72, t, { flip: true });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  function campfire(g, env, x, yb, t) {
+    var P = env.P;
+    for (var s = 0; s < 7; s++) {
+      var sx = x - 9 + s * 3;
+      g.r(sx, yb - 2, 3, 2, s % 2 ? '#8a8a96' : '#a8a8b4');
+    }
+    g.line(x - 7, yb - 2, x + 6, yb - 5, P.woodDD);
+    g.line(x - 6, yb - 5, x + 7, yb - 2, P.woodD);
+    g.em = 1;
+    var fl0 = mod(t, 3);
+    for (var c = -4; c <= 4; c++) {
+      var fh = 4 + rnd((1 - Math.abs(c) / 5) * 6) + ((c + fl0) % 3 === 0 ? 2 : 0);
+      for (var k = 0; k < fh; k++) {
+        var col = k < fh * 0.35 ? '#ffe28a' : (k < fh * 0.7 ? '#ffb03a' : '#f0603a');
+        if (Math.abs(c) > 2 && k < 2) col = '#ffb03a';
+        g.p(x + c + (k > fh - 3 ? ((k + fl0) % 2 ? 1 : 0) : 0), yb - 4 - k, col);
+      }
+    }
+    for (var i = 0; i < 5; i++) {
+      var a = mod(t * 1.3 + i * 7, 24);
+      g.p(x + rnd(Math.sin(a * 0.4 + i) * 4), yb - 12 - a, a < 12 ? '#ffd34a' : '#f0603a');
+    }
+    g.em = 0;
+    halo(g, x, yb - 7, 3, 7, '#ffb060', env.time === 'day' ? 0.25 : 0.6);
+    g.light(x, yb - 6, env.time === 'day' ? 30 : 64, [1, 0.62, 0.32], (env.time === 'day' ? 0.3 : 1.1) * (fl0 === 1 ? 0.9 : 1), { n: 6 });
+  }
+
+  SC.campsite = {
+    still: 4,
+    outdoor: true,
+    setup: function (env, R) {
+      var side = R.ch(0.5);
+      return {
+        tent: R.pick(['a', 'dome', 'tipi']),
+        tc: R.pick(['accent', 'accent2', 'leaf', 'woodL']),
+        side: side,
+        seat: R.pick(['log', 'chair', 'log']),
+        extra: R.pick(['guitar', 'backpack', 'kettle', 'none', 'canoe']),
+        lantern: R.ch(0.6),
+        lake: R.ch(0.4),
+        critter: hp(R, env, 'critter', ['squirrel', 'bunny', 'hedgehog', 'deer', 'owl', 'none']),
+        hammock: R.ch(0.35)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      skyTop(g, env, 54, t, 30);
+      distant(g, env, 0, 20, W, 30, 'hills', t);
+      var gnd = L.lake ? 58 : 50;
+      if (L.lake) {
+        water(g, env, 50, 58, t, mix(env.skyMid, '#1a4a6a', 0.5), mix(env.skyLow, '#4a98b8', 0.5));
+      }
+      for (var p = 0; p < 9; p++) pine(g, env, 4 + p * 23 + (p % 3) * 5, gnd + 1 + (p % 2), 14 + (p % 3) * 4);
+      grass(g, env, gnd, H, 3);
+      // trampled earth around the fire
+      for (y = 64; y < H; y++) {
+        var hw = rnd(30 * Math.sqrt(Math.max(0, 1 - Math.pow((y - 72) / 9, 2))));
+        for (x = 96 - hw; x < 96 + hw; x++) if (bay(x, y) < 0.75) g.p(x, y, mix(P.floor, P.woodD, 0.3));
+      }
+      var tx = L.side ? 18 : 132;
+      var tc = P[L.tc];
+      var tD = mix(tc, P.ink, 0.3);
+      var tL = mix(tc, WHITE, 0.3);
+      var inner = env.time === 'day' ? mix(tD, P.ink, 0.3) : hx('#ffcf7a');
+      if (L.tent === 'a') {
+        for (y = 0; y < 22; y++) {
+          var hw2 = rnd(y * 0.95);
+          g.r(tx + 21 - hw2, 48 + y, hw2 * 2 + 1, 1, y < 2 ? tL : tc);
+          g.p(tx + 21 + hw2, 48 + y, tD);
+          if (y > 8) g.r(tx + 21 - rnd((y - 8) * 0.45), 48 + y, rnd((y - 8) * 0.9) + 1, 1, inner);
+        }
+        g.r(tx, 70, 43, 1, tD);
+        g.line(tx + 21, 46, tx + 21, 48, P.woodDD);
+      } else if (L.tent === 'dome') {
+        for (y = 0; y < 18; y++) {
+          var hw3 = rnd(21 * Math.sqrt(1 - Math.pow((17 - y) / 18, 2)));
+          g.r(tx + 21 - hw3, 52 + y, hw3 * 2 + 1, 1, y < 3 ? tL : tc);
+          g.p(tx + 21 + hw3, 52 + y, tD);
+        }
+        g.line(tx + 4, 70, tx + 21, 52, tD);
+        g.line(tx + 38, 70, tx + 21, 52, tD);
+        g.ell(tx + 21, 66, 5, 5, inner);
+        g.r(tx + 15, 70, 13, 1, tD);
+      } else {
+        for (y = 0; y < 28; y++) {
+          var hw4 = rnd(y * 0.6);
+          g.r(tx + 21 - hw4, 42 + y, hw4 * 2 + 1, 1, (fl(y / 5) % 2) ? tc : tL);
+          if (y > 18) g.r(tx + 21 - rnd((y - 18) * 0.4), 42 + y, rnd((y - 18) * 0.8) + 1, 1, inner);
+        }
+        g.line(tx + 18, 38, tx + 22, 44, P.woodDD);
+        g.line(tx + 24, 38, tx + 20, 44, P.woodDD);
+      }
+      if (env.time !== 'day') g.light(tx + 21, 64, 20, [1, 0.8, 0.5], 1.4, { n: 3 });
+      if (L.hammock) {
+        var hx0 = L.side ? 140 : 24;
+        var sw = rnd(Math.sin(t * 0.15) * 1.2);
+        for (x = 0; x < 30; x++) {
+          var hy = 50 + rnd(Math.sin((x / 29) * PI) * 7) + (x > 4 && x < 26 ? sw : 0);
+          g.p(hx0 + x, hy, P.accent);
+          g.p(hx0 + x, hy + 1, (x >> 1) & 1 ? P.accentD : P.paper);
+        }
+      }
+      campfire(g, env, 96, 74, t);
+      if (L.seat === 'log') {
+        g.r(64, 70, 18, 5, P.woodD);
+        g.r(64, 70, 18, 1, P.woodL);
+        g.ell(64, 72, 1, 2, '#e8c890');
+        g.r(112, 71, 16, 4, P.woodD);
+        g.r(112, 71, 16, 1, P.woodL);
+      } else {
+        [66, 114].forEach(function (cx) {
+          g.r(cx, 66, 12, 4, P.accent2);
+          g.r(cx, 62, 2, 6, P.accent2D);
+          g.line(cx + 1, 70, cx + 10, 76, P.metalD);
+          g.line(cx + 10, 70, cx + 1, 76, P.metalD);
+        });
+      }
+      var ex = L.side ? 164 : 18;
+      if (L.extra === 'guitar') floorThing(g, env, 'guitar', ex, 76, t);
+      else if (L.extra === 'backpack') floorThing(g, env, 'bag', ex, 76, t);
+      else if (L.extra === 'kettle') {
+        cupOf(g, env, 'teapot', ex + 2, 76, P.metal, t);
+        cupOf(g, env, 'mug', ex + 14, 76, P.accent, t);
+      } else if (L.extra === 'canoe') {
+        g.r(ex - 4, 72, 26, 3, P.accent);
+        g.r(ex - 6, 71, 30, 1, P.accentL);
+        g.r(ex - 2, 75, 22, 1, P.accentD);
+      }
+      if (L.lantern) {
+        var lx = L.side ? 70 : 118;
+        g.r(lx, 44, 1, 20, P.woodDD);
+        g.r(lx, 44, 6, 1, P.woodDD);
+        g.r(lx + 4, 45, 4, 5, P.metalD);
+        g.em = 1;
+        g.r(lx + 5, 46, 2, 3, env.time === 'day' ? '#e8e8dc' : '#fff1a0');
+        g.em = 0;
+        if (env.time !== 'day') g.light(lx + 6, 48, 26, [1, 0.85, 0.55], 0.6, { n: 4 });
+      }
+      if (L.critter === 'deer') {
+        var dx = L.side ? 150 : 40;
+        var dc = hx('#b8784a');
+        g.r(dx, 54, 9, 4, dc);
+        g.r(dx + 8, 50, 3, 5, dc);
+        g.r(dx + 9, 49, 3, 2, dc);
+        g.p(dx + 12, 50, P.ink);
+        g.line(dx + 9, 48, dx + 8, 45, P.woodDD);
+        g.line(dx + 11, 48, dx + 12, 45, P.woodDD);
+        g.r(dx + 1, 58, 1, 4, mix(dc, P.ink, 0.3));
+        g.r(dx + 7, 58, 1, 4, mix(dc, P.ink, 0.3));
+        g.p(dx - 1, 54, WHITE);
+      } else if (L.critter === 'owl') {
+        var ox = L.side ? 166 : 12;
+        g.r(ox, 40, 6, 7, '#8a6a4a');
+        g.p(ox + 1, 42, env.time === 'night' ? '#ffe08a' : P.ink);
+        g.p(ox + 4, 42, env.time === 'night' ? '#ffe08a' : P.ink);
+        g.p(ox + 2, 43, '#f0a23a');
+        g.p(ox, 39, '#8a6a4a');
+        g.p(ox + 5, 39, '#8a6a4a');
+        g.r(ox - 3, 47, 12, 1, P.woodDD);
+      } else if (L.critter !== 'none') {
+        critter(g, env, L.critter, L.side ? 160 : 30, 66, t, !L.side);
+      }
+      mascot(g, env, L.seat === 'log' ? 64 : 66, L.seat === 'log' ? 70 : 66, t, { sleep: false });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  SC.mountain = {
+    still: 3,
+    outdoor: true,
+    setup: function (env, R) {
+      var peaks = [];
+      var n = R.i(2, 4);
+      for (var i = 0; i < n; i++) peaks.push({ x: R.i(10, 182), h: R.i(10, 26), s: R.r(0.6, 1.1) });
+      return {
+        peaks: peaks,
+        summit: R.pick(['flag', 'cairn', 'hut', 'none']),
+        cable: R.ch(0.4),
+        fore: R.pick(['sign', 'bench', 'bag', 'tent', 'none']),
+        cloudSea: R.ch(0.45),
+        critter: hp(R, env, 'critter', ['goat', 'eagle', 'none', 'eagle']),
+        trees: R.ch(0.7),
+        side: R.ch(0.5),
+        fly: R.pick(['none', 'balloon', 'flock', 'none'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      skyTop(g, env, 60, t, 30);
+      flyer(g, env, L.fly, 150, 12, t);
+      var far = mix(env.skyLow, '#7a8ab0', 0.4);
+      var farD = mix(far, '#2e3656', 0.25);
+      var snowC = hx('#f4f6fb');
+      var snowD = hx('#c9d3ea');
+      var top = [];
+      for (x = 0; x < W; x++) {
+        var my = 60;
+        var pkx = 0;
+        for (var k = 0; k < L.peaks.length; k++) {
+          var pk = L.peaks[k];
+          var hk = pk.h + Math.abs(x - pk.x) * pk.s + Math.sin(x * 0.4 + k) * 0.8;
+          if (hk < my) {
+            my = hk;
+            pkx = pk.x;
+          }
+        }
+        top.push([my, pkx]);
+        for (y = fl(my); y < H; y++) {
+          var sn = y < my + 4 + ((x * 5) % 3);
+          var sh = x > pkx;
+          g.p(x, y, sn ? (sh ? snowD : snowC) : (sh ? farD : far));
+        }
+      }
+      if (L.summit !== 'none') {
+        var best = 0;
+        for (x = 1; x < W; x++) if (top[x][0] < top[best][0]) best = x;
+        var sy = fl(top[best][0]);
+        if (L.summit === 'flag') {
+          g.r(best, sy - 7, 1, 7, P.ink);
+          var wv = mod(t, 4) < 2 ? 0 : 1;
+          g.r(best + 1, sy - 7, 4, 2, P.accent);
+          g.p(best + 5, sy - 7 + wv, P.accent);
+        } else if (L.summit === 'cairn') {
+          g.r(best - 2, sy - 2, 5, 2, '#8a8a96');
+          g.r(best - 1, sy - 4, 3, 2, '#a8a8b4');
+          g.r(best, sy - 5, 2, 1, '#8a8a96');
+        } else {
+          g.r(best - 3, sy - 4, 7, 4, P.woodD);
+          for (var hr = 0; hr < 3; hr++) g.r(best - 4 + hr, sy - 5 - hr, 9 - hr * 2, 1, P.accent);
+          g.p(best, sy - 3, env.time === 'day' ? P.woodDD : env.litC);
+        }
+      }
+      if (L.cloudSea) {
+        for (var c = 0; c < 10; c++) {
+          var cx = mod(c * 22 + t * 0.15, W + 30) - 15;
+          cloud(g, env, rnd(cx), 50 + (c % 3), 1.1 + (c % 2) * 0.2, env.clouds[c % env.clouds.length].puffs, env.cloudL, env.cloudD);
+        }
+      }
+      // near slope with a zig-zag trail
+      var near = P.leaf;
+      var nearD = P.leafD;
+      if (env.weather === 'snow') {
+        near = hx('#eef3fa');
+        nearD = hx('#ccd8ea');
+      }
+      for (x = 0; x < W; x++) {
+        var ny = L.side ? 44 + x * 0.12 + Math.sin(x * 0.07) * 3 : 67 - x * 0.12 + Math.sin(x * 0.07) * 3;
+        for (y = fl(ny); y < H; y++) g.p(x, y, (x * 7 + y * 11) % 19 === 0 ? nearD : near);
+      }
+      // switchback trail climbing the slope
+      var path = mix(P.paper, P.woodL, 0.5);
+      var pathD = mix(path, P.ink, 0.2);
+      var pts = [];
+      for (var seg = 0; seg < 7; seg++) {
+        var px = seg % 2 ? 66 + seg * 5 : 128 - seg * 5;
+        var py = 80 - seg * 5;
+        var base = L.side ? 44 + px * 0.12 : 67 - px * 0.12;
+        if (py < base + 2) break;
+        pts.push([px, py]);
+      }
+      for (var s = 0; s + 1 < pts.length; s++) {
+        g.line(pts[s][0], pts[s][1], pts[s + 1][0], pts[s + 1][1], path);
+        if (s < 3) g.line(pts[s][0], pts[s][1] + 1, pts[s + 1][0], pts[s + 1][1] + 1, pathD);
+      }
+      if (L.trees) {
+        for (var tr = 0; tr < 6; tr++) {
+          var tx = 12 + tr * 33 + (tr % 2) * 7;
+          var tb = (L.side ? 44 + tx * 0.12 : 67 - tx * 0.12) + 2;
+          pine(g, env, tx, tb, 9 + (tr % 3) * 3);
+        }
+      }
+      if (L.cable) {
+        g.line(0, 20, W, 50, P.ink);
+        var cp = mod(t * 0.6, W + 20) - 10;
+        var cy2 = 20 + cp * (30 / W);
+        g.r(cp, cy2, 1, 4, P.ink);
+        g.r(cp - 4, cy2 + 4, 9, 6, P.accent);
+        g.r(cp - 3, cy2 + 5, 7, 2, env.time === 'night' ? '#ffd36e' : '#bfe0ee');
+        g.r(cp - 4, cy2 + 9, 9, 1, P.accentD);
+      }
+      var fx = L.side ? 150 : 20;
+      var fb = L.side ? 44 + (fx + 8) * 0.12 + 18 : 67 - (fx + 8) * 0.12 + 10;
+      fb = Math.min(fb, 77);
+      if (L.fore === 'sign') streetThing(g, env, 'sign', fx, fb, t);
+      else if (L.fore === 'bench') streetThing(g, env, 'bench', fx, fb, t);
+      else if (L.fore === 'bag') floorThing(g, env, 'bag', fx, fb, t);
+      else if (L.fore === 'tent') {
+        for (y = 0; y < 10; y++) g.r(fx + 9 - y, fb - 10 + y, y * 2 + 1, 1, y < 1 ? P.accentL : P.accent);
+        g.r(fx + 8, fb - 5, 3, 5, mix(P.accent, P.ink, 0.4));
+      }
+      if (L.critter === 'goat') {
+        var gx = L.side ? 40 : 140;
+        var gy = (L.side ? 44 + gx * 0.12 : 67 - gx * 0.12) + 1;
+        g.r(gx, gy - 5, 7, 3, '#f4f0ea');
+        g.r(gx + 6, gy - 8, 2, 4, '#f4f0ea');
+        g.p(gx + 8, gy - 7, '#f4f0ea');
+        g.p(gx + 7, gy - 9, '#8a8a96');
+        g.p(gx + 5, gy - 9, '#8a8a96');
+        g.r(gx + 1, gy - 2, 1, 2, '#8a8a96');
+        g.r(gx + 5, gy - 2, 1, 2, '#8a8a96');
+      } else if (L.critter === 'eagle') {
+        var ex = 96 + rnd(Math.sin(t * 0.04) * 60);
+        var ey = 16 + rnd(Math.sin(t * 0.08) * 4);
+        var fl2 = mod(t, 8) < 4;
+        g.r(ex - 1, ey, 3, 1, '#4a3a36');
+        g.r(ex - 5, ey - (fl2 ? 1 : 0), 4, 1, '#4a3a36');
+        g.r(ex + 2, ey - (fl2 ? 1 : 0), 4, 1, '#4a3a36');
+        g.p(ex + 2, ey - 1, '#f4f0ea');
+      }
+      var mx = L.side ? 110 : 70;
+      var mb = L.side ? 44 + (mx + 8) * 0.12 + 6 : 67 - (mx + 8) * 0.12 + 6;
+      mascot(g, env, mx, fl(mb), t, { sleep: false, flip: !L.side });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  // 기차 창밖. 화면 x에 시간만큼 더한 세계 좌표로 그려 창 여러 개가 한 풍경으로 이어진다
+  function trainView(g, env, y0, y1, t, kind) {
+    var P = env.P;
+    var h = y1 - y0;
+    var x;
+    var y;
+    skyBg(g, env, 0, y0, W, h);
+    stars(g, env, 0, y0, W, h, t);
+    celestial(g, env, 0, y0, W, h + 8);
+    clouds(g, env, 0, y0, W, fl(h * 0.4), t * 2);
+    var far = mix(env.skyLow, kind === 'snow' ? '#e8eef6' : '#7a8ab0', 0.5);
+    var mid = kind === 'snow' ? hx('#f4f7fb') : (kind === 'sea' ? hx('#3a7ab0') : P.leaf);
+    var midD = kind === 'snow' ? hx('#ccd8ea') : (kind === 'sea' ? hx('#2a5a90') : P.leafD);
+    var o1 = t * 0.6;
+    var o2 = t * 2.2;
+    var o3 = t * 7;
+    for (x = 0; x < W; x++) {
+      var wx = x + o1;
+      var fy = y0 + h * 0.5 + Math.sin(wx * 0.05) * h * 0.12 + Math.sin(wx * 0.13) * 1.5;
+      if (kind === 'city') fy = y0 + h * 0.45 + (fl(wx / 9) % 3) * 3 + (hash(fl(wx / 9), 3) * 6);
+      for (y = fl(fy); y < y1; y++) g.p(x, y, far);
+      if (kind === 'city' && env.time !== 'day' && mod(fl(wx), 3) === 0 && hash(fl(wx), fl(fy)) < 0.5) g.p(x, fl(fy) + 3, env.litC);
+      var wx2 = x + o2;
+      var my = kind === 'sea' ? y0 + h * 0.7 : y0 + h * 0.72 + Math.sin(wx2 * 0.04 + 2) * h * 0.06;
+      for (y = fl(my); y < y1; y++) {
+        var cc = (fl(wx2) * 7 + y * 13) % 11 === 0 ? midD : mid;
+        if (kind === 'sea' && (y & 1) && mod(fl(wx2) + y * 5, 17) < 3) cc = mix(mid, WHITE, 0.4);
+        if (kind === 'fields' && mod(fl(wx2 * 0.5) + y, 6) < 2) cc = mix(mid, '#e8c060', 0.5);
+        g.p(x, y, cc);
+      }
+      if (kind === 'forest' || kind === 'snow') {
+        if (mod(fl(wx2), 11) === 0) {
+          var th = 6 + fl(hash(fl(wx2), 1) * 6);
+          for (var k = 0; k < th; k++) g.r(x - fl(k / 3), fl(my) - th + k, fl(k / 3) * 2 + 1, 1, kind === 'snow' && k % 3 === 0 ? '#f4f8ff' : mix(P.leafD, '#1f4a40', 0.4));
+        }
+      }
+      if (kind === 'sea' && mod(fl(wx2), 70) === 0) {
+        g.r(x, fl(my) - 2, 6, 2, P.paper);
+        g.r(x + 2, fl(my) - 8, 1, 6, P.woodDD);
+        g.r(x + 3, fl(my) - 7, 3, 4, P.paper);
+      }
+    }
+    // poles whipping past
+    for (var px = -mod(o3, 64); px < W; px += 64) {
+      g.r(px, y0, 2, h, mix(P.metalD, P.ink, 0.3));
+      g.line(px - 30, y0 + 3, px + 34, y0 + 3, P.ink);
+    }
+    weather(g, env, 0, y0, W, h, t, 1.2);
+  }
+
+  SC.train = {
+    still: 2,
+    setup: function (env, R) {
+      return {
+        view: R.pick(['hills', 'sea', 'fields', 'city', 'snow', 'forest']),
+        wins: R.pick([2, 3, 3]),
+        seat: R.pick(['accent', 'accent2', 'leafD', 'rug']),
+        blind: R.pick([0, 0, 4, 8]),
+        rack: [R.pick(['bag', 'case', 'hat', 'none']), R.pick(['bag', 'case', 'none', 'box'])],
+        itemA: hp(R, env, 'cup', CUPS),
+        itemB: R.pick(['bento', 'book', 'ticket', 'fruit', 'snack']),
+        lamp: R.ch(0.6),
+        spot: R.pick(['seat', 'table'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var top = 14;
+      var bot = 44;
+      g.em = 1;
+      trainView(g, env, top, bot, t, L.view);
+      g.em = 0;
+      // wall panels around the windows
+      var n = L.wins;
+      var ww = n === 2 ? 70 : 48;
+      var gap = (W - n * ww) / (n + 1);
+      var wallC = P.wall;
+      g.r(0, 0, W, top, wallC);
+      g.r(0, bot, W, 60 - bot, P.wallD);
+      var wxs = [];
+      for (var i = 0; i < n; i++) wxs.push(rnd(gap + i * (ww + gap)));
+      g.r(0, top, wxs[0], bot - top, wallC);
+      for (i = 0; i < n; i++) {
+        var ex = wxs[i] + ww;
+        var nx = i + 1 < n ? wxs[i + 1] : W;
+        g.r(ex, top, nx - ex, bot - top, wallC);
+        var wx = wxs[i];
+        // rounded corners + frame
+        g.p(wx, top, wallC);
+        g.p(wx + 1, top, wallC);
+        g.p(wx, top + 1, wallC);
+        g.p(ex - 1, top, wallC);
+        g.p(ex - 2, top, wallC);
+        g.p(ex - 1, top + 1, wallC);
+        g.p(wx, bot - 1, wallC);
+        g.p(ex - 1, bot - 1, wallC);
+        g.r(wx - 1, top - 1, ww + 2, 1, P.metalD);
+        g.r(wx - 1, bot, ww + 2, 2, P.metal);
+        g.r(wx - 1, bot + 2, ww + 2, 1, P.metalD);
+        for (var k = 0; k < bot - top; k++) g.b(wx + 4 + k * 0.4 + k, bot - 2 - k, WHITE, 0.08);
+        if (L.blind) {
+          g.r(wx, top, ww, L.blind, P.paperD);
+          for (var b = top + 1; b < top + L.blind; b += 2) g.r(wx, b, ww, 1, P.paper);
+          g.r(wx + fl(ww / 2), top + L.blind, 2, 2, P.accent);
+        }
+        g.light(wx + ww / 2, bot - 4, 60, env.T.win, env.winK, { sy: 1.3 });
+      }
+      // luggage rack
+      g.r(0, 6, W, 1, P.metalD);
+      g.r(0, 9, W, 1, P.metal);
+      for (x = 4; x < W; x += 6) g.p(x, 7, P.metalD);
+      for (x = 4; x < W; x += 6) g.p(x, 8, P.metalD);
+      function rack(kind, x0) {
+        if (kind === 'bag') {
+          g.r(x0, 1, 18, 5, P.accent2);
+          g.r(x0, 1, 18, 1, P.accent2L);
+          g.r(x0 + 7, 0, 4, 1, P.accent2D);
+        } else if (kind === 'case') {
+          g.r(x0, 0, 22, 6, P.accent);
+          g.r(x0, 0, 22, 1, P.accentL);
+          g.r(x0 + 4, 0, 1, 6, P.accentD);
+          g.r(x0 + 17, 0, 1, 6, P.accentD);
+        } else if (kind === 'hat') {
+          g.r(x0, 4, 14, 2, P.woodL);
+          g.r(x0 + 3, 1, 8, 3, P.woodL);
+          g.r(x0 + 3, 3, 8, 1, P.accent);
+        } else if (kind === 'box') {
+          g.r(x0, 1, 14, 5, '#d8a86a');
+          g.r(x0 + 6, 1, 2, 5, '#e8d8a8');
+        }
+      }
+      rack(L.rack[0], 24);
+      rack(L.rack[1], 130);
+      if (L.lamp && env.time !== 'day') {
+        g.em = 1;
+        g.r(92, 10, 8, 1, '#fff1c2');
+        g.em = 0;
+        g.light(96, 11, 50, env.T.lamp, env.lampK * 0.7, { top: 10 });
+      }
+      // floor
+      g.r(0, 60, W, 20, mix(P.floor, P.ink, 0.25));
+      for (x = 0; x < W; x += 4) g.r(x, 64 + (x % 8 ? 0 : 6), 2, 1, mix(P.floor, P.ink, 0.4));
+      // seats facing each other with a table between
+      var sc = P[L.seat];
+      var sD = mix(sc, P.ink, 0.3);
+      var sL = mix(sc, WHITE, 0.25);
+      function seat(x0, flip) {
+        var bx = flip ? x0 + 30 : x0;
+        g.r(bx, 34, 10, 34, sc);
+        g.r(bx, 34, 10, 2, sL);
+        g.r(flip ? bx : bx + 9, 36, 1, 32, sD);
+        g.r(bx + 2, 30, 6, 6, P.paper);
+        var cx0 = flip ? x0 : x0 + 10;
+        g.r(cx0, 58, 30, 6, sc);
+        g.r(cx0, 58, 30, 1, sL);
+        g.r(cx0, 64, 30, 2, sD);
+        g.r(cx0 + 2, 66, 26, 10, mix(sD, P.ink, 0.3));
+      }
+      seat(4, false);
+      seat(148, true);
+      g.r(68, 50, 56, 3, P.woodL);
+      g.r(68, 53, 56, 1, P.woodD);
+      g.r(94, 54, 4, 22, P.metalD);
+      g.r(88, 76, 16, 2, P.metalD);
+      cupOf(g, env, L.itemA, 74, 50, P.paper, t);
+      var ib = 104;
+      if (L.itemB === 'bento') {
+        g.r(ib, 46, 14, 4, P.accent);
+        g.r(ib + 1, 46, 12, 1, P.paper);
+        g.p(ib + 3, 47, '#e8483a');
+        g.p(ib + 6, 47, '#9ad04a');
+        g.p(ib + 9, 47, '#f6c63a');
+      } else if (L.itemB === 'book') {
+        g.r(ib, 48, 14, 2, P.accent2);
+        g.r(ib + 1, 47, 12, 1, P.paper);
+      } else if (L.itemB === 'ticket') {
+        g.r(ib, 48, 12, 2, '#f6e08a');
+        g.r(ib + 3, 48, 1, 2, P.accent);
+        g.p(ib + 6, 48, P.ink);
+        g.p(ib + 8, 48, P.ink);
+      } else if (L.itemB === 'fruit') {
+        trinket(g, env, 'fruit', ib, 50, t);
+      } else {
+        g.r(ib, 43, 8, 7, P.accent2);
+        g.r(ib, 43, 8, 2, P.paper);
+        g.r(ib + 2, 41, 1, 3, '#f6c63a');
+        g.r(ib + 4, 40, 1, 4, '#f6c63a');
+      }
+      if (L.spot === 'seat') mascot(g, env, 20, 58, t, { flip: false, sleep: env.time === 'night' });
+      else mascot(g, env, 80, 50, t, { flip: false });
+    }
+  };
+
+  function fishSpr(g, x, y, kind, c, flip) {
+    var S = {
+      round: ['..##..', '.####.#', '######.', '.####.#', '..##..'],
+      long: ['..####...', '########.#', '.#######.#', '..####...'],
+      clown: ['.#*#.', '##*##.#', '##*##.', '.#*#.#'],
+      tiny: ['.##.#', '####.', '.##.#']
+    };
+    var rows = S[kind] || S.round;
+    var cD = mix(c, '#1a2a4a', 0.35);
+    g.spr(x, y, rows, { '#': c, '*': WHITE }, flip);
+    g.p(flip ? x + rows[0].length - 2 : x + 1, y + 1, cD);
+    g.p(flip ? x + rows[0].length - 3 : x + 2, y + 1, '#1a1a2a');
+  }
+
+  SC.aquarium = {
+    still: 6,
+    setup: function (env, R) {
+      var fish = [];
+      var n = R.i(5, 9);
+      var kinds = ['round', 'long', 'clown', 'tiny'];
+      var cols = ['#ffb03a', '#ff7a5a', '#7fd8ff', '#ffe27a', '#c7a8ff', '#ff9fbf', '#a6f0a0'];
+      for (var i = 0; i < n; i++) fish.push({ k: R.pick(kinds), c: R.pick(cols), y: R.i(10, 48), v: R.r(0.25, 0.7) * (R.ch(0.5) ? 1 : -1), o: R.r(0, 300) });
+      return {
+        fish: fish,
+        big: R.pick(['turtle', 'ray', 'jelly', 'whale', 'octopus', 'none']),
+        coral: [R.pick(['#ff7a8a', '#ffb03a', '#c7a8ff', '#ff9fbf']), R.pick(['#7fd8a0', '#ffe27a', '#ff7a5a'])],
+        arch: R.ch(0.4),
+        water: R.pick(['#1a5a9a', '#1a6a8a', '#2a4a8a', '#1a7a7a']),
+        fore: R.pick(['bench', 'rail', 'none', 'plaque']),
+        chest: R.ch(0.4)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var room0 = mix(P.ink, '#101830', 0.4);
+      g.r(0, 0, W, H, room0);
+      var x0 = 6;
+      var x1 = 186;
+      var y0 = 4;
+      var y1 = 62;
+      var wc = hx(L.water);
+      var night = env.time === 'night';
+      g.em = 1;
+      var inTank = function (qx, qy) {
+        if (qx < x0 || qx >= x1 || qy < y0 || qy >= y1) return false;
+        if (!L.arch) return true;
+        var dx = (qx - 96) / 90;
+        var dy = (qy - y1) / (y1 - y0);
+        return dx * dx + dy * dy <= 1;
+      };
+      for (y = y0; y < y1; y++) {
+        var f = (y - y0) / (y1 - y0);
+        var c = mix(mix(wc, '#7fd8ff', 0.35 * (1 - f)), '#0a1a3a', f * 0.45 + (night ? 0.2 : 0));
+        for (x = x0; x < x1; x++) if (inTank(x, y)) g.p(x, y, bay(x, y) < 0.15 && f > 0.5 ? mix(c, '#0a1a3a', 0.2) : c);
+      }
+      g.clip(x0, y0, x1 - x0, y1 - y0, inTank);
+      // god rays
+      for (var r = 0; r < 4; r++) {
+        var rx = 30 + r * 44 + rnd(Math.sin(t * 0.05 + r) * 6);
+        for (y = y0; y < y0 + 40; y++) {
+          for (x = rx + fl((y - y0) * 0.3); x < rx + 6 + fl((y - y0) * 0.5); x++) if (bay(x, y) < 0.35) g.b(x, y, '#c8f0ff', 0.25 * (1 - (y - y0) / 40));
+        }
+      }
+      // sand, rocks, corals, weed
+      for (x = x0; x < x1; x++) {
+        var sy = 54 + rnd(Math.sin(x * 0.06) * 2);
+        for (y = sy; y < y1; y++) g.p(x, y, y === sy ? '#f0dca8' : (bay(x, y) < 0.12 ? '#b8a070' : '#d8c08a'));
+      }
+      g.ell(40, 54, 8, 4, '#5a6a7a');
+      g.ell(38, 52, 5, 2, '#7a8a9a');
+      g.ell(150, 55, 10, 4, '#5a6a7a');
+      for (var w = 0; w < 7; w++) {
+        var wx = 14 + w * 26 + (w % 2) * 5;
+        var wh = 10 + (w % 3) * 5;
+        for (var k = 0; k < wh; k++) {
+          var sx = wx + rnd(Math.sin(k * 0.4 + t * 0.12 + w) * (k / wh) * 2.5);
+          g.p(sx, 55 - k, k % 4 === 0 ? '#5ab86a' : '#3a9a5a');
+          if (k % 3 === 1) g.p(sx + 1, 55 - k, '#3a9a5a');
+        }
+      }
+      [[66, 0], [118, 1], [172, 0]].forEach(function (cr) {
+        var cc = hx(L.coral[cr[1]]);
+        var cx = cr[0];
+        g.r(cx, 46, 2, 9, cc);
+        g.r(cx - 3, 49, 2, 5, cc);
+        g.r(cx + 3, 47, 2, 6, cc);
+        g.r(cx - 3, 53, 9, 2, cc);
+        g.p(cx, 45, mix(cc, WHITE, 0.4));
+        g.p(cx + 3, 46, mix(cc, WHITE, 0.4));
+      });
+      if (L.chest) {
+        g.r(92, 50, 12, 6, P.woodD);
+        g.r(92, 48, 12, 2, P.woodL);
+        g.r(97, 51, 2, 2, '#f0c84a');
+        if (mod(t, 20) < 10) {
+          for (var bb = 0; bb < 3; bb++) g.p(96 + bb * 2, 46 - mod(t + bb * 3, 10), '#d8f4ff');
+        }
+      }
+      // bubbles
+      for (var bl = 0; bl < 10; bl++) {
+        var by = y1 - mod(t * 0.9 + bl * 6, y1 - y0);
+        g.p(24 + rnd(Math.sin(t * 0.3 + bl) * 1.5), by, '#d8f4ff');
+        if (bl % 3 === 0) g.p(25, by + 1, '#a8e0ff');
+      }
+      // big creature
+      var bxp = mod(t * 0.35, x1 - x0 + 60) - 30 + x0;
+      if (L.big === 'turtle') {
+        g.ell(bxp, 22, 8, 4, '#5a9a5a');
+        g.ell(bxp, 21, 6, 2, '#7aba6a');
+        g.r(bxp + 8, 20, 4, 3, '#8aca7a');
+        g.p(bxp + 10, 20, '#1a1a2a');
+        var fp = mod(t, 8) < 4 ? 1 : 0;
+        g.r(bxp - 5, 25 + fp, 4, 2, '#8aca7a');
+        g.r(bxp + 3, 25 - fp, 4, 2, '#8aca7a');
+      } else if (L.big === 'ray') {
+        var wv = rnd(Math.sin(t * 0.3) * 2);
+        for (var rr = -8; rr <= 8; rr++) g.r(bxp + rr, 26 - (Math.abs(rr) > 4 ? wv : 0) + Math.abs(rr) * 0.3, 1, 3 - Math.abs(rr) * 0.25, '#5a7a9a');
+        g.line(bxp - 9, 27, bxp - 20, 28, '#4a6a8a');
+      } else if (L.big === 'jelly') {
+        for (var j = 0; j < 3; j++) {
+          var jx = 50 + j * 46;
+          var jy = 14 + mod(-t * 0.25 + j * 12, 30);
+          var pulse = mod(t + j * 2, 6) < 3 ? 0 : 1;
+          g.ell(jx, jy, 4 - pulse, 3, '#f0c0f0');
+          g.r(jx - 3 + pulse, jy + 1, 7 - pulse * 2, 1, '#d8a0e0');
+          for (var tl = -2; tl <= 2; tl += 2) {
+            for (var tk = 0; tk < 6; tk++) g.b(jx + tl + rnd(Math.sin(tk * 0.8 + t * 0.3 + tl) * 0.7), jy + 2 + tk, '#f0c0f0', 0.6);
+          }
+        }
+      } else if (L.big === 'whale') {
+        g.ell(bxp, 18, 16, 5, '#3a5a8a');
+        g.ell(bxp, 20, 14, 3, '#5a7aaa');
+        g.r(bxp - 22, 15 + (mod(t, 10) < 5 ? 0 : 1), 6, 2, '#3a5a8a');
+        for (var sp = 0; sp < 6; sp++) g.p(bxp - 10 + sp * 4, 15, '#f0f4ff');
+        g.p(bxp + 10, 18, '#1a1a2a');
+      } else if (L.big === 'octopus') {
+        var ox = 140;
+        g.ell(ox, 44, 5, 4, '#e8705a');
+        g.p(ox - 2, 44, WHITE);
+        g.p(ox + 2, 44, WHITE);
+        for (var a = 0; a < 5; a++) {
+          for (var ak = 0; ak < 5; ak++) g.p(ox - 4 + a * 2 + rnd(Math.sin(ak + t * 0.25 + a) * 1), 48 + ak, '#d8604a');
+        }
+      }
+      for (var fi = 0; fi < L.fish.length; fi++) {
+        var fsh = L.fish[fi];
+        var span = x1 - x0 + 20;
+        var fxp = x0 - 10 + mod(fsh.o + t * fsh.v * 1.4, span);
+        var fyp = fsh.y + rnd(Math.sin(t * 0.15 + fi) * 2);
+        fishSpr(g, fxp, fyp, fsh.k, hx(fsh.c), fsh.v < 0);
+      }
+      g.noclip();
+      g.em = 0;
+      // glass frame + room floor
+      if (!L.arch) {
+        g.r(x0 - 2, y0 - 2, x1 - x0 + 4, 2, '#2a3048');
+        g.r(x0 - 2, y0, 2, y1 - y0, '#2a3048');
+        g.r(x1, y0, 2, y1 - y0, '#2a3048');
+        g.r(64, y0, 2, y1 - y0, '#2a3048');
+        g.r(126, y0, 2, y1 - y0, '#2a3048');
+      }
+      g.r(0, y1, W, 2, '#3a4060');
+      g.r(0, y1 + 2, W, H - y1 - 2, mix(room0, '#2a3a60', 0.4));
+      for (x = 0; x < W; x += 2) g.b(x, y1 + 3 + (x % 4 ? 1 : 0), '#7fd8ff', 0.15);
+      g.light(96, 50, 120, [0.45, 0.7, 1], night ? 0.9 : 0.6, { sy: 1.6 });
+      if (L.fore === 'bench') {
+        g.r(60, 70, 72, 3, '#1a1e30');
+        g.r(66, 73, 3, 7, '#1a1e30');
+        g.r(124, 73, 3, 7, '#1a1e30');
+      } else if (L.fore === 'rail') {
+        g.r(0, 66, W, 2, '#3a4060');
+        for (x = 8; x < W; x += 16) g.r(x, 68, 1, 12, '#3a4060');
+      } else if (L.fore === 'plaque') {
+        g.r(155, 70, 2, 10, '#2a3048');
+        g.em = 1;
+        g.r(148, 64, 16, 7, '#d8eef8');
+        fishSpr(g, 150, 65, L.fish[0].k, hx(L.fish[0].c), false);
+        textRow(g, 157, 66, 6, env.seed, 1, '#5a6a8a');
+        textRow(g, 157, 68, 5, env.seed, 2, '#5a6a8a');
+        g.em = 0;
+      }
+      mascot(g, env, 90, L.fore === 'bench' ? 70 : 76, t, { sleep: false });
+    }
+  };
+
+  var PAINTINGS = ['landscape', 'portrait', 'abstract', 'still', 'sea', 'night', 'flower', 'sunset'];
+
+  function painting(g, env, kind, x, y, w, h, t) {
+    var P = env.P;
+    var xx;
+    var i;
+    if (kind === 'landscape' || kind === 'sunset') {
+      var sky = kind === 'sunset' ? '#f0a070' : '#a8d4ea';
+      g.r(x, y, w, h, sky);
+      if (kind === 'sunset') g.r(x, y, w, fl(h / 3), '#c86a8a');
+      for (xx = 0; xx < w; xx++) {
+        var hy = rnd(h * 0.55 + Math.sin(xx * 0.5) * 1.5);
+        g.r(x + xx, y + hy, 1, h - hy, xx < w / 2 ? '#7fb87a' : '#6aa86a');
+      }
+      g.p(x + w - 3, y + 2, kind === 'sunset' ? '#ffe08a' : '#fff2a8');
+    } else if (kind === 'portrait') {
+      g.r(x, y, w, h, mix(P.accent2, P.ink, 0.3));
+      g.ell(x + w / 2, y + h * 0.4, Math.max(1, fl(w / 5)), Math.max(1, fl(h / 5)), '#f0c8a0');
+      g.r(x + fl(w / 4), y + fl(h * 0.65), fl(w / 2), h - fl(h * 0.65), P.accent);
+      g.r(x + fl(w / 2) - fl(w / 5), y + fl(h * 0.2), fl(w / 5) * 2 + 1, 1, '#4a3a36');
+    } else if (kind === 'abstract') {
+      g.r(x, y, w, h, P.paper);
+      g.r(x + 1, y + 1, fl(w / 2), fl(h / 2), P.accent);
+      g.r(x + fl(w / 2), y + fl(h / 3), fl(w / 2) - 1, fl(h / 2), P.accent2);
+      g.r(x + 2, y + h - 3, w - 4, 2, '#f6c63a');
+      g.r(x + fl(w / 3), y, 1, h, P.ink);
+    } else if (kind === 'still') {
+      g.r(x, y, w, h, mix(P.wallD, P.ink, 0.2));
+      g.r(x, y + fl(h * 0.7), w, h - fl(h * 0.7), P.woodL);
+      g.r(x + 2, y + fl(h * 0.35), 3, fl(h * 0.35), P.accent2);
+      g.ell(x + w - 4, y + fl(h * 0.62), 2, 2, '#e8483a');
+      g.ell(x + w - 7, y + fl(h * 0.65), 1, 1, '#f6a03a');
+    } else if (kind === 'sea') {
+      g.r(x, y, w, h, '#a8d4ea');
+      g.r(x, y + fl(h / 2), w, h - fl(h / 2), '#3a7ab0');
+      for (i = 0; i < w; i += 3) g.p(x + i, y + fl(h / 2) + 2 + (i % 2), '#d8f0ff');
+      g.r(x + 3, y + fl(h / 2) - 3, 1, 3, P.paper);
+      g.r(x + 4, y + fl(h / 2) - 2, 2, 2, P.paper);
+    } else if (kind === 'night') {
+      g.r(x, y, w, h, '#1a2a5a');
+      for (i = 0; i < 6; i++) g.p(x + fl(hash(x, i) * w), y + fl(hash(y, i) * h * 0.6), '#fff6c8');
+      g.ell(x + w - 4, y + 3, 1, 1, '#ffe08a');
+      for (xx = 0; xx < w; xx++) g.r(x + xx, y + h - 2 - (xx % 5 === 0 ? 2 : 0), 1, 2 + (xx % 5 === 0 ? 2 : 0), '#2a2030');
+    } else {
+      g.r(x, y, w, h, P.paper);
+      g.r(x + fl(w / 2), y + fl(h / 3), 1, h - fl(h / 3), P.leafD);
+      g.ell(x + fl(w / 2), y + fl(h / 3), 2, 2, P.accent);
+      g.p(x + fl(w / 2), y + fl(h / 3), '#ffe27a');
+      g.p(x + fl(w / 2) - 2, y + fl(h * 0.6), P.leaf);
+    }
+  }
+
+  SC.atelier = {
+    still: 5,
+    setup: function (env, R) {
+      return {
+        wallStyle: R.pick([0, 1, 2]),
+        win: R.pick(['big', 'skylight', 'round']),
+        view: R.pick(['trees', 'city', 'hills']),
+        canvas: R.pick(PAINTINGS),
+        wallP: [R.pick(PAINTINGS), R.pick(PAINTINGS), R.pick(PAINTINGS)],
+        easelX: R.pick([70, 96, 120]),
+        bust: R.ch(0.5),
+        stack: R.ch(0.6),
+        cloth: R.pick(['paper', 'accent2', 'woodL']),
+        jar: R.i(2, 4),
+        floor: hp(R, env, 'floor', ['stool', 'bigplant', 'none', 'pouf']),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'bird'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      room(g, env, L, 64);
+      if (L.win === 'big') win(g, env, 8, 6, 44, 42, t, { panes: 4, view: L.view, curtain: P.paper, cw: 7 });
+      else if (L.win === 'round') win(g, env, 14, 8, 30, 30, t, { shape: 'round', view: L.view });
+      else {
+        // slanted skylight in the ceiling
+        g.em = 1;
+        g.clip(6, 0, 52, 22, function (qx, qy) {
+          return qy < 20 - (qx - 6) * 0.25 && qy >= 0;
+        });
+        outside(g, env, 6, 0, 52, 22, t, null);
+        g.noclip();
+        g.em = 0;
+        for (x = 6; x < 58; x++) g.r(x, rnd(20 - (x - 6) * 0.25), 1, 2, P.woodD);
+        g.r(30, 0, 2, 15, P.woodD);
+        g.light(32, 26, 60, env.T.win, env.winK, { sy: 1.1 });
+      }
+      // wall paintings
+      var spots = [[62, 8, 18, 14], [86, 12, 12, 16], [154, 8, 20, 14]];
+      for (var i = 0; i < 3; i++) {
+        var s = spots[i];
+        if (Math.abs(s[0] + s[2] / 2 - L.easelX - 14) < 22) continue;
+        g.r(s[0] - 1, s[1] - 1, s[2] + 2, s[3] + 2, P.woodD);
+        painting(g, env, L.wallP[i], s[0], s[1], s[2], s[3], t);
+        g.br(s[0], s[1] + s[3] + 1, s[2] + 2, 1, P.ink, 0.15);
+      }
+      // shelf with paint jars and a plaster bust
+      g.r(150, 34, 38, 2, P.woodL);
+      g.r(150, 36, 38, 1, P.woodD);
+      for (var j = 0; j < L.jar; j++) {
+        var jx = 152 + j * 7;
+        g.r(jx, 28, 5, 6, mix('#e8f4f8', P.wall, 0.3));
+        g.r(jx, 31, 5, 3, P.books[(j + env.seed) % P.books.length]);
+        g.line(jx + 2, 28, jx + 1, 23, P.woodD);
+        g.line(jx + 3, 28, jx + 4, 24, P.woodD);
+        g.p(jx + 1, 22, P.ink);
+      }
+      if (L.bust) {
+        var bx = 178;
+        g.r(bx - 3, 31, 8, 3, P.paperD);
+        g.r(bx - 1, 26, 5, 5, P.paper);
+        g.ell(bx + 1, 23, 3, 3, P.paper);
+        g.p(bx + 3, 23, P.paperD);
+        g.p(bx + 2, 25, P.paperD);
+      }
+      // drop cloth with paint splatters
+      var dc = P[L.cloth];
+      g.ell(L.easelX + 14, 72, 36, 5, dc);
+      for (var sp = 0; sp < 14; sp++) g.p(L.easelX + 14 + fl((hash(env.seed, sp) - 0.5) * 60), 70 + fl(hash(env.seed, sp + 20) * 5), [P.accent, P.accent2, '#ffd25a'][sp % 3]);
+      // easel + canvas
+      var ex = L.easelX;
+      g.line(ex + 4, 22, ex - 2, 74, P.woodD);
+      g.line(ex + 24, 22, ex + 30, 74, P.woodD);
+      g.line(ex + 14, 18, ex + 14, 72, P.woodDD);
+      g.r(ex - 1, 52, 32, 2, P.woodL);
+      g.r(ex + 1, 22, 26, 30, P.paper);
+      g.r(ex + 1, 22, 26, 1, P.paperD);
+      painting(g, env, L.canvas, ex + 3, 24, 22, 26, t);
+      // the brush keeps working
+      var ph = mod(t, 24);
+      var bxp = ex + 8 + rnd(Math.sin(ph * 0.5) * 6);
+      var byp = 34 + rnd(Math.cos(ph * 0.4) * 5);
+      g.line(bxp, byp, bxp + 8, byp + 9, P.woodD);
+      g.p(bxp, byp, P.accent);
+      // side table with palette and tubes
+      var tx = ex > 100 ? 40 : 136;
+      g.r(tx, 54, 22, 2, P.woodL);
+      g.r(tx + 2, 56, 2, 20, P.woodD);
+      g.r(tx + 18, 56, 2, 20, P.woodD);
+      g.ell(tx + 8, 53, 7, 1, P.woodL);
+      g.p(tx + 4, 52, P.accent);
+      g.p(tx + 7, 52, P.accent2);
+      g.p(tx + 10, 52, '#ffd25a');
+      g.p(tx + 12, 53, P.paper);
+      g.r(tx + 15, 52, 5, 2, P.metal);
+      g.p(tx + 20, 52, P.accent);
+      if (L.stack) {
+        var sx2 = ex > 100 ? 8 : 166;
+        for (var c = 0; c < 3; c++) {
+          g.r(sx2 + c * 3, 50 - c * 2, 16, 26 + c * 2, P.woodL);
+          g.r(sx2 + c * 3 + 1, 51 - c * 2, 14, 24 + c * 2, c === 2 ? P.paper : P.paperD);
+        }
+        painting(g, env, L.wallP[0], sx2 + 8, 50, 12, 10, t);
+      }
+      if (L.floor !== 'none') floorThing(g, env, L.floor, ex > 100 ? 64 : 112, 77, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.critter === 'bird' ? 160 : 140, L.critter === 'bird' ? 34 : 78, t, true);
+      mascot(g, env, ex + 30, 74, t, { flip: true, sleep: false });
+    }
+  };
+
+  var TOOLS = ['hammer', 'saw', 'wrench', 'screwdriver', 'scissors', 'pliers', 'tape', 'brush', 'ruler', 'clamp'];
+
+  function tool(g, env, kind, x, y) {
+    var P = env.P;
+    g.p(x + 3, y, P.metalD);
+    if (kind === 'hammer') {
+      g.r(x + 3, y + 3, 1, 10, P.woodD);
+      g.r(x, y + 1, 7, 3, P.metalD);
+      g.r(x, y + 1, 7, 1, P.metal);
+    } else if (kind === 'saw') {
+      g.r(x + 1, y + 1, 5, 3, P.accent);
+      for (var i = 0; i < 12; i++) g.r(x + 1, y + 4 + i, 6 - fl(i / 3), 1, i % 2 ? P.metal : P.metalL);
+    } else if (kind === 'wrench') {
+      g.r(x + 3, y + 3, 1, 10, P.metal);
+      g.r(x + 1, y + 1, 5, 2, P.metal);
+      g.p(x + 3, y + 1, P.wall);
+      g.r(x + 2, y + 13, 3, 2, P.metal);
+    } else if (kind === 'screwdriver') {
+      g.r(x + 2, y + 1, 3, 5, P.accent2);
+      g.r(x + 2, y + 1, 1, 5, P.accent2L);
+      g.r(x + 3, y + 6, 1, 7, P.metal);
+    } else if (kind === 'scissors') {
+      disc(g, x + 2, y + 3, 1, P.accent);
+      disc(g, x + 5, y + 3, 1, P.accent);
+      g.line(x + 2, y + 5, x + 5, y + 12, P.metal);
+      g.line(x + 5, y + 5, x + 2, y + 12, P.metalL);
+    } else if (kind === 'pliers') {
+      g.line(x + 2, y + 2, x + 3, y + 8, P.accent);
+      g.line(x + 5, y + 2, x + 4, y + 8, P.accent);
+      g.r(x + 3, y + 8, 2, 5, P.metalD);
+    } else if (kind === 'tape') {
+      disc(g, x + 3, y + 5, 3, '#f6c63a');
+      disc(g, x + 3, y + 5, 1, P.metalD);
+      g.r(x + 5, y + 7, 3, 1, P.metalL);
+    } else if (kind === 'brush') {
+      g.r(x + 3, y + 1, 1, 7, P.woodD);
+      g.r(x + 1, y + 8, 5, 2, P.metal);
+      g.r(x + 1, y + 10, 5, 3, P.accent);
+    } else if (kind === 'ruler') {
+      g.r(x + 2, y + 1, 3, 14, '#f0d08a');
+      for (var k = 0; k < 14; k += 2) g.p(x + 2, y + 1 + k, P.ink);
+    } else {
+      g.r(x, y + 2, 2, 10, P.accent);
+      g.r(x, y + 2, 6, 2, P.accent);
+      g.r(x, y + 10, 6, 2, P.accent);
+      g.r(x + 5, y + 4, 1, 6, P.metal);
+    }
+  }
+
+  SC.workshop = {
+    still: 3,
+    setup: function (env, R) {
+      var tools = [];
+      for (var i = 0; i < 7; i++) tools.push(R.pick(TOOLS));
+      return {
+        wallStyle: R.pick([0, 1, 3]),
+        tools: tools,
+        project: R.pick(['birdhouse', 'chair', 'robot', 'boat', 'pottery', 'lamp']),
+        action: R.pick(['saw', 'sand', 'paint', 'none']),
+        under: [R.pick(['toolbox', 'planks', 'bucket', 'none']), R.pick(['boxes', 'planks', 'none', 'stool'])],
+        view: R.pick(['trees', 'city', 'hills']),
+        jars: R.i(3, 5),
+        critter: hp(R, env, 'critter', ['kitty', 'mouse', 'none', 'bird']),
+        spot: R.pick(['bench', 'floor'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var i;
+      room(g, env, L, 66);
+      win(g, env, 8, 8, 30, 26, t, { panes: 4, view: L.view, sill: true });
+      // pegboard with tools
+      var pb = mix(P.woodL, '#c8955a', 0.4);
+      g.r(48, 6, 92, 34, pb);
+      g.r(48, 6, 92, 1, mix(pb, WHITE, 0.3));
+      g.r(48, 39, 92, 1, mix(pb, P.ink, 0.3));
+      for (var py = 9; py < 39; py += 4) {
+        for (x = 51; x < 139; x += 4) g.p(x, py, mix(pb, P.ink, 0.35));
+      }
+      for (i = 0; i < L.tools.length; i++) tool(g, env, L.tools[i], 53 + i * 12, 10 + (i % 2) * 6);
+      // shelf with jars of screws
+      g.r(148, 22, 40, 2, P.woodL);
+      g.r(148, 24, 40, 1, P.woodD);
+      for (i = 0; i < L.jars; i++) {
+        var jx = 150 + i * 8;
+        g.r(jx, 15, 6, 7, mix('#e8f4f8', P.wall, 0.3));
+        g.r(jx, 14, 6, 1, P.metalD);
+        for (var d = 0; d < 6; d++) g.p(jx + 1 + (d * 3) % 4, 17 + fl(d / 2), [P.metal, '#d8a838', P.metalD][(d + i) % 3]);
+      }
+      g.r(150, 32, 30, 2, P.woodL);
+      g.r(150, 34, 30, 1, P.woodD);
+      trinket(g, env, 'radio', 152, 32, t);
+      trinket(g, env, 'pencils', 166, 32, t);
+      // hanging bulb, gently swinging
+      var sw = Math.sin(t * 0.18) * 2;
+      g.line(96, 0, 96 + sw, 3, P.ink);
+      g.r(95 + rnd(sw), 3, 3, 2, P.metalD);
+      g.em = 1;
+      g.r(95 + rnd(sw), 5, 3, 2, env.time === 'day' ? '#f6efd8' : '#fff1c2');
+      g.em = 0;
+      g.light(96 + sw, 6, 60, env.T.lamp, env.lampK * 1.1, { n: 6 });
+      // workbench
+      g.br(4, 47, 184, 1, P.ink, 0.15);
+      g.r(4, 48, 184, 4, P.woodL);
+      g.r(4, 48, 184, 1, mix(P.woodL, WHITE, 0.3));
+      g.r(4, 52, 184, 2, P.woodD);
+      g.r(8, 54, 4, 24, P.woodDD);
+      g.r(180, 54, 4, 24, P.woodDD);
+      g.r(8, 66, 176, 2, P.woodD);
+      // vise
+      g.r(14, 42, 10, 6, P.metalD);
+      g.r(14, 42, 10, 1, P.metal);
+      g.r(24, 44, 6, 1, P.metal);
+      g.r(29, 42, 1, 5, P.metal);
+      // project
+      var px = 82;
+      if (L.project === 'birdhouse') {
+        g.r(px, 38, 14, 10, P.woodL);
+        for (i = 0; i < 6; i++) g.r(px - 2 + i, 37 - i, 18 - i * 2, 1, P.accent);
+        disc(g, px + 7, 42, 2, P.woodDD);
+        g.r(px + 6, 45, 3, 1, P.woodD);
+      } else if (L.project === 'chair') {
+        g.r(px + 2, 36, 2, 12, P.woodD);
+        g.r(px + 2, 40, 12, 2, P.woodL);
+        g.r(px + 12, 42, 2, 6, P.woodD);
+        g.r(px + 4, 42, 1, 6, P.woodD);
+        g.r(px + 2, 36, 1, 1, P.woodL);
+      } else if (L.project === 'robot') {
+        g.r(px + 2, 38, 10, 10, P.metal);
+        g.r(px + 3, 31, 8, 6, P.metalL);
+        g.em = 1;
+        g.p(px + 5, 33, mod(t, 8) < 6 ? '#6aff8a' : '#2a8a3a');
+        g.p(px + 8, 33, mod(t, 8) < 6 ? '#6aff8a' : '#2a8a3a');
+        g.em = 0;
+        g.r(px + 7, 29, 1, 2, P.metalD);
+        g.p(px + 7, 28, P.accent);
+        g.r(px, 40, 2, 5, P.metalD);
+        g.r(px + 12, 40 - (mod(t, 10) < 5 ? 0 : 2), 2, 5, P.metalD);
+      } else if (L.project === 'boat') {
+        g.r(px, 44, 16, 3, P.woodD);
+        g.r(px + 2, 47, 12, 1, P.woodDD);
+        g.r(px + 7, 30, 1, 14, P.woodDD);
+        for (i = 0; i < 10; i++) g.r(px + 8, 31 + i, rnd(i * 0.6) + 1, 1, P.paper);
+      } else if (L.project === 'pottery') {
+        g.ell(px + 8, 47, 9, 1, P.metalD);
+        var spin = mod(t, 3);
+        g.r(px + 4, 38, 8, 9, '#c87a5a');
+        g.r(px + 5, 35, 6, 3, '#c87a5a');
+        g.r(px + 6, 34, 4, 1, '#a85a3a');
+        g.r(px + 4 + spin * 2, 39, 1, 7, '#e8a080');
+      } else {
+        g.r(px + 4, 45, 9, 3, P.woodD);
+        g.r(px + 8, 33, 1, 12, P.metalD);
+        for (i = 0; i < 5; i++) g.r(px + 4 - i * 0.5, 30 + i, 9 + i, 1, P.accent2);
+      }
+      // tool in action
+      var ax = 130;
+      if (L.action === 'saw') {
+        g.r(ax, 45, 34, 3, P.woodL);
+        g.r(ax, 45, 34, 1, mix(P.woodL, WHITE, 0.3));
+        var so = rnd(Math.sin(t * 0.8) * 4);
+        g.line(ax + 12 + so, 46, ax + 22 + so, 38, P.metal);
+        g.line(ax + 13 + so, 46, ax + 23 + so, 38, P.metalL);
+        g.r(ax + 22 + so, 36, 4, 3, P.accent);
+        for (i = 0; i < 6; i++) g.p(ax + 12 + fl(hash(i, fl(t / 2)) * 8), 47 + mod(t + i * 2, 8), '#f0d8a8');
+      } else if (L.action === 'sand') {
+        g.r(ax, 45, 34, 3, P.woodL);
+        var so2 = rnd(Math.sin(t * 0.9) * 6);
+        g.r(ax + 12 + so2, 42, 8, 3, P.accent2);
+        g.r(ax + 14 + so2, 40, 4, 2, P.accent2D);
+        for (i = 0; i < 4; i++) g.b(ax + 10 + so2 + i * 3, 41 - mod(t + i, 4), '#f0e0c0', 0.5);
+      } else if (L.action === 'paint') {
+        g.r(ax + 4, 42, 8, 6, P.metal);
+        g.r(ax + 4, 42, 8, 2, P.accent);
+        g.line(ax + 16, 47, ax + 22, 38, P.woodD);
+        g.r(ax + 15, 45, 3, 2, P.accent);
+        g.r(ax + 24, 44, 10, 4, P.accentL);
+      }
+      // under the bench
+      function under(kind, x0) {
+        if (kind === 'toolbox') {
+          g.r(x0, 70, 18, 8, P.accent);
+          g.r(x0, 70, 18, 1, P.accentL);
+          g.r(x0 + 6, 67, 6, 1, P.metalD);
+          g.r(x0 + 6, 67, 1, 3, P.metalD);
+          g.r(x0 + 11, 67, 1, 3, P.metalD);
+          g.r(x0 + 8, 72, 2, 2, P.metal);
+        } else if (kind === 'planks') {
+          for (i = 0; i < 3; i++) {
+            g.r(x0 - i * 2, 75 - i * 3, 30, 3, i % 2 ? P.woodL : P.wood);
+            g.r(x0 - i * 2, 75 - i * 3, 30, 1, mix(P.woodL, WHITE, 0.2));
+          }
+        } else if (kind === 'bucket') {
+          g.r(x0 + 2, 69, 10, 9, P.metal);
+          g.r(x0 + 1, 68, 12, 1, P.metalL);
+          g.line(x0 + 2, 68, x0 + 7, 64, P.metalD);
+          g.line(x0 + 12, 68, x0 + 7, 64, P.metalD);
+        } else if (kind !== 'none') {
+          floorThing(g, env, kind, x0, 78, t);
+        }
+      }
+      under(L.under[0], 24);
+      under(L.under[1], 140);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.critter === 'bird' ? 26 : 70, L.critter === 'bird' ? 34 : 78, t, false);
+      if (L.spot === 'bench') mascot(g, env, 108, 48, t, { sleep: false });
+      else mascot(g, env, 104, 78, t);
+    }
+  };
+
+  var BLOOMS = ['rose', 'tulip', 'sunflower', 'daisy', 'lavender', 'baby', 'hydrangea', 'lily'];
+
+  function bloomBucket(g, env, kind, x, yb, salt, t) {
+    var P = env.P;
+    g.r(x, yb - 7, 9, 7, P.metal);
+    g.r(x - 1, yb - 8, 11, 1, P.metalL);
+    g.r(x + 8, yb - 7, 1, 7, P.metalD);
+    var col = {
+      rose: ['#d8384a', '#f0607a'],
+      tulip: ['#f6a0c0', '#f6d04a'],
+      sunflower: ['#f6c63a', '#7a4a2a'],
+      daisy: ['#ffffff', '#ffe27a'],
+      lavender: ['#a88ad8', '#c8a8f0'],
+      baby: ['#ffffff', '#f0e8f0'],
+      hydrangea: ['#8ab0f0', '#c0a0f0'],
+      lily: ['#fff0e0', '#f6a03a']
+    }[kind];
+    var sw = Math.sin(t * 0.2 + salt) > 0.7 ? 1 : 0;
+    for (var i = 0; i < 5; i++) {
+      var fx = x + 1 + i * 2 + (i === 2 ? sw : 0);
+      var fh = 5 + fl(hash(salt, i) * 5);
+      g.r(fx, yb - 8 - fh, 1, fh, P.leafD);
+      var fy = yb - 9 - fh;
+      if (kind === 'lavender') {
+        g.r(fx, fy - 3, 1, 4, col[i % 2]);
+      } else if (kind === 'baby') {
+        g.p(fx - 1, fy, col[0]);
+        g.p(fx + 1, fy - 1, col[0]);
+        g.p(fx, fy - 2, col[0]);
+      } else if (kind === 'hydrangea') {
+        g.ell(fx, fy, 2, 1, col[i % 2]);
+      } else if (kind === 'sunflower') {
+        g.r(fx - 1, fy - 1, 3, 3, col[0]);
+        g.p(fx, fy, col[1]);
+      } else {
+        g.p(fx, fy, col[0]);
+        g.p(fx - 1, fy, col[0]);
+        g.p(fx + 1, fy, col[0]);
+        g.p(fx, fy - 1, kind === 'daisy' || kind === 'lily' ? col[1] : col[0]);
+        if (kind === 'rose' || kind === 'tulip') g.p(fx, fy, col[1]);
+      }
+    }
+    g.p(x, yb - 10, P.leaf);
+    g.p(x + 8, yb - 11, P.leaf);
+  }
+
+  SC['flower-shop'] = {
+    still: 4,
+    setup: function (env, R) {
+      var b = [];
+      for (var i = 0; i < 12; i++) b.push(R.pick(BLOOMS));
+      return {
+        wallStyle: R.pick([0, 1, 2]),
+        blooms: b,
+        hang: [R.ch(0.7), R.ch(0.5), R.ch(0.7)],
+        tiles: R.pick(['paper', 'accent2', 'wood', 'leaf']),
+        sign: R.pick(['flower', 'heart', 'sun', 'star']),
+        counter: R.pick(['bouquet', 'pots', 'register']),
+        floor: hp(R, env, 'floor', ['bigplant', 'basket', 'none', 'umbrella']),
+        critter: hp(R, env, 'critter', ['kitty', 'butterfly', 'none', 'bird']),
+        view: R.pick(['street', 'trees'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var i;
+      room(g, env, L, 64, { tiles: mix(P.floor, P[L.tiles], 0.55) });
+      win(g, env, 6, 6, 40, 38, t, { panes: 2, view: L.view, sill: true, curtain: P.accent2, tie: true, cw: 6 });
+      // shop sign
+      g.r(70, 3, 52, 10, P.woodD);
+      g.r(71, 4, 50, 8, P.paper);
+      motif(g, L.sign === 'flower' ? 'flower' : L.sign, 74, 5, P.accent, P.leaf);
+      textRow(g, 84, 6, 34, env.seed + 3, 0, P.ink);
+      textRow(g, 84, 9, 26, env.seed + 3, 1, P.accentD);
+      // hanging baskets
+      [60, 132, 176].forEach(function (hx0, k) {
+        if (!L.hang[k]) return;
+        g.line(hx0, 0, hx0 - 3, 12, P.paperD);
+        g.line(hx0, 0, hx0 + 3, 12, P.paperD);
+        plant(g, env, hx0, 20, 'trail', t, k + 3);
+      });
+      // three-step flower stand
+      for (var tier = 0; tier < 3; tier++) {
+        var ty = 44 + tier * 9;
+        var tx0 = 60 - tier * 6;
+        var tw = 84 + tier * 12;
+        g.r(tx0, ty, tw, 2, P.woodL);
+        g.r(tx0, ty + 2, tw, 1, P.woodD);
+        g.r(tx0 + 2, ty + 3, tw - 4, 6, mix(P.woodD, P.ink, 0.2));
+        var n = tier === 0 ? 3 : 4;
+        for (i = 0; i < n; i++) {
+          var bx = tx0 + 4 + i * fl((tw - 8) / n) + (tier === 0 ? 6 : 0);
+          bloomBucket(g, env, L.blooms[tier * 4 + i], bx, ty, tier * 4 + i + env.seed % 7, t);
+        }
+      }
+      g.r(54, 71, 4, 7, P.woodDD);
+      g.r(152, 71, 4, 7, P.woodDD);
+      // counter
+      g.r(158, 48, 34, 3, P.woodL);
+      g.r(158, 51, 34, 1, P.woodD);
+      g.r(160, 52, 32, 26, P.wood);
+      g.r(162, 54, 28, 22, P.woodD);
+      if (L.counter === 'bouquet') {
+        for (i = 0; i < 6; i++) g.r(170 - fl(i / 2), 47 - i, 3 + i, 1, P.paper);
+        g.r(170, 47, 3, 1, P.accent);
+        for (i = 0; i < 5; i++) g.p(166 + i * 2, 40 - (i % 2), [P.accent, '#ffd25a', '#ffffff', P.accent2, P.accent][i]);
+        g.p(167, 41, P.leaf);
+        g.p(173, 41, P.leaf);
+        g.r(180, 44, 6, 4, P.accent2);
+        g.r(182, 43, 2, 1, P.accent2L);
+      } else if (L.counter === 'pots') {
+        plant(g, env, 166, 48, 'succulent', t, 1);
+        plant(g, env, 178, 48, 'cactus', t, 2);
+      } else {
+        g.r(170, 40, 14, 8, P.metalD);
+        g.r(171, 41, 12, 3, P.paper);
+        g.r(172, 45, 10, 2, P.metal);
+        g.em = 1;
+        g.r(172, 42, 5, 1, '#6aff8a');
+        g.em = 0;
+      }
+      if (L.floor !== 'none') floorThing(g, env, L.floor, 30, 77, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.critter === 'bird' ? 30 : 146, L.critter === 'bird' ? 44 : 78, t, L.critter !== 'bird');
+      mascot(g, env, 8, 77, t, { sleep: false });
+    }
+  };
+
+  var CONSTELLATIONS = [
+    [[20, 10], [30, 6], [40, 9], [48, 4], [56, 12]],
+    [[120, 8], [128, 14], [136, 10], [146, 16], [140, 22], [128, 20]],
+    [[70, 6], [78, 12], [86, 8], [94, 14]],
+    [[150, 6], [160, 4], [168, 10], [160, 14], [150, 12]]
+  ];
+
+  SC.observatory = {
+    still: 9,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        dome: R.pick(['left', 'right', 'none']),
+        scope: R.pick(['paper', 'accent', 'accent2', 'metal']),
+        planet: R.pick(['ringed', 'red', 'none', 'ringed', 'twin']),
+        px: R.i(60, 150),
+        cons: [R.i(0, 3), R.i(0, 3)],
+        fore: R.pick(['blanket', 'chair', 'lantern', 'book', 'none']),
+        critter: hp(R, env, 'critter', ['owl', 'kitty', 'none', 'bunny']),
+        glow: R.ch(0.5),
+        meteor: R.i(18, 40)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var dark = env.time !== 'day';
+      g.em = 1;
+      skyBg(g, env, 0, 0, W, 62);
+      stars(g, env, 0, 0, W, 60, t);
+      stars(g, env, 7, 3, W - 14, 40, t + 17);
+      celestial(g, env, 0, 0, W, 50);
+      if (dark) {
+        for (var ci = 0; ci < 2; ci++) {
+          var cs = CONSTELLATIONS[L.cons[ci]];
+          if (ci === 1 && L.cons[1] === L.cons[0]) break;
+          for (var k = 0; k + 1 < cs.length; k++) {
+            var a = cs[k];
+            var b = cs[k + 1];
+            for (var s = 1; s < 8; s++) if (s % 2) g.b(a[0] + ((b[0] - a[0]) * s) / 8, a[1] + ((b[1] - a[1]) * s) / 8, '#aeb9ea', 0.35);
+          }
+          for (k = 0; k < cs.length; k++) {
+            g.p(cs[k][0], cs[k][1], '#fff6dc');
+            if (mod(t + k * 5, 30) < 2) halo(g, cs[k][0], cs[k][1], 0, 2, '#fff6dc', 0.7);
+          }
+        }
+        var mp = mod(t, L.meteor);
+        if (mp < 8) {
+          var mx = 40 + ((env.seed * 7) % 100) + mp * 4;
+          var my = 6 + mp * 2;
+          for (var tl = 0; tl < 6; tl++) g.b(mx - tl * 2, my - tl, WHITE, 0.9 - tl * 0.15);
+        }
+      }
+      if (L.planet !== 'none') {
+        var px = L.px;
+        if (L.planet === 'ringed') {
+          disc(g, px, 18, 4, '#e8c890');
+          g.r(px - 4, 17, 9, 1, '#d8a868');
+          g.line(px - 8, 20, px + 8, 16, '#f0e0c0');
+          g.line(px - 7, 21, px + 7, 17, '#c8b090');
+        } else if (L.planet === 'red') {
+          disc(g, px, 16, 3, '#e07a5a');
+          g.p(px - 1, 15, '#f0a080');
+          g.p(px + 1, 17, '#b85a3a');
+        } else {
+          disc(g, px, 14, 2, '#c8d8f0');
+          disc(g, px + 7, 18, 1, '#f0d8c8');
+        }
+      }
+      g.em = 0;
+      clouds(g, env, 0, 0, W, 30, t);
+      if (L.glow) {
+        for (x = 0; x < W; x++) {
+          var hb = 56 + fl(hash(fl(x / 4), 9) * 4);
+          for (y = hb; y < 62; y++) g.p(x, y, tone(env, mix(env.skyLow, '#4a536f', 0.6)));
+          if (dark && hash(x, 3) < 0.25) g.p(x, hb + 1, env.litC);
+        }
+      }
+      // hill
+      for (x = 0; x < W; x++) {
+        var hy = 60 - Math.sin((x / W) * PI) * 8 + Math.sin(x * 0.11) * 1;
+        for (y = fl(hy); y < H; y++) g.p(x, y, (x * 7 + y * 13) % 19 === 0 ? P.leafD : (y < hy + 1 ? P.leafL : P.leaf));
+      }
+      if (env.weather === 'snow') for (x = 0; x < W; x++) for (y = 70; y < H; y++) if (bay(x, y) < 0.5) g.p(x, y, '#eef3fa');
+      if (L.dome !== 'none') {
+        var dx = L.dome === 'left' ? 28 : 160;
+        g.r(dx - 16, 38, 32, 18, P.paper);
+        g.r(dx - 16, 38, 32, 1, P.paperD);
+        g.r(dx + 12, 39, 4, 17, P.paperD);
+        g.r(dx - 3, 46, 6, 10, P.woodD);
+        for (y = 0; y < 16; y++) {
+          var hw = rnd(17 * Math.sqrt(1 - Math.pow((15 - y) / 16, 2)));
+          for (x = -hw; x <= hw; x++) g.p(dx + x, 22 + y, x > hw * 0.4 ? P.metalD : (x < -hw * 0.5 ? P.metalL : P.metal));
+        }
+        g.r(dx - 2, 22, 5, 16, mix(P.ink, '#101830', 0.5));
+        g.line(dx, 30, dx + 10, 20, P.metalL);
+        g.line(dx, 31, dx + 10, 21, P.metal);
+        g.r(dx - 12, 42, 4, 4, dark ? env.litC : '#bfe0ee');
+        if (dark) g.light(dx - 10, 44, 18, [1, 0.8, 0.5], 0.4, { n: 3 });
+      }
+      // telescope on tripod
+      var sc = P[L.scope];
+      var tx = 96;
+      g.line(tx, 56, tx - 8, 74, P.ink);
+      g.line(tx, 56, tx + 8, 74, P.ink);
+      g.line(tx, 56, tx, 74, P.ink);
+      for (var r = 0; r < 4; r++) g.line(tx - 12, 58 - r + 1, tx + 12, 46 - r + 1, r === 0 ? mix(sc, P.ink, 0.3) : (r === 3 ? mix(sc, WHITE, 0.3) : sc));
+      g.r(tx + 10, 44, 3, 5, P.metalD);
+      g.r(tx - 1, 54, 3, 3, P.metalD);
+      var fx = 130;
+      if (L.fore === 'blanket') {
+        g.r(fx, 72, 28, 6, P.accent);
+        for (x = fx; x < fx + 28; x += 4) g.r(x, 72, 2, 6, P.paper);
+        cupOf(g, env, 'mug', fx + 18, 73, P.paper, t);
+      } else if (L.fore === 'chair') {
+        g.r(fx + 4, 64, 14, 4, P.accent2);
+        g.r(fx + 4, 58, 2, 8, P.accent2D);
+        g.line(fx + 5, 68, fx + 16, 76, P.metalD);
+        g.line(fx + 16, 68, fx + 5, 76, P.metalD);
+      } else if (L.fore === 'lantern') {
+        streetThing(g, env, 'lantern', fx, 76, t);
+      } else if (L.fore === 'book') {
+        g.r(fx + 2, 72, 14, 4, P.paper);
+        g.r(fx + 9, 72, 1, 4, P.paperD);
+        textRow(g, fx + 3, 73, 5, env.seed, 2, P.ink);
+        g.r(fx + 18, 74, 4, 2, P.accent);
+      }
+      if (L.critter === 'owl') {
+        var ox = L.dome === 'right' ? 20 : 172;
+        g.r(ox + 2, 58, 1, 18, P.woodDD);
+        g.r(ox, 51, 6, 7, '#8a6a4a');
+        g.p(ox + 1, 53, dark ? '#ffe08a' : P.ink);
+        g.p(ox + 4, 53, dark ? '#ffe08a' : P.ink);
+        g.p(ox + 2, 54, '#f0a23a');
+      } else if (L.critter !== 'none') {
+        critter(g, env, L.critter, 60, 74, t, false);
+      }
+      mascot(g, env, 104, 75, t, { sleep: false });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  var BLANKETS = ['plain', 'stripes', 'check', 'dots', 'quilt', 'hearts'];
+
+  SC.bedroom = {
+    still: 7,
+    setup: function (env, R) {
+      var left = R.ch(0.5);
+      return {
+        wallStyle: R.i(0, 3),
+        left: left,
+        shape: R.pick(['rect', 'arch', 'round']),
+        view: R.pick(['trees', 'city', 'hills']),
+        cur: R.pick(['accent2', 'accent', 'paper']),
+        blanket: R.pick(BLANKETS),
+        bc: R.pick(['accent', 'accent2', 'leaf', 'rug']),
+        art: [hp(R, env, 'wall', WALL_ART), hp(R, env, 'wall', ['poster', 'poster', 'photos', 'pennant', 'neon', 'mirror'])],
+        fairy: R.ch(0.55),
+        lampC: R.pick(['accent', 'accent2', 'paper']),
+        nTr: hp(R, env, 'trinket', TRINKETS),
+        floor: hp(R, env, 'floor', FLOOR_THINGS.concat(['none'])),
+        rug: R.pick(['rug', 'accent2', 'paper']),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'pup', 'none'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      room(g, env, L, 62);
+      var wx = L.left ? 14 : 142;
+      win(g, env, wx, 8, 34, 30, t, { shape: L.shape, panes: 4, view: L.view, curtain: P[L.cur], tie: true, cw: 7 });
+      if (L.fairy) stringLights(g, env, 2, t, 3, 7, ['#ffe08a', '#fff6c0']);
+      var bx = L.left ? 96 : 20;
+      // wall art over the bed and beside it
+      wallArt(g, env, L.art[0], bx + 24, 12, t, 1);
+      wallArt(g, env, L.art[1], L.left ? 62 : 110, 14, t, 2);
+      g.ell(96, 72, 56, 5, P[L.rug]);
+      g.ell(96, 72, 52, 4, mix(P[L.rug], WHITE, 0.25));
+      // bed
+      var bw = 76;
+      var hbx = L.left ? bx + bw - 4 : bx;
+      g.r(hbx, 34, 4, 32, P.woodD);
+      g.r(hbx - 1, 33, 6, 2, P.woodL);
+      g.r(bx, 52, bw, 6, P.paper);
+      g.r(bx, 58, bw, 8, P.woodD);
+      g.r(bx, 58, bw, 1, P.woodL);
+      g.r(bx + 1, 66, 3, 10, P.woodDD);
+      g.r(bx + bw - 4, 66, 3, 10, P.woodDD);
+      var pxw = L.left ? bx + bw - 20 : bx + 5;
+      g.r(pxw, 46, 15, 7, P.paper);
+      g.r(pxw, 46, 15, 1, WHITE);
+      g.r(pxw, 52, 15, 1, P.paperD);
+      // blanket
+      var bc = P[L.bc];
+      var bL = mix(bc, WHITE, 0.35);
+      var bD = mix(bc, P.ink, 0.25);
+      var b0 = L.left ? bx : bx + 22;
+      var b1 = L.left ? bx + bw - 22 : bx + bw;
+      for (y = 50; y < 64; y++) {
+        for (x = b0; x < b1; x++) {
+          var c = bc;
+          var u = x - b0;
+          var v = y - 50;
+          if (L.blanket === 'stripes') c = (fl(u / 4) & 1) ? bL : bc;
+          else if (L.blanket === 'check') c = ((fl(u / 4) + fl(v / 4)) & 1) ? bL : bc;
+          else if (L.blanket === 'dots') c = u % 5 === 2 && v % 4 === 1 ? P.paper : bc;
+          else if (L.blanket === 'quilt') c = [bc, bL, P.accent2L, bD][(fl(u / 6) + fl(v / 5) * 3) % 4];
+          else if (L.blanket === 'hearts') c = (u % 8 === 3 || u % 8 === 5) && v % 6 === 2 ? P.paper : (u % 8 === 4 && v % 6 === 3 ? P.paper : bc);
+          if (y === 50) c = bL;
+          if (y >= 62) c = bD;
+          g.p(x, y, c);
+        }
+      }
+      g.r(L.left ? b1 - 1 : b0, 50, 1, 14, bD);
+      // nightstand + lamp
+      var nx = L.left ? bx + bw + 2 : bx - 20;
+      if (nx < 2) nx = bx + bw + 2;
+      g.r(nx, 50, 18, 3, P.woodL);
+      g.r(nx + 1, 53, 16, 13, P.wood);
+      g.r(nx + 3, 56, 12, 1, P.woodD);
+      g.r(nx + 8, 58, 2, 1, P.metalL);
+      g.r(nx + 2, 66, 2, 8, P.woodDD);
+      g.r(nx + 14, 66, 2, 8, P.woodDD);
+      lamp(g, env, nx + 5, 50, { color: P[L.lampC], h: 6, r: 38 });
+      trinket(g, env, L.nTr, nx + 10, 50, t);
+      var fx = L.left ? 64 : 136;
+      if (L.floor !== 'none') floorThing(g, env, L.floor, fx, 76, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 40 : 150, 77, t, L.left);
+      mascot(g, env, L.left ? bx + 30 : bx + 36, 51, t, { flip: L.left });
+    }
+  };
+
+  var STALLS = ['fruit', 'veg', 'fish', 'bread', 'flowers', 'lanterns', 'toys', 'skewer', 'tteok'];
+
+  function goods(g, env, kind, x, y, w, t) {
+    var P = env.P;
+    var i;
+    for (i = 0; i < w; i += 7) {
+      var gx = x + i;
+      if (kind === 'fruit') {
+        var fc = ['#e8483a', '#f6a03a', '#f6d04a', '#9ad04a'][fl(i / 7) % 4];
+        g.ell(gx + 3, y - 2, 2, 2, fc);
+        g.ell(gx + 1, y - 4, 1, 1, fc);
+        g.p(gx + 2, y - 4, mix(fc, WHITE, 0.4));
+      } else if (kind === 'veg') {
+        if (fl(i / 7) % 2) {
+          g.r(gx, y - 2, 6, 2, '#f08a3a');
+          g.p(gx + 6, y - 2, '#5fb05a');
+        } else {
+          g.ell(gx + 3, y - 2, 2, 2, '#8ac860');
+          g.p(gx + 3, y - 5, '#5a9a3a');
+        }
+      } else if (kind === 'fish') {
+        g.r(gx, y - 2, 5, 2, '#a8c0d8');
+        g.p(gx + 5, y - 1, '#a8c0d8');
+        g.p(gx + 6, y - 2, '#a8c0d8');
+        g.p(gx + 1, y - 2, P.ink);
+        g.r(gx - 1, y - 1, 7, 1, '#e8f4fa');
+      } else if (kind === 'bread') {
+        pastry(g, env, fl(i / 7) % 4, gx - 1, y - 2);
+      } else if (kind === 'flowers') {
+        bloomBucket(g, env, BLOOMS[(fl(i / 7) + env.seed) % BLOOMS.length], gx - 1, y, i, t);
+      } else if (kind === 'toys') {
+        var tc = [P.accent, P.accent2, '#f6d04a'][fl(i / 7) % 3];
+        g.r(gx, y - 4, 5, 4, tc);
+        g.r(gx + 1, y - 6, 3, 2, tc);
+        g.p(gx + 1, y - 5, P.ink);
+        g.p(gx + 3, y - 5, P.ink);
+      } else if (kind === 'skewer') {
+        g.line(gx + 1, y, gx + 4, y - 7, P.woodD);
+        g.r(gx + 2, y - 5, 2, 2, '#c85a3a');
+        g.r(gx + 3, y - 7, 2, 2, '#a84a2a');
+      } else if (kind === 'tteok') {
+        g.r(gx, y - 2, 6, 2, '#e8483a');
+        g.r(gx + 1, y - 3, 1, 1, '#ff7a5a');
+        g.r(gx + 4, y - 3, 1, 1, '#ff7a5a');
+      } else {
+        g.ell(gx + 3, y - 3, 2, 3, i % 14 ? P.accent : '#f6d04a');
+        g.r(gx + 2, y - 7, 3, 1, P.ink);
+      }
+    }
+    if (kind === 'skewer' || kind === 'tteok') steam(g, x + fl(w / 2), y - 8, t, 9, x);
+  }
+
+  SC['street-market'] = {
+    still: 5,
+    outdoor: true,
+    setup: function (env, R) {
+      var st = [];
+      for (var i = 0; i < 3; i++) st.push({ k: R.pick(STALLS), c: R.pick(['accent', 'accent2', 'leaf', 'rug']) });
+      return {
+        stalls: st,
+        lanterns: R.ch(0.7),
+        crates: R.pick(['crates', 'cart', 'barrel', 'none']),
+        walkers: R.i(0, 2),
+        critter: hp(R, env, 'critter', ['pup', 'kitty', 'bird', 'none']),
+        spot: R.i(0, 2)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      skyTop(g, env, 46, t, 22);
+      distant(g, env, 0, 6, W, 42, 'street', t);
+      // cobbles
+      var cob = mix(P.paper, P.metal, 0.5);
+      for (y = 48; y < H; y++) {
+        for (x = 0; x < W; x++) {
+          var row = fl((y - 48) / 3);
+          var edge = (y - 48) % 3 === 2 || mod(x + row * 3, 7) === 0;
+          g.p(x, y, edge ? mix(cob, P.ink, 0.25) : cob);
+        }
+      }
+      if (L.lanterns) {
+        for (x = 0; x < W; x++) {
+          var sag = rnd(Math.abs(Math.sin((x / 64) * PI)) * 5);
+          g.p(x, 8 + sag, P.ink);
+          if (x % 12 === 6) {
+            g.r(x - 1, 9 + sag, 3, 4, ['#e8483a', '#f6a03a'][fl(x / 12) % 2]);
+            g.p(x, 13 + sag, '#f6d04a');
+            if (env.time !== 'day') {
+              g.em = 1;
+              g.p(x, 10 + sag, '#ffe08a');
+              g.em = 0;
+            }
+          }
+        }
+      }
+      for (var s = 0; s < 3; s++) {
+        var st = L.stalls[s];
+        var sx = 6 + s * 62;
+        var c1 = P[st.c];
+        g.r(sx + 1, 32, 1, 34, P.woodDD);
+        g.r(sx + 52, 32, 1, 34, P.woodDD);
+        awning(g, env, sx - 2, 26, 58, c1, P.paper, 5);
+        g.r(sx, 52, 54, 3, P.woodL);
+        g.r(sx, 55, 54, 10, P.woodD);
+        for (x = sx + 2; x < sx + 52; x += 6) g.r(x, 56, 1, 9, P.woodDD);
+        g.r(sx + 4, 40, 18, 7, P.woodL);
+        textRow(g, sx + 6, 43, 14, env.seed + s, s, P.ink);
+        goods(g, env, st.k, sx + 4, 52, 46, t);
+        if (env.time !== 'day') {
+          g.em = 1;
+          g.r(sx + 26, 33, 3, 2, '#fff1c2');
+          g.em = 0;
+          g.light(sx + 27, 34, 34, env.T.lamp, env.lampK * 0.8, { top: 33 });
+        }
+      }
+      // passers-by
+      for (var wk = 0; wk < L.walkers; wk++) {
+        var dir = wk ? -1 : 1;
+        var wxp = mod(wk * 90 + t * 0.6 * dir, W + 20) - 10;
+        var leg = mod(t, 4) < 2;
+        var cc = [P.accent2D, P.accentD][wk];
+        g.r(wxp, 66, 5, 7, cc);
+        g.ell(wxp + 2, 63, 2, 2, '#f0c8a0');
+        g.r(wxp, 61, 5, 1, P.ink);
+        g.r(wxp + (leg ? 0 : 1), 73, 1, 4, P.ink);
+        g.r(wxp + (leg ? 4 : 3), 73, 1, 4, P.ink);
+      }
+      if (L.crates === 'crates') {
+        g.r(160, 68, 14, 10, '#c8955a');
+        g.r(160, 68, 14, 1, '#e0b47a');
+        g.r(166, 68, 2, 10, '#a87a42');
+        goods(g, env, 'fruit', 161, 68, 12, t);
+      } else if (L.crates !== 'none') {
+        streetThing(g, env, L.crates === 'cart' ? 'cart' : 'barrel', 158, 78, t);
+      }
+      if (L.critter !== 'none') critter(g, env, L.critter, L.critter === 'bird' ? 100 : 130, L.critter === 'bird' ? 26 : 78, t, true);
+      mascot(g, env, 20 + L.spot * 62, 77, t, { sleep: false });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  SC.riverside = {
+    still: 2,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['trees', 'city', 'hills']),
+        farT: R.pick(FAR.concat(['none', 'none'])),
+        ftx: R.i(20, 170),
+        bridge: R.pick(['arch', 'truss', 'foot', 'none']),
+        boats: [R.pick(BOATS), R.pick(BOATS.concat(['none', 'none']))],
+        bank: R.pick(STREET),
+        tree: R.ch(0.7),
+        tl: R.ch(0.5),
+        critter: hp(R, env, 'critter', ['duck', 'duck', 'pup', 'none', 'bird']),
+        rod: R.ch(0.45),
+        fly: hp(R, env, 'fly', FLYERS)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      skyTop(g, env, 42, t, 24);
+      flyer(g, env, L.fly, 130, 10, t);
+      distant(g, env, 0, 14, W, 28, L.far, t);
+      if (L.farT !== 'none') farThing(g, env, L.farT, L.ftx, 40, t);
+      water(g, env, 40, 62, t, mix(env.skyMid, '#1a4a7a', 0.55), mix(env.skyLow, '#4a9ab8', 0.5));
+      g.r(0, 40, W, 1, mix(env.skyLow, WHITE, 0.25));
+      if (env.weather !== 'rain' && env.weather !== 'snow') {
+        var sx = fl(env.sunX * W);
+        g.em = 1;
+        for (var ry = 42; ry < 58; ry += 2) if (mod(ry + fl(t / 2), 4) < 3) g.r(sx - 1 + rnd(Math.sin(t * 0.4 + ry) * 2), ry, 3, 1, env.time === 'night' ? '#fff1c6' : (env.time === 'day' ? '#ffffff' : '#ffd27a'));
+        g.em = 0;
+      }
+      if (L.bridge === 'arch') {
+        var stone = mix(P.paper, P.metal, 0.5);
+        for (x = 20; x < 172; x++) {
+          var u = mod(x - 20, 38);
+          var ah = u < 5 ? 0 : rnd(Math.sqrt(Math.max(0, 1 - Math.pow((u - 21.5) / 16.5, 2))) * 13);
+          for (var y = 30; y < 52 - ah; y++) g.p(x, y, y < 32 ? mix(stone, WHITE, 0.2) : (mod(x + (y >> 1) * 3, 6) === 0 || y % 4 === 0 ? mix(stone, P.ink, 0.2) : stone));
+        }
+        g.r(18, 27, 156, 3, mix(stone, P.ink, 0.15));
+        for (x = 20; x < 172; x += 6) g.r(x, 24, 1, 3, mix(stone, P.ink, 0.25));
+        g.r(18, 24, 156, 1, mix(stone, P.ink, 0.25));
+      } else if (L.bridge === 'truss') {
+        g.r(0, 32, W, 3, P.metalD);
+        for (x = 0; x < W; x += 16) {
+          g.line(x, 32, x + 8, 20, P.accent);
+          g.line(x + 8, 20, x + 16, 32, P.accent);
+        }
+        g.r(0, 20, W, 1, P.accent);
+        g.r(40, 35, 4, 18, P.metalD);
+        g.r(148, 35, 4, 18, P.metalD);
+        if (env.time !== 'day') {
+          g.em = 1;
+          for (x = 8; x < W; x += 32) g.p(x, 31, '#ffe08a');
+          g.em = 0;
+        }
+      } else if (L.bridge === 'foot') {
+        for (x = 0; x < W; x++) g.p(x, 44 + rnd(Math.sin((x / W) * PI) * -4), P.woodD);
+        for (x = 0; x < W; x++) g.p(x, 45 + rnd(Math.sin((x / W) * PI) * -4), P.woodL);
+        for (x = 4; x < W; x += 8) {
+          var by = 44 + rnd(Math.sin((x / W) * PI) * -4);
+          g.r(x, by - 5, 1, 5, P.woodDD);
+          g.r(x, by + 1, 1, 60 - by, mix(P.woodDD, '#1a4a7a', 0.4));
+        }
+        for (x = 0; x < W; x++) g.p(x, 39 + rnd(Math.sin((x / W) * PI) * -4), P.woodDD);
+      }
+      boat(g, env, L.boats[0], mod(30 + t * 0.2, W + 40) - 20, 52, t);
+      if (L.boats[1] !== 'none') boat(g, env, L.boats[1], mod(150 - t * 0.12, W + 40) - 20, 47, t);
+      if (L.critter === 'duck') {
+        critter(g, env, 'duck', mod(100 - t * 0.15, W), 58, t, true);
+        critter(g, env, 'duck', mod(112 - t * 0.15, W), 59, t, true);
+      }
+      // near bank
+      for (x = 0; x < W; x++) {
+        var sy = 60 + rnd(Math.sin(x * 0.06) * 1.5);
+        g.p(x, sy - 1, mix(env.skyLow, WHITE, 0.35));
+        for (var yy = sy; yy < H; yy++) g.p(x, yy, yy < sy + 2 ? P.leafD : ((x * 7 + yy * 13) % 17 === 0 ? P.leafD : P.leaf));
+      }
+      if (env.weather === 'snow') for (x = 0; x < W; x++) for (yy = 64; yy < H; yy++) if (bay(x, yy) < 0.6) g.p(x, yy, '#eef3fa');
+      var path = mix(P.paper, P.woodL, 0.5);
+      g.r(0, 68, W, 5, path);
+      g.r(0, 68, W, 1, mix(path, P.ink, 0.15));
+      flowerDots(g, env, 0, 62, W, 5, 14, 4);
+      if (L.tree) tree(g, env, L.tl ? 20 : 172, 68, 10, t);
+      streetThing(g, env, L.bank, L.tl ? 150 : 30, 70, t);
+      if (L.critter !== 'duck' && L.critter !== 'none') critter(g, env, L.critter, 120, 78, t, false);
+      var mx = 92;
+      if (L.rod) {
+        g.line(mx + 12, 60, mx + 28, 46, P.woodDD);
+        g.line(mx + 28, 46, mx + 30, 56 + rnd(Math.sin(t * 0.2)), mix(WHITE, P.ink, 0.3));
+        g.p(mx + 30, 57 + rnd(Math.sin(t * 0.2)), P.accent);
+      }
+      mascot(g, env, mx, 64, t, { sleep: false });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  SC.greenhouse = {
+    still: 6,
+    setup: function (env, R) {
+      var pots = [];
+      for (var i = 0; i < 10; i++) pots.push(hp(R, env, 'plant', PLANTS2.concat(['bush', 'flower', 'cactus', 'tall'])));
+      return {
+        view: R.pick(['trees', 'hills', 'trees']),
+        pots: pots,
+        big: R.pick(['palm', 'banana', 'cactus', 'none']),
+        bigX: R.pick([96, 96, 30, 162]),
+        hang: [R.ch(0.7), R.ch(0.7), R.ch(0.5)],
+        mist: R.ch(0.5),
+        tool: R.pick(['can', 'hose', 'wheelbarrow', 'none']),
+        critter: hp(R, env, 'critter', ['butterfly', 'butterfly', 'snail', 'ladybug', 'kitty']),
+        frame: R.pick(['paper', 'metal', 'leafD'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      g.em = 1;
+      outside(g, env, 0, 0, W, 62, t, env.weather === 'snow' ? 'hills' : L.view);
+      g.em = 0;
+      // glass sheen
+      for (var k = 0; k < 60; k++) {
+        g.b(20 + k, 60 - k, WHITE, 0.08);
+        g.b(120 + k, 60 - k, WHITE, 0.08);
+      }
+      // frame: gable roof + mullions
+      var fc = P[L.frame];
+      var fD = mix(fc, P.ink, 0.3);
+      for (x = 0; x < W; x++) {
+        var ry = rnd(14 - Math.abs(x - 96) * 0.14);
+        g.r(x, ry, 1, 2, fc);
+        g.p(x, ry + 2, fD);
+      }
+      for (x = 0; x < W; x += 24) {
+        var top = rnd(14 - Math.abs(x - 96) * 0.14);
+        g.r(x, top, 2, 62 - top, fc);
+        g.r(x + 1, top + 2, 1, 60 - top, fD);
+      }
+      g.r(0, 22, W, 1, fc);
+      g.r(0, 40, W, 1, fc);
+      g.r(95, 0, 2, 62, fc);
+      g.light(96, 30, 110, env.T.win, env.winK * 1.2, { sy: 0.8 });
+      // brick floor
+      for (y = 62; y < H; y++) {
+        var row = fl((y - 62) / 3);
+        for (x = 0; x < W; x++) {
+          var edge = (y - 62) % 3 === 2 || mod(x + row * 4, 8) === 0;
+          g.p(x, y, edge ? P.floorD : mix(P.floor, '#c8704a', 0.35));
+        }
+      }
+      if (L.big !== 'none') {
+        var bx = L.bigX;
+        g.r(bx - 7, 54, 15, 10, P.pot);
+        g.r(bx - 8, 53, 17, 2, P.potL);
+        g.r(bx + 6, 55, 2, 9, P.potD);
+        if (L.big === 'palm') {
+          for (y = 22; y < 53; y++) g.p(bx + rnd(Math.sin(y * 0.2) * 1), y, y % 3 ? P.woodD : P.woodDD);
+          for (var f = 0; f < 6; f++) {
+            var a = -PI + (f / 5) * PI + Math.sin(t * 0.1 + f) * 0.05;
+            for (var s = 0; s < 14; s++) {
+              var px = bx + Math.cos(a) * s;
+              var py = 22 + Math.sin(a) * s * 0.5 + (s * s) / 28;
+              g.p(px, py, f % 2 ? P.leaf : P.leafD);
+              if (s > 3 && s % 2) g.p(px, py + 1, P.leafL);
+            }
+          }
+        } else if (L.big === 'banana') {
+          g.r(bx - 1, 30, 3, 23, P.leafD);
+          for (var lf = 0; lf < 4; lf++) {
+            var dir = lf % 2 ? 1 : -1;
+            var ly = 26 + lf * 6;
+            for (s = 0; s < 14; s++) g.r(bx + dir * s, ly - fl(s * 0.4) + fl((s * s) / 40), 1, 4 - fl(s / 5), lf % 2 ? P.leaf : P.leafL);
+          }
+        } else {
+          g.r(bx - 2, 24, 5, 29, P.leaf);
+          g.r(bx + 2, 24, 1, 29, P.leafD);
+          g.r(bx - 8, 34, 6, 3, P.leaf);
+          g.r(bx - 8, 28, 3, 6, P.leaf);
+          g.r(bx + 3, 38, 5, 3, P.leafD);
+          g.r(bx + 6, 31, 3, 7, P.leafD);
+          g.p(bx, 23, '#ff8fb0');
+        }
+      }
+      // plant benches
+      [[4, 70], [118, 70]].forEach(function (bn, bi) {
+        var b0 = bn[0];
+        var bw = bn[1];
+        g.r(b0, 48, bw, 2, P.woodL);
+        g.r(b0, 50, bw, 1, P.woodD);
+        g.r(b0 + 2, 51, 2, 24, P.woodDD);
+        g.r(b0 + bw - 4, 51, 2, 24, P.woodDD);
+        g.r(b0 + 2, 64, bw - 4, 1, P.woodD);
+        for (var i = 0; i < 5; i++) {
+          var px0 = b0 + 7 + i * 14;
+          if (Math.abs(px0 - L.bigX) < 10 && L.big !== 'none') continue;
+          plant(g, env, px0, 48, L.pots[bi * 5 + i], t, i + bi * 5);
+        }
+      });
+      [40, 150, 72].forEach(function (hx0, k) {
+        if (!L.hang[k]) return;
+        var ty = rnd(14 - Math.abs(hx0 - 96) * 0.14) + 2;
+        g.line(hx0, ty, hx0 - 3, ty + 8, P.paperD);
+        g.line(hx0, ty, hx0 + 3, ty + 8, P.paperD);
+        plant(g, env, hx0, ty + 16, 'trail', t, k + 9);
+      });
+      if (L.mist) {
+        g.r(0, 6, W, 1, P.metalD);
+        for (var m = 0; m < 4; m++) {
+          var nx = 24 + m * 48;
+          g.r(nx, 7, 1, 2, P.metalD);
+          if (mod(t + m * 7, 40) < 14) {
+            for (var d = 0; d < 10; d++) g.b(nx + rnd((hash(d, m) - 0.5) * 10), 9 + mod(d * 3 + t, 12), WHITE, 0.35);
+          }
+        }
+      }
+      if (L.tool === 'can') {
+        g.r(70, 70, 10, 7, P.accent2);
+        g.r(70, 70, 10, 1, P.accent2L);
+        g.line(80, 72, 85, 67, P.accent2D);
+        g.line(71, 69, 75, 66, P.accent2D);
+        g.line(75, 66, 79, 69, P.accent2D);
+      } else if (L.tool === 'hose') {
+        for (var hh = 0; hh < 18; hh++) {
+          var a2 = (hh / 18) * 2 * PI;
+          g.p(78 + rnd(Math.cos(a2) * 7), 72 + rnd(Math.sin(a2) * 3), '#4a9a5a');
+          g.p(78 + rnd(Math.cos(a2) * 5), 72 + rnd(Math.sin(a2) * 2), '#3a8a4a');
+        }
+      } else if (L.tool === 'wheelbarrow') {
+        g.r(64, 66, 18, 6, P.accent);
+        g.r(64, 66, 18, 1, P.accentL);
+        g.ell(68, 75, 2, 2, P.ink);
+        g.line(82, 68, 90, 72, P.woodD);
+        g.ell(73, 65, 6, 2, '#6a4a32');
+      }
+      critter(g, env, L.critter, L.critter === 'butterfly' ? 50 : 30, L.critter === 'butterfly' ? 34 : 48, t, false);
+      if (L.critter === 'butterfly') critter(g, env, 'butterfly', 140, 30, t + 13, false);
+      mascot(g, env, 100, 78, t, { sleep: false });
+    }
+  };
+
+  // ---- extra slots for the first 14 scenes (D-129)
+  //
+  // 원래 그림의 빈자리에만 그린다. 칸마다 'none'이 섞여 있어 예전 그림 그대로인 배치도 남는다.
+
+  function opt(R, arr, none) {
+    return R.ch(none) ? 'none' : R.pick(arr);
+  }
+  function addMore(key, extra, more) {
+    SC[key].extra = extra;
+    SC[key].more = more;
+  }
+  // ph 0은 뒤쪽(먼 풍경), 1은 앞쪽 소품. 장면이 그리는 순서 중간에 끼워 넣는다
+  function moreOf(g, env, L, t, key, ph) {
+    if (L.x) SC[key].more(g, env, L.x, t, L, ph || 1);
+  }
+  var SMALL_ART = ['poster', 'calendar', 'clock', 'pennant', 'neon', 'mirror'];
+  var SAND = ['castle', 'ball', 'bucket', 'crab', 'shells', 'none'];
+
+  addMore(
+    'study',
+    function (env, R) {
+      return { under: hopt(R, env, 'floor', ['basket', 'books', 'catbed', 'pouf', 'bag', 'boxes'], 0.3), critter: hopt(R, env, 'critter', ['kitty', 'mouse', 'snail'], 0.6), desk: hopt(R, env, 'trinket', TRINKETS, 0.35), plant: hopt(R, env, 'plant', PLANTS2.concat(['flower', 'cactus']), 0.5) };
+    },
+    function (g, env, X, t, L) {
+      if (X.under !== 'none') floorThing(g, env, X.under, 40, 78, t);
+      if (X.critter !== 'none') critter(g, env, X.critter, 80, 78, t, false);
+      if (X.desk !== 'none' && L.spot !== 'desk') trinket(g, env, X.desk, 6, 51, t);
+      if (X.plant !== 'none') plant(g, env, 106, 79, X.plant, t, 3);
+    }
+  );
+
+  addMore(
+    'desk',
+    function (env, R) {
+      return { wall: hopt(R, env, 'wall', ['poster', 'calendar', 'cork', 'photos', 'neon', 'mirror', 'pennant'], 0.3), desk: hopt(R, env, 'trinket', TRINKETS, 0.3), under: hopt(R, env, 'floor', ['bag', 'basket', 'boxes', 'catbed', 'books', 'skate'], 0.4), critter: hopt(R, env, 'critter', ['kitty', 'mouse'], 0.7) };
+    },
+    function (g, env, X, t) {
+      if (X.wall !== 'none') wallArt(g, env, X.wall, 127, 24, t, 11);
+      if (X.desk !== 'none') trinket(g, env, X.desk, 148, 53, t);
+      if (X.under !== 'none') floorThing(g, env, X.under, 118, 79, t);
+      if (X.critter !== 'none') critter(g, env, X.critter, 54, 79, t, false);
+    }
+  );
+
+  addMore(
+    'kitchen',
+    function (env, R) {
+      return { a: hopt(R, env, 'trinket', ['fruit', 'vase', 'succulent', 'radio', 'alarm', 'candle'], 0.3), b: hopt(R, env, 'cup', CUPS, 0.35), wall: hopt(R, env, 'wall', ['calendar', 'clock', 'poster', 'herbs'], 0.35) };
+    },
+    function (g, env, X, t) {
+      if (X.a !== 'none') trinket(g, env, X.a, 108, 51, t);
+      if (X.b !== 'none') cupOf(g, env, X.b, 124, 51, env.P.paper, t);
+      if (X.wall === 'herbs') {
+        g.r(176, 4, 14, 1, env.P.woodD);
+        for (var i = 0; i < 3; i++) {
+          g.line(178 + i * 5, 5, 178 + i * 5, 9, env.P.paperD);
+          g.ell(178 + i * 5, 12, 2, 3, i % 2 ? env.P.leaf : env.P.leafD);
+        }
+      } else if (X.wall !== 'none') wallArt(g, env, X.wall, 176, 6, t, 12);
+    }
+  );
+
+  addMore(
+    'cafe',
+    function (env, R) {
+      return { sill: hopt(R, env, 'trinket', ['succulent', 'vase', 'candle', 'figure', 'books', 'frame'], 0.3), sill2: hopt(R, env, 'plant', PLANTS2, 0.5), critter: hopt(R, env, 'critter', ['kitty', 'pup', 'bird'], 0.55) };
+    },
+    function (g, env, X, t, L) {
+      if (X.sill !== 'none') trinket(g, env, X.sill, 66, 49, t);
+      if (X.sill2 !== 'none' && L.spot !== 'sill') plant(g, env, 112, 49, X.sill2, t, 4);
+      if (X.critter !== 'none') critter(g, env, X.critter, 112, 78, t, true);
+    }
+  );
+
+  addMore(
+    'sky',
+    function (env, R) {
+      return { fly: hopt(R, env, 'fly', ['kite', 'blimp', 'lanterns', 'flock', 'balloon'], 0.3), fx: R.i(90, 130) };
+    },
+    function (g, env, X, t) {
+      if (X.fly !== 'none') flyer(g, env, X.fly, X.fx, 12, t);
+    }
+  );
+
+  addMore(
+    'stage',
+    function (env, R) {
+      return { poster: hopt(R, env, 'wall', ['poster', 'neon', 'banner'], 0.35), crowd: opt(R, ['heads', 'sticks'], 0.4), disco: R.ch(0.4) };
+    },
+    function (g, env, X, t) {
+      var P = env.P;
+      if (X.poster !== 'none') wallArt(g, env, X.poster, 38, 6, t, 13);
+      if (X.disco) {
+        g.r(112, 0, 1, 6, P.ink);
+        disc(g, 112, 9, 3, P.metal);
+        g.em = 1;
+        for (var i = 0; i < 4; i++) {
+          var sx = 110 + ((i * 2 + fl(t / 2)) % 5);
+          var sy = 7 + ((i * 3 + fl(t / 2)) % 5);
+          g.p(sx, sy, WHITE);
+        }
+        for (i = 0; i < 6; i++) g.p(mod(i * 33 + t * 3, W), 14 + mod(i * 13 + t, 40), mix(WHITE, P.accent2, 0.3));
+        g.em = 0;
+      }
+      if (X.crowd !== 'none') {
+        for (var x = 4; x < W; x += 9) {
+          var bob = mod(t + x, 4) < 2 ? 0 : 1;
+          var hc = mix(P.ink, '#101018', 0.4);
+          g.ell(x + 3, 77 + bob, 3, 3, hc);
+          g.r(x, 79, 7, 1, hc);
+          if (X.crowd === 'sticks' && x % 27 === 4) {
+            g.em = 1;
+            g.r(x + 5, 69 + bob, 1, 6, hc);
+            g.p(x + 5, 68 + bob, mod(t + x, 6) < 3 ? '#fff6a0' : P.accent2L);
+            g.em = 0;
+          }
+        }
+      }
+    }
+  );
+
+  addMore(
+    'photo',
+    function (env, R) {
+      return { boat: opt(R, ['row', 'swan', 'kayak', 'sail'], 0.4), bx: R.i(30, 110), shore: opt(R, ['picnic', 'tent', 'sign', 'bench'], 0.4), fly: hopt(R, env, 'fly', ['balloon', 'flock', 'kite'], 0.6) };
+    },
+    function (g, env, X, t) {
+      var P = env.P;
+      if (X.fly !== 'none') flyer(g, env, X.fly, 60, 10, t);
+      if (X.boat !== 'none') boat(g, env, X.boat, X.bx, 58, t);
+      if (X.shore === 'picnic') {
+        g.r(36, 72, 22, 5, P.accent);
+        for (var x = 36; x < 58; x += 4) g.r(x, 72, 2, 5, P.paper);
+        floorThing(g, env, 'basket', 44, 73, t);
+      } else if (X.shore === 'tent') {
+        for (var y = 0; y < 10; y++) g.r(48 - y, 66 + y, y * 2 + 1, 1, y < 1 ? P.accent2L : P.accent2);
+        g.r(47, 71, 3, 5, mix(P.accent2, P.ink, 0.4));
+      } else if (X.shore !== 'none') streetThing(g, env, X.shore, 40, 76, t);
+    }
+  );
+
+  addMore(
+    'game',
+    function (env, R) {
+      return { floor: hopt(R, env, 'floor', ['catbed', 'pouf', 'boxes', 'books', 'skate', 'bag'], 0.35), wall: hopt(R, env, 'wall', ['shelf', 'pennant', 'clock', 'photos', 'neon', 'calendar'], 0.35), snack: hopt(R, env, 'cup', ['iced', 'bottle', 'glass'], 0.5) };
+    },
+    function (g, env, X, t) {
+      if (X.wall !== 'none') wallArt(g, env, X.wall, 128, 10, t, 14);
+      if (X.floor !== 'none') floorThing(g, env, X.floor, 140, 74, t);
+      if (X.snack !== 'none') cupOf(g, env, X.snack, 50, 70, env.P.accent, t);
+    }
+  );
+
+  addMore(
+    'park',
+    function (env, R) {
+      return { critter: hopt(R, env, 'critter', ['pup', 'squirrel', 'bunny', 'duck', 'hedgehog'], 0.35), street: opt(R, ['mailbox', 'hydrant', 'bike', 'sign', 'barrel', 'bin'], 0.4), far: opt(R, ['windmill', 'church', 'tower', 'house'], 0.6), fx: R.i(40, 150), fly: hopt(R, env, 'fly', ['kite', 'balloon', 'flock'], 0.6) };
+    },
+    function (g, env, X, t, L, ph) {
+      if (ph === 0) {
+        if (X.far !== 'none') farThing(g, env, X.far, X.fx, 46, t);
+        return;
+      }
+      if (X.fly !== 'none') flyer(g, env, X.fly, 70, 12, t);
+      if (X.street !== 'none') streetThing(g, env, X.street, 42, 64, t);
+      if (X.critter !== 'none') critter(g, env, X.critter, 60, 76, t, false);
+    }
+  );
+
+  addMore(
+    'bakery',
+    function (env, R) {
+      return { wall: hopt(R, env, 'wall', ['clock', 'calendar', 'plates', 'wreath', 'poster'], 0.3), end: hopt(R, env, 'trinket', ['vase', 'teapot', 'candle', 'fruit'], 0.4) };
+    },
+    function (g, env, X, t) {
+      if (X.wall !== 'none') wallArt(g, env, X.wall, 112, 10, t, 15);
+      if (X.end === 'teapot') cupOf(g, env, 'teapot', 178, 52, env.P.accent2, t);
+      else if (X.end !== 'none') trinket(g, env, X.end, 179, 52, t);
+    }
+  );
+
+  addMore(
+    'sea',
+    function (env, R) {
+      return { sand: R.pick(SAND), boat: opt(R, ['ferry', 'yacht', 'fishing', 'kayak'], 0.45), far: opt(R, ['lighthouse', 'turbines'], 0.6), sx: R.i(20, 110) };
+    },
+    function (g, env, X, t, L, ph) {
+      var P = env.P;
+      if (ph === 0) {
+        if (X.far === 'lighthouse') farThing(g, env, 'lighthouse', 12, 41, t);
+        else if (X.far !== 'none') farThing(g, env, X.far, 40, 41, t);
+        if (X.boat !== 'none') boat(g, env, X.boat, mod(130 - t * 0.1, W + 40) - 20, 41, t);
+        return;
+      }
+      var sx = X.sx;
+      if (X.sand === 'castle') {
+        g.r(sx, 70, 14, 6, '#e0c088');
+        g.r(sx + 1, 66, 4, 4, '#e0c088');
+        g.r(sx + 9, 66, 4, 4, '#e0c088');
+        g.r(sx + 5, 64, 4, 6, '#d8b878');
+        g.r(sx + 6, 60, 1, 4, P.ink);
+        g.r(sx + 7, 60, 3, 2, P.accent);
+      } else if (X.sand === 'ball') {
+        disc(g, sx + 4, 72, 3, P.paper);
+        g.r(sx + 1, 71, 7, 2, P.accent);
+        g.r(sx + 3, 69, 2, 7, P.accent2);
+      } else if (X.sand === 'bucket') {
+        g.r(sx, 70, 7, 6, P.accent2);
+        g.r(sx - 1, 69, 9, 1, P.accent2L);
+        g.line(sx + 9, 76, sx + 14, 66, P.accent);
+        g.r(sx + 8, 74, 4, 2, P.accent);
+      } else if (X.sand === 'crab') {
+        var cx = sx + rnd(Math.sin(t * 0.1) * 6);
+        g.r(cx, 73, 6, 3, '#e8583a');
+        g.p(cx - 1, 72, '#e8583a');
+        g.p(cx + 6, 72, '#e8583a');
+        g.p(cx + 1, 72, P.ink);
+        g.p(cx + 4, 72, P.ink);
+        g.p(cx, 76, '#c8382a');
+        g.p(cx + 5, 76, '#c8382a');
+      } else if (X.sand === 'shells') {
+        for (var i = 0; i < 4; i++) {
+          g.p(sx + i * 6, 72 + (i % 2) * 3, '#f6d0c0');
+          g.p(sx + i * 6 + 1, 72 + (i % 2) * 3, '#e8b0a0');
+        }
+      }
+    }
+  );
+
+  addMore(
+    'snowfield',
+    function (env, R) {
+      return { sled: opt(R, ['sled', 'skis'], 0.45), cabin: R.ch(0.45), critter: hopt(R, env, 'critter', ['bunny', 'bird'], 0.5) };
+    },
+    function (g, env, X, t, L, ph) {
+      var P = env.P;
+      if (ph === 0) {
+        if (X.cabin) farThing(g, env, 'house', 160, 44, t);
+        return;
+      }
+      if (X.sled === 'sled') {
+        g.r(150, 72, 16, 3, P.accent);
+        g.r(150, 72, 16, 1, P.accentL);
+        g.r(148, 76, 20, 1, P.metalD);
+        g.p(167, 75, P.metalD);
+        g.r(152, 75, 1, 1, P.metalD);
+        g.r(163, 75, 1, 1, P.metalD);
+      } else if (X.sled === 'skis') {
+        g.line(172, 77, 180, 58, P.accent2);
+        g.line(175, 77, 183, 58, P.accent2);
+        g.line(168, 66, 188, 62, P.metalD);
+      }
+      if (X.critter !== 'none') critter(g, env, X.critter, 64, 77, t, false);
+    }
+  );
+
+  addMore(
+    'garden',
+    function (env, R) {
+      return { wall: hopt(R, env, 'wall', ['wreath', 'mirror', 'photos', 'clock', 'calendar', 'poster'], 0.3), shelf: R.ch(0.5), critter: hopt(R, env, 'critter', ['kitty', 'snail', 'ladybug', 'bird'], 0.45) };
+    },
+    function (g, env, X, t) {
+      if (X.wall !== 'none') wallArt(g, env, X.wall, 166, 14, t, 16);
+      if (X.shelf) wallArt(g, env, 'shelf', 8, 32, t, 17);
+      if (X.critter === 'bird') critter(g, env, 'bird', 120, 50, t, true);
+      else if (X.critter !== 'none') critter(g, env, X.critter, 140, 79, t, true);
+    }
+  );
+
+  addMore(
+    'night-city',
+    function (env, R) {
+      return { item: opt(R, ['bench', 'bike', 'barrel', 'vending'], 0.4), critter: hopt(R, env, 'critter', ['kitty', 'bird'], 0.5), fly: hopt(R, env, 'fly', ['plane', 'lanterns', 'blimp'], 0.5) };
+    },
+    function (g, env, X, t) {
+      if (X.fly !== 'none') flyer(g, env, X.fly, 120, 14, t);
+      if (X.item !== 'none') streetThing(g, env, X.item, 70, 71, t);
+      if (X.critter !== 'none') critter(g, env, X.critter, 132, 71, t, true);
+    }
+  );
 
   // ---------------------------------------------------------------- API
 
@@ -3161,13 +6781,13 @@
   function specFor(seedString) {
     var seed = hashStr(String(seedString == null ? '' : seedString));
     var R = makeRand(seed);
-    var scene = R.pick(SCENES);
+    var scene = R.pick(LEGACY_SCENES);
     var time = R.pick(['day', 'day', 'sunset', 'night', 'night', 'dawn']);
     var weather;
     if (scene === 'cafe' && R.ch(0.5)) weather = 'rain';
     else if (scene === 'snowfield') weather = R.ch(0.7) ? 'snow' : 'clear';
     else weather = R.pick(['clear', 'clear', 'clear', 'cloudy', 'rain', 'snow', 'petals', 'leaves']);
-    var spec = { scene: scene, time: time, weather: weather, palette: R.pick(PALETTES), seed: seed };
+    var spec = { scene: scene, time: time, weather: weather, palette: R.pick(LEGACY_PALETTES), seed: seed };
     if (R.ch(0.7)) spec.mascot = R.pick(ANIMALS);
     return spec;
   }
@@ -3188,6 +6808,7 @@
       seed: seed
     };
     if (MASCOT_KEYS.indexOf(spec.mascot) >= 0) out.mascot = spec.mascot;
+    if (PROPS.indexOf(spec.prop) >= 0) out.prop = spec.prop;
     return out;
   }
 
@@ -3199,6 +6820,8 @@
     var env = new Env(spec);
     var scene = SC[spec.scene];
     var L = scene.setup(env, makeRand((spec.seed ^ 0x9e3779b9) >>> 0));
+    // 원래 장면에 덧붙인 소품 칸. setup과 다른 난수라 예전 배치는 그대로다 (D-129)
+    if (scene.extra) L.x = scene.extra(env, xr(env, 7));
     var g = new Gfx();
     var off = document.createElement('canvas');
     off.width = W;
@@ -3302,13 +6925,13 @@
     return handle;
   }
 
-  // 서버가 저장한 값(study.night.rain.mint.4821)을 spec으로 바꾼다. 값이 없으면 fallbackSeed(블로그 주소)로 정한다.
+  // 서버가 저장한 값(study.night.rain.mint.4821, 소품 주제가 있으면 끝에 .cat처럼 한 칸 더)을 spec으로 바꾼다. 값이 없으면 fallbackSeed(블로그 주소)로 정한다.
   // mascot은 블로그 마스코트 값(cat.mint.beret.heart)이고 바탕이 동물이면 장면 안에 그린다
   function fromValue(value, fallbackSeed, mascot) {
     var spec;
     var p = typeof value === 'string' ? value.split('.') : [];
     if (SCENES.indexOf(p[0]) >= 0) {
-      spec = normalize({ scene: p[0], time: p[1], weather: p[2], palette: p[3], seed: Number(p[4]) || 0 });
+      spec = normalize({ scene: p[0], time: p[1], weather: p[2], palette: p[3], seed: Number(p[4]) || 0, prop: p[5] });
     } else {
       spec = normalize({ seed: String(fallbackSeed || '') });
       delete spec.mascot;
@@ -3326,6 +6949,7 @@
     WEATHERS: WEATHERS.slice(),
     PALETTES: PALETTES.slice(),
     MASCOTS: MASCOT_KEYS.slice(),
+    PROPS: PROPS.slice(),
     label: function (kind, key) {
       var m = LABELS[kind];
       return (m && m[key]) || '';

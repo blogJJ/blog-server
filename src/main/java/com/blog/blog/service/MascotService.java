@@ -141,7 +141,10 @@ public class MascotService {
     }
   }
 
-  /** 단어 사전으로 바탕을 고르고 색·모자·장식과 장면의 시간·날씨·색은 이름과 태그로 정한다. 장면은 바탕 그림에 맞춘다. */
+  /**
+   * 단어 사전으로 바탕을 고르고 색·모자·장식과 장면의 시간·날씨·색은 이름과 태그로 정한다. 장면과 소품 주제는 태그 단어 사전(KeywordScenePicker)으로 먼저
+   * 고르고, 맞는 단어가 없으면 바탕 그림과 어울리는 장면 몇 개 중 하나를 이름·태그로 고른다 (D-129).
+   */
   static ClaudeMascotClient.Art fallback(String name, List<String> tags) {
     int seed = (name == null ? "" : name).hashCode() * 31 + tags.hashCode();
     Mascot base = KeywordMascotPicker.pick(name, tags);
@@ -152,31 +155,67 @@ public class MascotService {
     return new ClaudeMascotClient.Art(
         MascotDesign.ofVariant(base, seed),
         new CoverScene(
-            sceneFor(base),
+            KeywordScenePicker.scene(name, tags).orElseGet(() -> sceneFor(base, h / 512)),
             times[h % times.length],
             // 날씨는 절반쯤 맑게
             h / 4 % 2 == 0 ? CoverScene.Weather.CLEAR : weathers[h / 8 % weathers.length],
             palettes[h / 64 % palettes.length],
-            0));
+            0,
+            KeywordScenePicker.prop(name, tags).orElse(null)));
   }
 
-  static CoverScene.Scene sceneFor(Mascot base) {
+  /** 바탕 그림과 어울리는 장면들. 첫째가 원래(D-119) 장면이고, 나머지는 D-129에서 더한 장면이다. */
+  static List<CoverScene.Scene> scenesFor(Mascot base) {
     return switch (base) {
-      case COMPUTER -> CoverScene.Scene.DESK;
-      case CAMERA -> CoverScene.Scene.PHOTO;
-      case BOOK, OWL -> CoverScene.Scene.STUDY;
-      case PLANE -> CoverScene.Scene.SEA;
-      case HEADPHONES, FROG -> CoverScene.Scene.STAGE;
-      case GAMEPAD -> CoverScene.Scene.GAME;
-      case COFFEE -> CoverScene.Scene.CAFE;
-      case CAKE -> CoverScene.Scene.BAKERY;
-      case BEAR -> CoverScene.Scene.KITCHEN;
-      case PENGUIN -> CoverScene.Scene.SNOWFIELD;
-      case BIRD -> CoverScene.Scene.SKY;
-      case DOG, FOX -> CoverScene.Scene.PARK;
-      case CAT, RABBIT -> CoverScene.Scene.GARDEN;
-      case HAMSTER -> CoverScene.Scene.NIGHT_CITY;
+      case COMPUTER -> List.of(CoverScene.Scene.DESK, CoverScene.Scene.WORKSHOP);
+      case CAMERA ->
+          List.of(CoverScene.Scene.PHOTO, CoverScene.Scene.MOUNTAIN, CoverScene.Scene.RIVERSIDE);
+      case BOOK -> List.of(CoverScene.Scene.STUDY, CoverScene.Scene.LIBRARY);
+      case OWL ->
+          List.of(CoverScene.Scene.STUDY, CoverScene.Scene.LIBRARY, CoverScene.Scene.OBSERVATORY);
+      case PLANE -> List.of(CoverScene.Scene.SEA, CoverScene.Scene.SKY, CoverScene.Scene.TRAIN);
+      case HEADPHONES -> List.of(CoverScene.Scene.STAGE, CoverScene.Scene.BEDROOM);
+      case FROG ->
+          List.of(CoverScene.Scene.STAGE, CoverScene.Scene.GREENHOUSE, CoverScene.Scene.RIVERSIDE);
+      case GAMEPAD -> List.of(CoverScene.Scene.GAME, CoverScene.Scene.BEDROOM);
+      case COFFEE -> List.of(CoverScene.Scene.CAFE, CoverScene.Scene.STREET_MARKET);
+      case CAKE -> List.of(CoverScene.Scene.BAKERY, CoverScene.Scene.KITCHEN);
+      case BEAR ->
+          List.of(
+              CoverScene.Scene.KITCHEN, CoverScene.Scene.CAMPSITE, CoverScene.Scene.STREET_MARKET);
+      case PENGUIN ->
+          List.of(CoverScene.Scene.SNOWFIELD, CoverScene.Scene.AQUARIUM, CoverScene.Scene.MOUNTAIN);
+      case BIRD ->
+          List.of(
+              CoverScene.Scene.SKY,
+              CoverScene.Scene.MOUNTAIN,
+              CoverScene.Scene.CAMPSITE,
+              CoverScene.Scene.TRAIN);
+      case DOG ->
+          List.of(CoverScene.Scene.PARK, CoverScene.Scene.RIVERSIDE, CoverScene.Scene.ROOFTOP);
+      case FOX ->
+          List.of(CoverScene.Scene.PARK, CoverScene.Scene.ATELIER, CoverScene.Scene.CAMPSITE);
+      case CAT ->
+          List.of(
+              CoverScene.Scene.GARDEN,
+              CoverScene.Scene.BEDROOM,
+              CoverScene.Scene.FLOWER_SHOP,
+              CoverScene.Scene.ROOFTOP);
+      case RABBIT ->
+          List.of(
+              CoverScene.Scene.GARDEN, CoverScene.Scene.FLOWER_SHOP, CoverScene.Scene.GREENHOUSE);
+      case HAMSTER ->
+          List.of(
+              CoverScene.Scene.NIGHT_CITY,
+              CoverScene.Scene.STREET_MARKET,
+              CoverScene.Scene.WORKSHOP);
     };
+  }
+
+  /** 바탕 그림에 어울리는 장면 중 하나. 같은 바탕이라도 이름·태그에 따라 다른 장면이 나온다. */
+  static CoverScene.Scene sceneFor(Mascot base, int h) {
+    List<CoverScene.Scene> scenes = scenesFor(base);
+    return scenes.get(Math.floorMod(h, scenes.size()));
   }
 
   /** 배치 번호를 새로 뽑는다. 지금 장면과 같은 번호는 피한다. */
@@ -185,7 +224,7 @@ public class MascotService {
     do {
       seed = ThreadLocalRandom.current().nextInt(CoverScene.SEEDS);
     } while (current != null && current.seed() == seed);
-    return new CoverScene(chosen.scene(), chosen.time(), chosen.weather(), chosen.palette(), seed);
+    return chosen.withSeed(seed);
   }
 
   /** 쓰고 있는 조합이면 같은 바탕 안에서 비어 있는 조합으로 바꾼다. 모두 차 있으면 원래 조합을 그대로 쓴다. */

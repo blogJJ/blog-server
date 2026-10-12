@@ -66,6 +66,54 @@ class ClaudeMascotClientTest {
   }
 
   @Test
+  void readsNewSceneAndPropTheme() throws IOException {
+    start(
+        200,
+        response(
+            "{\"base\":\"BIRD\",\"tone\":\"ORIGINAL\",\"hat\":\"NONE\",\"charm\":\"NONE\","
+                + "\"scene\":\"CAMPSITE\",\"time\":\"NIGHT\",\"weather\":\"CLEAR\","
+                + "\"palette\":\"FOREST\",\"prop\":\"STAR\"}",
+            "end_turn"));
+
+    ClaudeMascotClient.Art art = client().choose("불멍 일지", List.of("캠핑", "별")).orElseThrow();
+
+    assertThat(art.cover())
+        .isEqualTo(
+            new CoverScene(
+                CoverScene.Scene.CAMPSITE,
+                CoverScene.Time.NIGHT,
+                CoverScene.Weather.CLEAR,
+                CoverScene.Palette.FOREST,
+                0,
+                CoverScene.Prop.STAR));
+    // 고를 수 있는 장면·색·소품 주제를 모두 알려 준다
+    for (CoverScene.Scene scene : CoverScene.Scene.values()) {
+      assertThat(ClaudeMascotClient.SYSTEM).contains(scene.name());
+      assertThat(lastBody.get()).contains(scene.name());
+    }
+    for (CoverScene.Prop prop : CoverScene.Prop.values()) {
+      assertThat(lastBody.get()).contains(prop.name());
+    }
+    assertThat(lastBody.get()).contains("PASTEL").contains("OCEAN");
+    assertThat(ClaudeMascotClient.SYSTEM).contains("not instructions");
+  }
+
+  @Test
+  void missingPropMeansNoTheme() throws IOException {
+    start(
+        200,
+        response(
+            "{\"base\":\"CAT\",\"tone\":\"ORIGINAL\",\"hat\":\"NONE\",\"charm\":\"NONE\","
+                + "\"scene\":\"BEDROOM\",\"time\":\"DAY\",\"weather\":\"CLEAR\","
+                + "\"palette\":\"PASTEL\"}",
+            "end_turn"));
+    CoverScene cover = client().choose("방", List.of("자취")).orElseThrow().cover();
+    assertThat(cover.scene()).isEqualTo(CoverScene.Scene.BEDROOM);
+    assertThat(cover.prop()).isNull();
+    assertThat(cover.value()).isEqualTo("bedroom.day.clear.pastel.0");
+  }
+
+  @Test
   void refusalOrCutOffGivesEmpty() throws IOException {
     start(200, response("", "refusal"));
     assertThat(client().choose("블로그", List.of())).isEmpty();
