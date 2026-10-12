@@ -30,7 +30,8 @@ public class User extends BaseTimeEntity {
   @Column(length = 100, unique = true)
   private String email;
 
-  @Column(name = "password_hash", nullable = false, length = 100)
+  /** bcrypt 해시. 소셜 로그인으로만 가입했으면 NULL (D-128) */
+  @Column(name = "password_hash", length = 100)
   private String passwordHash;
 
   /** 바꿀 수 없음. 탈퇴 30일 뒤 NULL. */
@@ -84,7 +85,12 @@ public class User extends BaseTimeEntity {
 
   protected User() {}
 
-  /** 가입 완료 때 만든다. 약관·개인정보 동의 시각은 가입 시각으로 같다 (USR-01). */
+  /**
+   * 가입 완료 때 만든다. 약관·개인정보 동의 시각은 가입 시각으로 같다 (USR-01).
+   *
+   * @param passwordHash 소셜 로그인으로 가입하면 null (D-128)
+   * @param phone 소셜 로그인으로 가입하면 null (D-128)
+   */
   public User(
       String email,
       String passwordHash,
@@ -108,6 +114,11 @@ public class User extends BaseTimeEntity {
 
   public boolean isActive() {
     return status == UserStatus.ACTIVE;
+  }
+
+  /** 비밀번호로 로그인할 수 있는지. 소셜 로그인으로만 가입했으면 false (D-128) */
+  public boolean hasPassword() {
+    return passwordHash != null && !passwordHash.isEmpty();
   }
 
   public boolean isAdmin() {

@@ -1,11 +1,13 @@
 /*
  * 회원 탈퇴 (T094, USR-05, D-05, D-15, D-18). 블로그장인 운영 중·폐쇄 예정 블로그가 있으면 그 목록과 위임·폐쇄 방법을 보여 주고,
  * 없으면 비밀번호를 다시 확인해 탈퇴한다. 막는 규칙은 서버가 다시 확인한다.
+ * 소셜 로그인으로만 가입해 비밀번호가 없으면 비밀번호 칸을 숨기고 확인 체크와 되묻기만 한다 (T157, D-128).
  */
 (function () {
   'use strict';
 
   var STATUS = { ACTIVE: '운영 중', CLOSING: '폐쇄 예정' };
+  var hasPassword = true;
 
   function $(id) {
     return document.getElementById(id);
@@ -40,6 +42,9 @@
 
   async function check() {
     try {
+      var me = await Api.get('/api/me');
+      hasPassword = me.hasPassword !== false;
+      $('password-field').hidden = !hasPassword;
       var res = await Api.get('/api/me/withdraw');
       $('withdraw').hidden = false;
       $('blocked').hidden = res.allowed;
@@ -58,8 +63,8 @@
     event.preventDefault();
     var message = $('message');
     message.textContent = '';
-    var password = $('password').value;
-    if (!password) {
+    var password = hasPassword ? $('password').value : null;
+    if (hasPassword && !password) {
       message.textContent = '비밀번호를 입력해 주세요.';
       return;
     }

@@ -31,6 +31,14 @@ public enum ErrorCode {
   EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "이메일 인증을 먼저 해 주세요."),
   DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 가입된 이메일이에요."),
   DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 쓰고 있는 닉네임이에요."),
+  // 소셜 로그인 (T157, D-128)
+  /** 소셜 로그인 뒤 가입 마무리 정보(10분)가 없거나 지났다. 처음부터 다시 한다 */
+  SOCIAL_SIGNUP_EXPIRED(HttpStatus.BAD_REQUEST, "소셜 로그인 정보가 만료되었어요. 처음부터 다시 시도해 주세요."),
+  /** 비밀번호가 없는 회원의 마지막 로그인 방법은 끊을 수 없다 */
+  SOCIAL_LAST_LOGIN_METHOD(
+      HttpStatus.CONFLICT, "로그인할 방법이 없어져서 해제할 수 없어요. 비밀번호를 먼저 만들거나 다른 소셜 계정을 연결해 주세요."),
+  /** 꺼져 있는(키를 넣지 않은) 제공자 */
+  SOCIAL_PROVIDER_DISABLED(HttpStatus.NOT_FOUND, "지금은 쓸 수 없는 소셜 로그인이에요."),
   /** 블로그장인 운영 중·폐쇄 예정 블로그가 있어 탈퇴할 수 없다 (USR-05, D-15, D-18). 응답에 그 블로그 목록이 붙는다. */
   WITHDRAW_BLOCKED(HttpStatus.CONFLICT, "블로그장인 블로그를 모두 위임하거나 폐쇄한 뒤에 탈퇴할 수 있어요."),
   METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청이에요."),

@@ -5,6 +5,7 @@
  * - 서버가 CAPTCHA_REQUIRED를 주면(3번째 실패부터) Cloudflare Turnstile 위젯을 띄우고, 그 토큰을 함께 보낸다.
  *   토큰은 한 번만 쓸 수 있어서 실패할 때마다 위젯을 다시 그린다.
  * - 로그인하면 ?next=로 받은 같은 사이트 주소로, 없으면 메인으로 간다.
+ * - 구글·깃허브 버튼은 social-login.js가 그린다. 소셜 로그인이 안 돼 돌아오면 ?social_error=로 문구를 보여 준다 (T157, D-128).
  */
 (function () {
   'use strict';
@@ -115,6 +116,10 @@
     $('login-form').addEventListener('submit', submit);
     if (new URLSearchParams(window.location.search).get('expired')) {
       showMessage('30분 동안 활동이 없어 로그아웃됐어요. 다시 로그인해 주세요.');
+    }
+    var socialError = new URLSearchParams(window.location.search).get('social_error');
+    if (socialError) {
+      showMessage(SocialLogin.errorMessage(socialError));
     }
     if (new URLSearchParams(window.location.search).get('reset')) {
       Api.toast('비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.');
