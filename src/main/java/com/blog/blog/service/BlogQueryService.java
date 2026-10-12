@@ -100,6 +100,8 @@ public class BlogQueryService {
    * @param role 멤버가 아니면 null
    * @param joinRequestId 대기 중인 신청 번호 (취소 버튼용)
    * @param reapplyAt 거절되어 다시 신청할 수 있는 시각. 지났거나 없으면 null
+   * @param owner 블로그장만 하는 일(폐쇄·철회, 부블로그장 지정)을 할 수 있는지. 메인 관리자도 true (D-122)
+   * @param canTransfer 블로그장 위임을 할 수 있는지. 진짜 블로그장만, 메인 관리자는 false (D-122)
    * @param subscribed 이 블로그를 구독 중인지 (SOC-01). 일부 공개는 이 화면을 볼 수 있는 회원(링크로 온 회원·멤버)만 구독할 수 있다
    */
   public record Viewer(
@@ -112,6 +114,7 @@ public class BlogQueryService {
       boolean canManageMembers,
       boolean canManagePosts,
       boolean owner,
+      boolean canTransfer,
       boolean subscribed) {}
 
   /** 내 블로그 목록 (BLG-06) */
@@ -257,12 +260,13 @@ public class BlogQueryService {
         }
       }
     }
-    boolean canEdit =
-        member != null && blogAuthz.hasPermission(blog.getId(), ManagerPermission.EDIT_INFO);
+    // 메인 관리자는 멤버가 아니어도 블로그장 관리 권한을 모두 갖는다. 위임만 빼고 (D-122)
+    boolean manager = member != null || (viewerId != null && BlogAuthz.isAdmin());
+    boolean canEdit = manager && blogAuthz.hasPermission(blog.getId(), ManagerPermission.EDIT_INFO);
     boolean canManage =
-        member != null && blogAuthz.hasPermission(blog.getId(), ManagerPermission.MANAGE_MEMBERS);
+        manager && blogAuthz.hasPermission(blog.getId(), ManagerPermission.MANAGE_MEMBERS);
     boolean canManagePosts =
-        member != null && blogAuthz.hasPermission(blog.getId(), ManagerPermission.MANAGE_POSTS);
+        manager && blogAuthz.hasPermission(blog.getId(), ManagerPermission.MANAGE_POSTS);
     Viewer viewer =
         new Viewer(
             viewerId != null,
@@ -273,7 +277,8 @@ public class BlogQueryService {
             canEdit,
             canManage,
             canManagePosts,
-            member != null && blogAuthz.isOwner(blog.getId()),
+            manager && blogAuthz.isOwner(blog.getId()),
+            member != null && blogAuthz.isRealOwner(blog.getId()),
             viewerId != null
                 && subscriptionRepository.existsByBlogIdAndUserId(blog.getId(), viewerId));
 

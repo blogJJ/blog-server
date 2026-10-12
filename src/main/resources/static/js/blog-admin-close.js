@@ -1,6 +1,6 @@
 /*
  * 블로그 관리 화면의 위임·폐쇄 탭 (T093, BLG-08, BLG-09, D-12, D-16, D-19, D-20).
- * 블로그장에게만 탭이 보인다. 위임할 멤버가 없으면 폐쇄 버튼만, 폐쇄 예정이면 철회 버튼만 보인다.
+ * 블로그장과 메인 관리자에게 탭이 보이고, 위임은 진짜 블로그장에게만 보인다 (D-122). 위임할 멤버가 없으면 폐쇄 버튼만, 폐쇄 예정이면 철회 버튼만 보인다.
  * 권한과 규칙(폐쇄 예정 중 위임 불가, 대기 요청은 하나)은 서버가 다시 확인한다.
  */
 (function () {
@@ -52,19 +52,22 @@
       return;
     }
 
-    var members;
-    var pending;
-    try {
-      members = await Api.get(base() + '/members');
-      pending = await Api.get(base() + '/transfers/pending');
-    } catch (e) {
-      Api.showError(e);
-      return;
+    var pending = null;
+    // 위임은 진짜 블로그장만. 메인 관리자는 폐쇄·철회만 한다 (D-122)
+    if (blog.viewer.canTransfer) {
+      var members;
+      try {
+        members = await Api.get(base() + '/members');
+        pending = await Api.get(base() + '/transfers/pending');
+      } catch (e) {
+        Api.showError(e);
+        return;
+      }
+      var candidates = members.filter(function (m) {
+        return m.role !== 'OWNER' && !isSuspended(m);
+      });
+      renderTransfer(candidates, pending);
     }
-    var candidates = members.filter(function (m) {
-      return m.role !== 'OWNER' && !isSuspended(m);
-    });
-    renderTransfer(candidates, pending);
     $('close-desc').textContent =
       '지금 누르면 ' + dateTime(closeAtIfNow()) + '에 폐쇄돼요. 그 전까지 철회할 수 있고, 멤버와 구독자에게 바로, 3일 전, 1일 전에 알림이 가요.' +
       (pending ? ' 대기 중인 위임 요청은 취소돼요.' : '') +

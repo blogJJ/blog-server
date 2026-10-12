@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 블로그장 위임 (T087, BLG-08, D-16, D-20, D-31). 요청은 블로그장만, 수락·거절은 받는 멤버만. */
+/**
+ * 블로그장 위임 (T087, BLG-08, D-16, D-20, D-31). 요청은 블로그장만, 수락·거절은 받는 멤버만. 메인 관리자는 다른 블로그장 권한을 모두 갖지만
+ * 위임은 하지 못한다 (D-122).
+ */
 @RestController
 public class TransferController {
 
@@ -31,7 +34,7 @@ public class TransferController {
 
   /** 위임 요청 */
   @PostMapping("/api/blogs/{blogId}/transfers")
-  @PreAuthorize("@blogAuthz.isOwner(#blogId)")
+  @PreAuthorize("@blogAuthz.isRealOwner(#blogId)")
   public ResponseEntity<CreatedResponse> request(
       @AuthenticationPrincipal AuthUser user,
       @PathVariable Long blogId,
@@ -42,7 +45,7 @@ public class TransferController {
 
   /** 관리 화면: 대기 중인 요청. 없으면 204 */
   @GetMapping("/api/blogs/{blogId}/transfers/pending")
-  @PreAuthorize("@blogAuthz.isOwner(#blogId)")
+  @PreAuthorize("@blogAuthz.isRealOwner(#blogId)")
   public ResponseEntity<TransferRow> pending(@PathVariable Long blogId) {
     return transferService
         .pendingOfBlog(blogId)

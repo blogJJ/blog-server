@@ -11,6 +11,8 @@ public enum AdminAction {
   UNHIDE_BLOG,
   /** 블로그 강제 폐쇄 (7일 유예, D-96) */
   CLOSE_BLOG,
+  /** 블로그 폐쇄 철회. 블로그 관리 화면에서 메인 관리자가 한다 (D-122) */
+  REVOKE_CLOSE_BLOG,
   HIDE_POST,
   DELETE_POST,
   RESTORE_POST,

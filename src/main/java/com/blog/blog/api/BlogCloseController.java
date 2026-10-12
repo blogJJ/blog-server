@@ -1,10 +1,13 @@
 package com.blog.blog.api;
 
+import com.blog.admin.service.AdminBlogService;
+import com.blog.auth.domain.UserRole;
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogStatus;
 import com.blog.blog.domain.CloseReason;
 import com.blog.blog.service.BlogCloseService;
 import com.blog.common.security.AuthUser;
+import com.blog.common.security.BlogAuthz;
 import java.time.LocalDateTime;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,16 +18,27 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 블로그 폐쇄·철회 (T088, BLG-09, D-12, D-19). 블로그장만(계정 정지 중이면 못 한다, D-100). 관리자 강제 폐쇄는 관리자 기능이 {@link
- * BlogCloseService}를 바로 부른다.
+ * BlogCloseService}를 바로 부른다. 메인 관리자가 이 화면에서 누르면 관리자 강제 폐쇄(ADMIN)로 처리하고 활동 기록을 남긴다 (D-122). 관리자가 직접
+ * 만든 블로그는 블로그장과 같다.
  */
 @RestController
 @RequestMapping("/api/blogs/{blogId}/close")
 public class BlogCloseController {
 
   private final BlogCloseService closeService;
+  private final AdminBlogService adminBlogService;
+  private final BlogAuthz blogAuthz;
 
-  public BlogCloseController(BlogCloseService closeService) {
+  public BlogCloseController(
+      BlogCloseService closeService, AdminBlogService adminBlogService, BlogAuthz blogAuthz) {
     this.closeService = closeService;
+    this.adminBlogService = adminBlogService;
+    this.blogAuthz = blogAuthz;
+  }
+
+  /** 메인 관리자가 남의 블로그에서 누른 것인지. 관리자가 직접 만든 블로그는 블로그장으로 처리한다 */
+  private boolean asAdmin(AuthUser user, Long blogId) {
+    return user.role() == UserRole.ADMIN && !blogAuthz.isRealOwner(blogId);
   }
 
   /**
@@ -41,6 +55,9 @@ public class BlogCloseController {
   @PostMapping
   @PreAuthorize("@blogAuthz.isOwner(#blogId)")
   public CloseResponse close(@AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
+    if (asAdmin(user, blogId)) {
+      return CloseResponse.of(adminBlogService.closeFromBlogPage(blogId, user.id()));
+    }
     return CloseResponse.of(closeService.scheduleClose(blogId, CloseReason.OWNER, user.id()));
   }
 
@@ -48,6 +65,9 @@ public class BlogCloseController {
   @PostMapping("/revoke")
   @PreAuthorize("@blogAuthz.isOwner(#blogId)")
   public CloseResponse revoke(@AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
+    if (asAdmin(user, blogId)) {
+      return CloseResponse.of(adminBlogService.revokeCloseFromBlogPage(blogId, user.id()));
+    }
     return CloseResponse.of(closeService.revokeClose(blogId, user.id()));
   }
 }

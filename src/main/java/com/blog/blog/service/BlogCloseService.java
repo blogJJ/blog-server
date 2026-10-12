@@ -37,7 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       (SC-005).
  *   <li>블로그장 폐쇄(OWNER), 메인 관리자 강제 폐쇄(ADMIN, D-96), 블로그장 박탈 + 부블로그장 없음(OWNER_DEMOTED, ADM-07)이 모두
  *       {@link #scheduleClose}를 쓴다. 누가 부를 수 있는지는 부르는 쪽(컨트롤러·관리자 서비스)이 확인한다.
- *   <li>철회는 사유와 관계없이 그 블로그의 블로그장만 7일 안에 한다 (D-19, D-96).
+ *   <li>철회는 사유와 관계없이 그 블로그의 블로그장이 7일 안에 한다 (D-19, D-96). 메인 관리자도 할 수 있다 (D-122).
  * </ul>
  */
 @Service
@@ -120,8 +120,18 @@ public class BlogCloseService {
    */
   @Transactional
   public Blog revokeClose(Long blogId, Long actorId) {
+    return revokeClose(blogId, actorId, false);
+  }
+
+  /**
+   * 폐쇄 철회. 메인 관리자도 사유와 관계없이 철회한다 (D-122). 관리자인지는 부르는 쪽이 확인한다.
+   *
+   * @param byAdmin 메인 관리자가 철회하면 true
+   */
+  @Transactional
+  public Blog revokeClose(Long blogId, Long actorId, boolean byAdmin) {
     Blog blog = lock(blogId);
-    if (!blog.getOwner().getId().equals(actorId)) {
+    if (!byAdmin && !blog.getOwner().getId().equals(actorId)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, "폐쇄 철회는 블로그장만 할 수 있어요.");
     }
     if (!blog.isClosing()) {
