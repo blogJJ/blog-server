@@ -125,6 +125,11 @@ class LifecycleFlowTest {
         .andExpect(status().isConflict());
     call(member, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
         .andExpect(status().isForbidden());
+    // 메인 관리자도 위임 요청은 건드리지 못한다 (D-122)
+    User admin = newUser();
+    jdbc.update("update users set role = 'ADMIN' where id = ?", admin.getId());
+    call(admin, UserRole.ADMIN, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
+        .andExpect(status().isForbidden());
 
     call(owner, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
         .andExpect(status().isNoContent());
@@ -339,13 +344,19 @@ class LifecycleFlowTest {
 
   private ResultActions call(User user, MockHttpServletRequestBuilder request, String json)
       throws Exception {
+    return call(user, UserRole.USER, request, json);
+  }
+
+  private ResultActions call(
+      User user, UserRole role, MockHttpServletRequestBuilder request, String json)
+      throws Exception {
     request.with(csrf());
     request.with(
         authentication(
             UsernamePasswordAuthenticationToken.authenticated(
-                new AuthUser(user.getId(), UserRole.USER),
+                new AuthUser(user.getId(), role),
                 null,
-                List.of(new SimpleGrantedAuthority("ROLE_USER")))));
+                List.of(new SimpleGrantedAuthority("ROLE_" + role.name())))));
     if (json != null) {
       request.contentType(MediaType.APPLICATION_JSON).content(json);
     }

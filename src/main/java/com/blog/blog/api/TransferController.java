@@ -55,7 +55,7 @@ public class TransferController {
 
   /** 관리 화면: 대기 중인 요청을 블로그장이 취소한다 (D-124) */
   @PostMapping("/api/blogs/{blogId}/transfers/pending/cancel")
-  @PreAuthorize("@blogAuthz.isOwner(#blogId)")
+  @PreAuthorize("@blogAuthz.isRealOwner(#blogId)")
   public ResponseEntity<Void> cancel(
       @AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
     transferService.cancelByOwner(blogId, user.id());
