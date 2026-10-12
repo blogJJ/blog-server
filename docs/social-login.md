@@ -8,10 +8,10 @@
 
 | 제공자 | 운영 주소 | 로컬 시험 주소 |
 | --- | --- | --- |
-| 구글 | `http://jj-blog.java21.net/login/oauth2/code/google` | `http://localhost:8080/login/oauth2/code/google` |
-| 깃허브 | `http://jj-blog.java21.net/login/oauth2/code/github` | `http://localhost:8080/login/oauth2/code/github` |
+| 구글 | `https://jj-blog.java21.net/login/oauth2/code/google` | `http://localhost:8080/login/oauth2/code/google` |
+| 깃허브 | `https://jj-blog.java21.net/login/oauth2/code/github` | `http://localhost:8080/login/oauth2/code/github` |
 
-- 서버는 이 주소를 요청 주소로 만듭니다. 운영에서는 nginx가 보낸 `Host`와 `X-Forwarded-Proto`를 따릅니다. 나중에 사이트를 https로 바꾸면 `https://jj-blog.java21.net/...`도 콘솔에 등록해야 합니다.
+- 서버는 이 주소를 요청 주소로 만듭니다. 운영 서버는 `X-Forwarded-Proto: https`를 받으므로 돌아오는 주소를 **https**로 만듭니다. 그래서 콘솔에는 위의 `https://jj-blog.java21.net/...` 주소를 꼭 등록해야 합니다(http 주소만 있으면 깃허브가 "redirect_uri is not associated"로 막습니다).
 - 로그인할 때 구글이 `redirect_uri_mismatch`, 깃허브가 "The redirect_uri is not associated with this application"이라고 하면, 오류 화면이나 주소창의 `redirect_uri=` 값과 콘솔에 넣은 주소가 글자 하나까지(http/https, 끝의 `/`) 같은지 확인합니다.
 
 ## 1. 구글 OAuth 클라이언트 만들기
@@ -25,7 +25,7 @@
 3. **API 및 서비스 → 사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID**(새 화면에서는 **클라이언트 → 클라이언트 만들기**)를 고릅니다.
    - 애플리케이션 유형: **웹 애플리케이션**
    - 이름: 아무거나(예: jj-blog-web)
-   - **승인된 리디렉션 URI**에 `http://jj-blog.java21.net/login/oauth2/code/google`을 넣습니다. 로컬에서도 시험하려면 `http://localhost:8080/login/oauth2/code/google`을 하나 더 넣습니다.
+   - **승인된 리디렉션 URI**에 `https://jj-blog.java21.net/login/oauth2/code/google`을 넣습니다. 로컬에서도 시험하려면 `http://localhost:8080/login/oauth2/code/google`을 하나 더 넣습니다.
    - "승인된 JavaScript 원본"은 비워 둬도 됩니다.
 4. 만들면 **클라이언트 ID**와 **클라이언트 보안 비밀번호(Client secret)**가 나옵니다. 이 두 값을 아래 3단계의 secrets에 넣습니다. 보안 비밀번호는 나중에 다시 못 볼 수 있으니 바로 옮겨 둡니다.
 
@@ -35,8 +35,8 @@
    - GitHub App이 아니라 **OAuth App**입니다.
 2. 값을 넣습니다.
    - Application name: 예) JJ 블로그
-   - Homepage URL: `http://jj-blog.java21.net`
-   - **Authorization callback URL**: `http://jj-blog.java21.net/login/oauth2/code/github`
+   - Homepage URL: `https://jj-blog.java21.net`
+   - **Authorization callback URL**: `https://jj-blog.java21.net/login/oauth2/code/github`
    - Enable Device Flow는 체크하지 않습니다.
 3. **Register application**을 누르면 **Client ID**가 보입니다. **Generate a new client secret**을 눌러 비밀값을 만들고 바로 복사합니다(다시 볼 수 없습니다).
 4. OAuth App에는 callback URL을 하나만 넣을 수 있어서, 로컬에서 시험하려면 callback을 `http://localhost:8080/login/oauth2/code/github`로 한 OAuth App을 따로 하나 더 만듭니다.
