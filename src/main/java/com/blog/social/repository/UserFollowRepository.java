@@ -28,7 +28,8 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
 
   /** 지웠으면 1. */
   @Modifying
-  @Query("delete from UserFollow f where f.follower.id = :followerId and f.followee.id = :followeeId")
+  @Query(
+      "delete from UserFollow f where f.follower.id = :followerId and f.followee.id = :followeeId")
   int deletePair(@Param("followerId") Long followerId, @Param("followeeId") Long followeeId);
 
   /** 차단할 때 서로의 팔로우를 푼다 (SOC-05). */

@@ -17,14 +17,17 @@ import com.blog.common.security.BlogAuthz;
 import com.blog.common.web.PageResponse;
 import com.blog.social.domain.NotificationTargetType;
 import com.blog.social.domain.NotificationType;
+import com.blog.social.service.BlockService;
 import com.blog.social.service.NotificationService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -53,6 +56,7 @@ public class CommentService {
    *
    * @param content 지운 댓글이면 null
    * @param replyToNickname 대댓글이 답하는 회원 (@닉네임)
+   * @param blocked 내가 차단한 회원의 첫 댓글인데 다른 사람의 답글이 달려 있어 자리만 남긴 것. 내용·닉네임은 null (SOC-05)
    */
   public record CommentRow(
       Long id,
@@ -61,6 +65,7 @@ public class CommentService {
       String replyToNickname,
       String content,
       boolean deleted,
+      boolean blocked,
       boolean edited,
       LocalDateTime createdAt,
       boolean canEdit,
@@ -75,6 +80,7 @@ public class CommentService {
   private final AccountGuard accountGuard;
   private final NotificationService notificationService;
   private final Clock clock;
+  private final BlockService blockService;
 
   public CommentService(
       CommentRepository commentRepository,
@@ -84,7 +90,8 @@ public class CommentService {
       BlogAuthz blogAuthz,
       AccountGuard accountGuard,
       NotificationService notificationService,
-      Clock clock) {
+      Clock clock,
+      BlockService blockService) {
     this.commentRepository = commentRepository;
     this.postRepository = postRepository;
     this.userRepository = userRepository;
@@ -93,6 +100,7 @@ public class CommentService {
     this.accountGuard = accountGuard;
     this.notificationService = notificationService;
     this.clock = clock;
+    this.blockService = blockService;
   }
 
   /** 댓글 또는 대댓글을 단다. */
@@ -147,43 +155,70 @@ public class CommentService {
     postRepository.addCommentCount(comment.getPost().getId(), -1);
   }
 
-  /** 글의 댓글 목록. 첫 댓글 50개씩, 답글은 첫 댓글 아래에 모두. */
+  /**
+   * 글의 댓글 목록. 첫 댓글 50개씩, 답글은 첫 댓글 아래에 모두. 내가 차단한 회원의 댓글은 빼고, 답글이 남은 첫 댓글은 자리만 남긴다. 내가 이 블로그 멤버면 그대로
+   * 보인다 (T104, SOC-05, D-36).
+   */
   @Transactional(readOnly = true)
   public PageResponse<CommentRow> list(
       Long postId, Long viewerId, UserRole viewerRole, String shareKey, int page) {
-    Post post = visiblePost(postId, viewerId, shareKey);
+    Post post =
+        postRepository
+            .findDetail(postId)
+            .filter(Post::isPublished)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+    BlogAccessService.Access access = accessService.check(post.getBlog(), viewerId, shareKey);
+    Set<Long> hidden =
+        access.membership().isPresent()
+            ? Set.of()
+            : new HashSet<>(blockService.hiddenAuthorIds(viewerId));
     boolean moderator = viewerId != null && canModerate(post.getBlog().getId(), viewerRole);
     Page<Comment> roots =
         commentRepository.findRoots(postId, PageRequest.of(Math.max(page, 1) - 1, PAGE_SIZE));
-    return PageResponse.of(roots, list -> rows(list, viewerId, moderator));
+    return PageResponse.of(roots, list -> rows(list, viewerId, moderator, hidden));
   }
 
-  private List<CommentRow> rows(List<Comment> roots, Long viewerId, boolean moderator) {
+  private List<CommentRow> rows(
+      List<Comment> roots, Long viewerId, boolean moderator, Set<Long> hidden) {
     if (roots.isEmpty()) {
       return List.of();
     }
     Map<Long, List<CommentRow>> replies = new LinkedHashMap<>();
     roots.forEach(r -> replies.put(r.getId(), new ArrayList<>()));
     for (Comment r : commentRepository.findReplies(replies.keySet())) {
-      replies.get(r.getParent().getId()).add(row(r, viewerId, moderator, List.of()));
+      if (!hidden.contains(r.getAuthor().getId())) {
+        replies.get(r.getParent().getId()).add(row(r, viewerId, moderator, List.of(), false));
+      }
     }
-    return roots.stream().map(r -> row(r, viewerId, moderator, replies.get(r.getId()))).toList();
+    List<CommentRow> rows = new ArrayList<>(roots.size());
+    for (Comment r : roots) {
+      List<CommentRow> children = replies.get(r.getId());
+      boolean blocked = hidden.contains(r.getAuthor().getId());
+      if (blocked && children.isEmpty()) {
+        continue;
+      }
+      rows.add(row(r, viewerId, moderator, children, blocked));
+    }
+    return rows;
   }
 
-  private CommentRow row(Comment c, Long viewerId, boolean moderator, List<CommentRow> replies) {
+  private CommentRow row(
+      Comment c, Long viewerId, boolean moderator, List<CommentRow> replies, boolean blocked) {
     boolean deleted = !c.isActive();
+    boolean shown = !deleted && !blocked;
     boolean mine = viewerId != null && c.isWrittenBy(viewerId);
     return new CommentRow(
         c.getId(),
         c.getParent() == null ? null : c.getParent().getId(),
-        deleted ? null : nickname(c.getAuthor()),
+        shown ? nickname(c.getAuthor()) : null,
         c.getReplyToUser() == null ? null : nickname(c.getReplyToUser()),
-        deleted ? null : c.getContent(),
+        shown ? c.getContent() : null,
         deleted,
-        !deleted && c.isEdited(),
+        !deleted && blocked,
+        shown && c.isEdited(),
         c.getCreatedAt(),
-        !deleted && mine,
-        !deleted && (mine || moderator),
+        shown && mine,
+        shown && (mine || moderator),
         replies);
   }
 

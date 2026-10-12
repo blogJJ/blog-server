@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface RecentSearchRepository extends JpaRepository<RecentSearch, Long> {
 
-  /** 새 검색어면 넣고, 이미 있으면 시각만 바꾼다. */
+  /** 새 검색어면 넣고, 이미 있으면 시각만 바꾼다 (동시에 같은 검색어가 들어와도 한 행). */
   @Modifying
   @Query(
       value =
@@ -23,6 +23,10 @@ public interface RecentSearchRepository extends JpaRepository<RecentSearch, Long
       @Param("now") LocalDateTime now);
 
   List<RecentSearch> findByUserIdOrderBySearchedAtDescIdDesc(Long userId);
+
+  @Modifying
+  @Query("delete from RecentSearch r where r.user.id = :userId and r.keyword = :keyword")
+  int deleteKeyword(@Param("userId") Long userId, @Param("keyword") String keyword);
 
   @Modifying
   @Query("delete from RecentSearch r where r.id = :id and r.user.id = :userId")

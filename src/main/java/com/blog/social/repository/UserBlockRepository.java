@@ -37,7 +37,8 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
 
   @Modifying
   @Query(
-      value = "insert ignore into user_blocks (blocker_id, blocked_id) values (:blockerId, :blockedId)",
+      value =
+          "insert ignore into user_blocks (blocker_id, blocked_id) values (:blockerId, :blockedId)",
       nativeQuery = true)
   int insertIgnore(@Param("blockerId") Long blockerId, @Param("blockedId") Long blockedId);
 

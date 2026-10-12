@@ -34,7 +34,8 @@ public class BlockService {
   /** 빈 목록을 {@code not in}에 넣으면 SQL이 깨져서, 없는 번호 하나를 대신 넣는다. */
   public static final List<Long> NONE = List.of(-1L);
 
-  public record BlockedRow(Long userId, String nickname, String profileImage, LocalDateTime blockedAt) {}
+  public record BlockedRow(
+      Long userId, String nickname, String profileImage, LocalDateTime blockedAt) {}
 
   private final UserBlockRepository blockRepository;
   private final UserFollowRepository followRepository;
@@ -61,7 +62,9 @@ public class BlockService {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "나 자신은 차단할 수 없어요.");
     }
     User target =
-        userRepository.findById(targetId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        userRepository
+            .findById(targetId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     blockRepository.insertIgnore(me, target.getId());
     followRepository.deleteBetween(me, target.getId());
     User handler = userRepository.getReferenceById(me);
@@ -98,9 +101,7 @@ public class BlockService {
     return rows;
   }
 
-  /**
-   * 목록·피드·검색에서 뺄 작성자 번호. 비회원이거나 차단한 회원이 없으면 {@link #NONE}이라 쿼리의 {@code not in}에 그대로 넣을 수 있다.
-   */
+  /** 목록·피드·검색에서 뺄 작성자 번호. 비회원이거나 차단한 회원이 없으면 {@link #NONE}이라 쿼리의 {@code not in}에 그대로 넣을 수 있다. */
   @Transactional(readOnly = true)
   public List<Long> hiddenAuthorIds(Long viewerId) {
     if (viewerId == null) {

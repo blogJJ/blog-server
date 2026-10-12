@@ -1,5 +1,6 @@
 /*
  * 내 정보 (T099, USR-07, D-21, D-32). 닉네임·휴대폰 번호·소개·프로필 사진·비밀번호를 바꾼다. 이메일과 이름은 보여 주기만 한다.
+ * 차단한 회원 목록에서 차단을 푼다 (T104, SOC-05).
  */
 (function () {
   'use strict';
@@ -32,7 +33,42 @@
     $('phone').value = me.phone || '';
     $('bio').value = me.bio || '';
     showPhoto(me.profileImage);
+    $('my-profile').href = '/profile.html?id=' + encodeURIComponent(me.id);
+    $('my-profile').hidden = false;
     $('me').hidden = false;
+  }
+
+  async function loadBlocks() {
+    try {
+      var rows = await Api.get('/api/me/blocks');
+      $('blocks').replaceChildren.apply($('blocks'), rows.map(blockRow));
+      $('blocks-empty').hidden = rows.length > 0;
+    } catch (e) {
+      Api.showError(e);
+    }
+  }
+
+  function blockRow(row) {
+    var li = document.createElement('li');
+    li.className = 'request-list__item';
+    var who = document.createElement('a');
+    who.href = '/profile.html?id=' + encodeURIComponent(row.userId);
+    who.textContent = row.nickname;
+    var unblock = document.createElement('button');
+    unblock.type = 'button';
+    unblock.className = 'button';
+    unblock.textContent = '차단 해제';
+    unblock.addEventListener('click', async function () {
+      try {
+        await Api.delete('/api/users/' + row.userId + '/block');
+        Api.toast('차단을 풀었어요.');
+        loadBlocks();
+      } catch (e) {
+        Api.showError(e);
+      }
+    });
+    li.append(who, unblock);
+    return li;
   }
 
   async function saveProfile(event) {
@@ -110,6 +146,7 @@
     }
     try {
       fill(await Api.get('/api/me'));
+      loadBlocks();
     } catch (e) {
       Api.showError(e);
     }

@@ -335,7 +335,7 @@ public class BlogQueryService {
    * 검색어를 FULLTEXT boolean 검색식으로 바꾼다. 연산자 문자는 지우고, 단어마다 {@code +"단어"}로 묶어 모두 들어 있는 블로그만 찾는다. ngram
    * 기본 길이(2)보다 짧은 단어는 뺀다.
    */
-  static String toBooleanQuery(String q) {
+  public static String toBooleanQuery(String q) {
     StringBuilder sb = new StringBuilder();
     for (String word : q.split("\\s+")) {
       String w = word.replaceAll("[^\\p{L}\\p{N}_]", "");

@@ -24,8 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 팔로우·구독 (T101, T102, SOC-01, SOC-02, D-02). 누르면 하고, 다시 누르면 취소한다. 계정 정지 중이면 못 하고, 메인 관리자는 팔로우만
- * 못 한다 (AccountGuard). 새로 할 때만 상대(블로그는 블로그장)에게 알림이 간다.
+ * 팔로우·구독 (T101, T102, SOC-01, SOC-02, D-02). 누르면 하고, 다시 누르면 취소한다. 계정 정지 중이면 못 하고, 메인 관리자는 팔로우만 못 한다
+ * (AccountGuard). 새로 할 때만 상대(블로그는 블로그장)에게 알림이 간다.
  */
 @Service
 public class FollowService {
@@ -95,13 +95,15 @@ public class FollowService {
   }
 
   /**
-   * 블로그 구독 (T101). 블로그를 볼 수 있어야 구독할 수 있다: 일부 공개는 공유 링크로 들어온 회원과 멤버, 비공개는 멤버만 (D-50). 취소는
-   * 블로그가 비공개로 바뀐 뒤에도 된다.
+   * 블로그 구독 (T101). 블로그를 볼 수 있어야 구독할 수 있다: 일부 공개는 공유 링크로 들어온 회원과 멤버, 비공개는 멤버만 (D-50). 취소는 블로그가 비공개로
+   * 바뀐 뒤에도 된다.
    */
   @Transactional
   public SubscribeResult toggleSubscribe(Long me, Long blogId, String shareKey) {
     Blog blog =
-        blogRepository.findById(blogId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        blogRepository
+            .findById(blogId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     if (subscriptionRepository.deletePair(blogId, me) > 0) {
       blogRepository.addSubscriberCount(blogId, -1);
       return new SubscribeResult(false, Math.max(blog.getSubscriberCount() - 1, 0));
@@ -151,7 +153,10 @@ public class FollowService {
             .map(
                 u ->
                     new UserRow(
-                        u.getId(), u.getNickname(), ImageService.url(u.getProfileImage()), u.getBio()))
+                        u.getId(),
+                        u.getNickname(),
+                        ImageService.url(u.getProfileImage()),
+                        u.getBio()))
             .toList();
   }
 

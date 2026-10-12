@@ -21,10 +21,7 @@ public interface BlogSubscriptionRepository extends JpaRepository<BlogSubscripti
   @Query("delete from BlogSubscription s where s.blog.id = :blogId and s.user.id = :userId")
   int deletePair(@Param("blogId") Long blogId, @Param("userId") Long userId);
 
-  /** 멤버가 아닌 구독자들. 비공개로 바뀌면 이 사람들에게 알린다 (BLG-01, D-50). */
-  @Query(
-      "select s.user.id from BlogSubscription s where s.blog.id = :blogId"
-          + " and not exists (select m.id from BlogMember m"
-          + " where m.blog.id = s.blog.id and m.user.id = s.user.id)")
-  List<Long> findNonMemberSubscriberIds(@Param("blogId") Long blogId);
+  /** 구독자들. 비공개로 바뀌면 모두에게 알린다 (BLG-01, 3.6 알림 종류 "비공개 전환"). */
+  @Query("select s.user.id from BlogSubscription s where s.blog.id = :blogId")
+  List<Long> findSubscriberIds(@Param("blogId") Long blogId);
 }

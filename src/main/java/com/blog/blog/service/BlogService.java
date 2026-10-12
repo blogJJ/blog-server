@@ -11,9 +11,6 @@ import com.blog.blog.domain.JoinPolicy;
 import com.blog.blog.repository.BlogMemberRepository;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogSubscriptionRepository;
-import com.blog.social.domain.NotificationTargetType;
-import com.blog.social.domain.NotificationType;
-import com.blog.social.service.NotificationService;
 import com.blog.blog.repository.BlogTagRepository;
 import com.blog.board.domain.Tag;
 import com.blog.board.service.TagNormalizer;
@@ -22,6 +19,9 @@ import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
 import com.blog.common.security.AccountGuard;
 import com.blog.common.security.AccountGuard.Activity;
+import com.blog.social.domain.NotificationTargetType;
+import com.blog.social.domain.NotificationType;
+import com.blog.social.service.NotificationService;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -158,8 +158,8 @@ public class BlogService {
   }
 
   /**
-   * 정보 수정 (T053, T109). 권한(블로그장 또는 EDIT_INFO)은 컨트롤러가 확인한다. 비공개로 바꾸면 구독은 그대로 두고, 멤버가 아닌 구독자에게
-   * 알린다. 그 구독자에게는 피드의 구독 탭에서도 글이 안 보인다 (BLG-01, D-50).
+   * 정보 수정 (T053, T109). 권한(블로그장 또는 EDIT_INFO)은 컨트롤러가 확인한다. 비공개로 바꾸면 구독은 그대로 두고 구독자에게 알린다. 멤버가 아닌
+   * 구독자에게는 블로그를 볼 수 없게 되고(BlogAccessService), 피드의 구독 탭에서도 글이 빠진다(FeedService) (BLG-01, D-50).
    */
   @Transactional
   public Blog update(Long blogId, BlogForm form) {
@@ -174,15 +174,14 @@ public class BlogService {
       userRepository.findByIdForUpdate(blog.getOwner().getId());
       checkLimit(blog.getOwner().getId(), f.visibility(), blog.getId());
     }
-    boolean becomesPrivate =
-        !isPrivate(blog.getVisibility()) && isPrivate(f.visibility());
+    boolean becomesPrivate = !isPrivate(blog.getVisibility()) && isPrivate(f.visibility());
     blog.updateInfo(f.name(), f.description(), f.visibility(), f.joinPolicy());
     ShareLinkService.syncWithVisibility(blog);
     blogTagRepository.deleteByBlogId(blog.getId());
     saveTags(blog, f.tags());
     if (becomesPrivate) {
       notificationService.notifyAll(
-          subscriptionRepository.findNonMemberSubscriberIds(blog.getId()),
+          subscriptionRepository.findSubscriberIds(blog.getId()),
           null,
           NotificationType.BLOG_PRIVATE,
           NotificationTargetType.BLOG,
