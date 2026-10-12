@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>이메일이 없거나 탈퇴했거나 비밀번호가 틀리면 모두 같은 문구(LOGIN_FAILED). 가입 여부가 드러나지 않게 이메일이 없어도 bcrypt 비교를 한 번 한다.
  *   <li>계정별 연속 5번 실패면 5분 잠금. 3번 실패한 뒤부터는 Turnstile 사람 확인을 통과해야 비밀번호를 확인한다.
  *   <li>IP별 횟수 제한은 컨트롤러에서 RateLimiter로 건다.
+ *   <li>소셜 로그인으로만 가입해 비밀번호가 없는 회원은 비밀번호가 틀린 것과 같다 (D-128).
  *   <li>계정 정지(ADM-08) 중이어도 로그인은 된다. 읽기만 할 수 있는 것은 AccountGuard가 막는다.
  * </ul>
  *
@@ -75,7 +76,7 @@ public class LoginService {
     if (user.needsCaptcha() && !turnstileVerifier.verify(turnstileToken, ip)) {
       throw new BusinessException(ErrorCode.CAPTCHA_REQUIRED);
     }
-    if (password == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
+    if (!passwordMatches(user, password)) {
       boolean locked = user.recordLoginFailure(now);
       SecurityEventLogger.loginFailed(rawEmail, ip);
       if (locked) {
@@ -91,5 +92,16 @@ public class LoginService {
     }
     user.resetLoginFailures();
     return user;
+  }
+
+  /**
+   * 소셜 로그인으로만 가입해 비밀번호가 없는 회원은 비밀번호가 틀린 것과 똑같이 본다(실패 횟수도 센다). 걸리는 시간이 같게 bcrypt 비교를 한 번 한다 (D-128).
+   */
+  private boolean passwordMatches(User user, String password) {
+    if (!user.hasPassword()) {
+      passwordEncoder.matches(password == null ? "" : password, dummyHash);
+      return false;
+    }
+    return password != null && passwordEncoder.matches(password, user.getPasswordHash());
   }
 }

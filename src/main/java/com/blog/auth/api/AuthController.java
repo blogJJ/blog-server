@@ -1,11 +1,13 @@
 package com.blog.auth.api;
 
 import com.blog.auth.domain.RefreshToken;
+import com.blog.auth.domain.SocialProvider;
 import com.blog.auth.domain.User;
 import com.blog.auth.domain.UserRole;
 import com.blog.auth.service.ActivityPolicy;
 import com.blog.auth.service.LoginService;
 import com.blog.auth.service.LoginSessionService;
+import com.blog.auth.service.SocialClientRegistrations;
 import com.blog.auth.service.TurnstileVerifier;
 import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
@@ -17,6 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +29,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 로그인·토큰 재발급·로그아웃·로그인 연장 (T034~T037, USR-03, USR-04, SEC-04). */
+/**
+ * 로그인·토큰 재발급·로그아웃·로그인 연장 (T034~T037, USR-03, USR-04, SEC-04). 소셜 로그인은 SocialLoginHandlers (T157).
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -35,6 +40,7 @@ public class AuthController {
   private final LoginSessionService sessionService;
   private final ActivityPolicy activityPolicy;
   private final TurnstileVerifier turnstileVerifier;
+  private final SocialClientRegistrations socialRegistrations;
   private final AuthCookies authCookies;
   private final RateLimitGuard rateLimitGuard;
   private final Clock clock;
@@ -44,6 +50,7 @@ public class AuthController {
       LoginSessionService sessionService,
       ActivityPolicy activityPolicy,
       TurnstileVerifier turnstileVerifier,
+      SocialClientRegistrations socialRegistrations,
       AuthCookies authCookies,
       RateLimitGuard rateLimitGuard,
       Clock clock) {
@@ -51,6 +58,7 @@ public class AuthController {
     this.sessionService = sessionService;
     this.activityPolicy = activityPolicy;
     this.turnstileVerifier = turnstileVerifier;
+    this.socialRegistrations = socialRegistrations;
     this.authCookies = authCookies;
     this.rateLimitGuard = rateLimitGuard;
     this.clock = clock;
@@ -61,8 +69,12 @@ public class AuthController {
 
   public record LoginResponse(Long id, String nickname, UserRole role) {}
 
-  /** 로그인 화면에 필요한 공개 설정 */
-  public record AuthConfig(String turnstileSiteKey) {}
+  /**
+   * 로그인 화면에 필요한 공개 설정
+   *
+   * @param socialProviders 켜진 소셜 로그인 (google, github). 키가 없는 제공자는 빠지고 화면이 버튼을 숨긴다 (T157, D-128)
+   */
+  public record AuthConfig(String turnstileSiteKey, List<String> socialProviders) {}
 
   /**
    * @param expiresAt "로그인 유지"를 안 한 로그인이 끝나는 시각(서울 시각)
@@ -72,7 +84,9 @@ public class AuthController {
 
   @GetMapping("/config")
   public AuthConfig config() {
-    return new AuthConfig(turnstileVerifier.getSiteKey());
+    return new AuthConfig(
+        turnstileVerifier.getSiteKey(),
+        socialRegistrations.enabledProviders().stream().map(SocialProvider::getId).toList());
   }
 
   @PostMapping("/login")

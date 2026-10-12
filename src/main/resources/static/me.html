@@ -8,6 +8,7 @@
     <script src="/js/theme.js"></script>
     <script src="/js/api.js" defer></script>
     <script src="/js/layout.js" defer></script>
+    <script src="/js/social-login.js" defer></script>
     <script src="/js/me.js" defer></script>
   </head>
   <body>
@@ -67,9 +68,21 @@
         <ul class="request-list" id="blocks"></ul>
         <p class="field__hint" id="blocks-empty" hidden>차단한 회원이 없어요.</p>
 
-        <h2 class="me-section">비밀번호 변경</h2>
+        <!-- 소셜 로그인 연결 (T157, D-128). 비밀번호가 없으면 마지막 연결은 해제할 수 없다 -->
+        <div id="social-section" hidden>
+          <h2 class="me-section">소셜 로그인</h2>
+          <ul class="request-list" id="social-accounts"></ul>
+          <p class="field__hint" id="social-hint" hidden>
+            비밀번호가 없어서 마지막 소셜 로그인은 해제할 수 없어요. 아래에서 비밀번호를 먼저 만들어 주세요.
+          </p>
+        </div>
+
+        <h2 class="me-section" id="password-title">비밀번호 변경</h2>
+        <p class="field__hint field__hint--spaced" id="password-none" hidden>
+          소셜 로그인으로 가입해서 비밀번호가 없어요. 만들면 이메일과 비밀번호로도 로그인할 수 있어요.
+        </p>
         <form id="password-form" novalidate>
-          <div class="field">
+          <div class="field" id="current-password-field">
             <label for="current-password">현재 비밀번호</label>
             <input id="current-password" type="password" autocomplete="current-password" maxlength="15" />
           </div>

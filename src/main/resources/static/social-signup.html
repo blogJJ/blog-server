@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>가입 마무리 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/social-signup.js" defer></script>
+  </head>
+  <body>
+    <!-- 소셜 로그인 가입 마무리 (T157, D-128). 이메일은 구글·깃허브가 인증한 것을 쓰고, 비밀번호·전화번호는 받지 않는다 -->
+    <main>
+      <section class="auth-card">
+        <h1>가입 마무리</h1>
+        <p class="form-message form-message--error" id="message" role="alert"></p>
+
+        <div id="expired" hidden>
+          <p class="field__hint">소셜 로그인 정보가 없거나 10분이 지났어요. 처음부터 다시 시도해 주세요.</p>
+          <a class="button button--primary button--block" href="/login.html">로그인 화면으로</a>
+        </div>
+
+        <form id="form" novalidate hidden>
+          <p class="field__hint field__hint--spaced" id="intro"></p>
+          <dl class="me-fixed">
+            <dt>이메일</dt>
+            <dd id="email"></dd>
+          </dl>
+          <p class="field__hint field__hint--spaced">이 이메일이 아이디가 돼요. 비밀번호는 나중에 내 정보에서 만들 수 있어요.</p>
+          <div class="field">
+            <label for="name">이름</label>
+            <input id="name" type="text" autocomplete="name" maxlength="30" />
+            <p class="field__hint">가입한 뒤에는 바꿀 수 없어요.</p>
+          </div>
+          <div class="field">
+            <label for="nickname">닉네임</label>
+            <input id="nickname" type="text" autocomplete="nickname" maxlength="12" />
+            <p class="field__hint">2~12자 한글·영문·숫자. 다른 사람에게 보이는 이름이에요.</p>
+          </div>
+          <label class="check">
+            <input id="agree-all" type="checkbox" />
+            <strong>모두 동의</strong>
+          </label>
+          <label class="check">
+            <input id="agree-terms" type="checkbox" />
+            <span>[필수] <a href="/terms.html" target="_blank" rel="noopener">이용약관</a> 동의</span>
+          </label>
+          <label class="check">
+            <input id="agree-privacy" type="checkbox" />
+            <span
+              >[필수]
+              <a href="/privacy.html" target="_blank" rel="noopener">개인정보 수집·이용</a>
+              동의</span
+            >
+          </label>
+          <button class="button button--primary button--block" type="submit">가입하기</button>
+        </form>
+
+        <p class="auth-links">이미 계정이 있나요? <a href="/login.html">로그인</a></p>
+      </section>
+    </main>
+  </body>
+</html>

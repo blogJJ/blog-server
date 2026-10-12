@@ -1,7 +1,11 @@
 package com.blog.common.config;
 
+import com.blog.auth.api.SocialAuthorizationRequestResolver;
+import com.blog.auth.api.SocialLoginHandlers;
 import com.blog.auth.service.ActivityPolicy;
 import com.blog.auth.service.LoginSessionService;
+import com.blog.auth.service.SocialClientRegistrations;
+import com.blog.auth.service.SocialOAuth2UserService;
 import com.blog.common.security.JsonSecurityErrorHandler;
 import com.blog.common.security.JwtCookieAuthFilter;
 import com.blog.common.security.JwtProvider;
@@ -33,6 +37,9 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>주소 권한: 비회원·회원·관리자만 여기서 나눈다. 블로그별 역할은 {@code @PreAuthorize("@blogAuthz...")}로 메서드에서 확인한다
  *       (SEC-11, T017).
  *   <li>보안 헤더: X-Frame-Options DENY, nosniff, CSP, HSTS(HTTPS일 때), Referrer-Policy (SEC-12).
+ *   <li>소셜 로그인(T157, D-128): 키가 있는 제공자가 하나라도 있으면 Spring OAuth2 로그인을 켠다. {@code GET
+ *       /oauth2/authorization/{google|github}}로 보내고 {@code /login/oauth2/code/{google|github}}로
+ *       돌아온다. 돌아온 뒤에는 일반 로그인과 같은 JWT 쿠키를 쓴다 (SocialLoginHandlers). state 값만 서버 세션에 잠깐 둔다.
  *   <li>HTTPS: {@code app.security.require-https=true}(prod)면 http 요청을 https로 돌려보낸다. 로드밸런서가 http로
  *       묻는 상태 확인 주소만 예외 (SEC-10, OPS-11).
  * </ul>
@@ -79,9 +86,28 @@ public class SecurityConfig {
       LoginSessionService sessionService,
       ActivityPolicy activityPolicy,
       JsonMapper jsonMapper,
+      SocialClientRegistrations socialRegistrations,
+      SocialAuthorizationRequestResolver socialRequestResolver,
+      SocialOAuth2UserService socialUserService,
+      SocialLoginHandlers socialHandlers,
       @Value("${app.security.require-https:false}") boolean requireHttps)
       throws Exception {
     JsonSecurityErrorHandler errorHandler = new JsonSecurityErrorHandler(jsonMapper);
+
+    if (!socialRegistrations.isEmpty()) {
+      http.oauth2Login(
+          oauth ->
+              oauth
+                  // 기본 로그인 화면(/login)을 만들지 않게 우리 화면을 알려 준다
+                  .loginPage("/login.html")
+                  .clientRegistrationRepository(socialRegistrations)
+                  // 제공자 토큰은 회원 정보를 읽을 때만 쓰고 보관하지 않는다
+                  .authorizedClientRepository(new NoopAuthorizedClientRepository())
+                  .authorizationEndpoint(a -> a.authorizationRequestResolver(socialRequestResolver))
+                  .userInfoEndpoint(u -> u.userService(socialUserService))
+                  .successHandler(socialHandlers)
+                  .failureHandler(socialHandlers));
+    }
 
     if (requireHttps) {
       // 어느 포트로 들어왔든 사용자에게는 443(https 기본 포트)으로 보낸다. 서버는 docker가 연 포트(APP_PORT)로도 받는데,

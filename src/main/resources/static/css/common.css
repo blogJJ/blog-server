@@ -1951,3 +1951,50 @@ a.site-header__nickname {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
 }
+
+/* ---------- 소셜 로그인 (T157, D-128) ---------- */
+.social-login {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.social-login__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 4px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.social-login__divider::before,
+.social-login__divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-border);
+}
+
+.social-login--top .social-login__divider {
+  order: 1;
+  margin: 12px 0 20px;
+}
+
+.button--social {
+  gap: 8px;
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.button--social svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.social-accounts__status {
+  color: var(--color-muted);
+  font-size: 13px;
+  word-break: break-all;
+}

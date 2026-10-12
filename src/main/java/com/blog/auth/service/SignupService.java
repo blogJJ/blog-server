@@ -100,10 +100,7 @@ public class SignupService {
   public User signup(SignupForm form) {
     String email = normalizeEmail(form.email());
     validatePassword(form.password());
-    String name = form.name() == null ? "" : form.name().strip();
-    if (name.isEmpty() || name.length() > 30) {
-      throw new BusinessException(ErrorCode.INVALID_INPUT, "이름을 1~30자로 입력해 주세요.");
-    }
+    String name = validateName(form.name());
     String nickname = validateNickname(form.nickname());
     String phone = normalizePhone(form.phone());
     if (!Boolean.TRUE.equals(form.agreeTerms()) || !Boolean.TRUE.equals(form.agreePrivacy())) {
@@ -144,6 +141,14 @@ public class SignupService {
     if (password == null || !PASSWORD.matcher(password).matches()) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "비밀번호는 8~15자로 영문, 숫자, 특수문자를 모두 넣어 주세요.");
     }
+  }
+
+  static String validateName(String rawName) {
+    String name = rawName == null ? "" : rawName.strip();
+    if (name.isEmpty() || name.length() > 30) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT, "이름을 1~30자로 입력해 주세요.");
+    }
+    return name;
   }
 
   static String validateNickname(String rawNickname) {

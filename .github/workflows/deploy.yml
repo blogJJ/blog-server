@@ -12,6 +12,8 @@
 #   MAIL_USERNAME, MAIL_PASSWORD                 Gmail 주소와 앱 비밀번호
 #   TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY     Cloudflare Turnstile 키
 #   ANTHROPIC_API_KEY (선택)                      블로그 마스코트를 Claude로 고른다. 없으면 태그 단어 사전으로 고른다 (D-116)
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (선택) 구글 소셜 로그인. 없으면 구글 버튼이 숨는다 (T157, D-128, docs/social-login.md)
+#   GH_CLIENT_ID, GH_CLIENT_SECRET (선택)         깃허브 소셜 로그인. 없으면 깃허브 버튼이 숨는다. GITHUB_로 시작하는 이름은 secret으로 못 쓴다 (T157, D-128)
 name: Deploy
 
 on:
@@ -58,6 +60,10 @@ jobs:
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+      GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
     steps:
       - name: Check secrets
         run: |
@@ -123,6 +129,12 @@ jobs:
           if [ -n "$ANTHROPIC_API_KEY" ]; then
             put ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
           fi
+          # 소셜 로그인 키(선택). 아이디와 비밀값이 모두 있는 제공자만 켜진다
+          for name in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GH_CLIENT_ID GH_CLIENT_SECRET; do
+            if [ -n "${!name}" ]; then
+              put "$name" "${!name}"
+            fi
+          done
 
       - name: Upload to server
         run: |

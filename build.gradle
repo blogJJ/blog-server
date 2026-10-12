@@ -27,6 +27,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     // 상태 확인 주소 /actuator/health만 연다 (T138, OPS-04)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // 구글·깃허브 소셜 로그인 (T157, D-128)
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     runtimeOnly 'org.flywaydb:flyway-mysql'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
