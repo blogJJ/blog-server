@@ -71,6 +71,7 @@ public class MeController {
 
   /**
    * @param suspendedUntil 계정 정지 중이면 끝나는 시각, 아니면 null (ADM-08)
+   * @param hasPassword 비밀번호가 있는지. 소셜 로그인으로만 가입했으면 false라 화면이 "현재 비밀번호" 없이 새로 만들게 한다 (D-128)
    */
   public record MeResponse(
       Long id,
@@ -82,7 +83,8 @@ public class MeController {
       String profileImage,
       UserRole role,
       LocalDateTime suspendedUntil,
-      LocalDateTime createdAt) {
+      LocalDateTime createdAt,
+      boolean hasPassword) {
 
     static MeResponse of(User user) {
       return new MeResponse(
@@ -95,7 +97,8 @@ public class MeController {
           ImageService.url(user.getProfileImage()),
           user.getRole(),
           user.getSuspendedUntil(),
-          user.getCreatedAt());
+          user.getCreatedAt(),
+          user.hasPassword());
     }
   }
 

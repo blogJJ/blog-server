@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>릴리즈 노트 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/release-notes.js" defer></script>
+  </head>
+  <body>
+    <!-- 버전 하나의 릴리즈 노트 (T159, D-130). ?v=v1.0.3 -->
+    <main>
+      <p class="release-back"><a href="/release-notes.html">← 릴리즈 노트</a></p>
+      <article class="release" id="release" hidden>
+        <h1 class="release__title" id="release-title"></h1>
+        <p class="release__date" id="release-date"></p>
+        <ul class="release__changes" id="release-changes"></ul>
+      </article>
+      <p class="empty" id="release-empty" hidden>찾는 버전이 없어요.</p>
+    </main>
+  </body>
+</html>

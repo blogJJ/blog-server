@@ -29,7 +29,7 @@ public class MeService {
   public User updateProfile(Long userId, ProfileForm form) {
     User user = load(userId);
     String nickname = SignupService.validateNickname(form.nickname());
-    String phone = SignupService.normalizePhone(form.phone());
+    String phone = optionalPhone(user, form.phone());
     String bio = form.bio() == null ? null : form.bio().strip();
     if (bio != null && bio.codePointCount(0, bio.length()) > BIO_MAX) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "소개는 200자까지 쓸 수 있어요.");
@@ -47,13 +47,19 @@ public class MeService {
   }
 
   /**
-   * 현재 비밀번호를 확인하고 바꾼다. 로그인을 모두 끝내는 일은 부른 쪽이 새 로그인을 만들며 함께 한다.
+   * 현재 비밀번호를 확인하고 바꾼다. 로그인을 모두 끝내는 일은 부른 쪽이 새 로그인을 만들며 함께 한다. 소셜 로그인으로만 가입해 비밀번호가 없으면 현재 비밀번호 없이 새로
+   * 만든다 (D-128).
    *
    * @throws BusinessException 현재 비밀번호가 틀리거나, 새 비밀번호가 규칙에 맞지 않거나 지금과 같으면 INVALID_INPUT
    */
   @Transactional
   public User changePassword(Long userId, String currentPassword, String newPassword) {
     User user = load(userId);
+    if (!user.hasPassword()) {
+      SignupService.validatePassword(newPassword);
+      user.changePassword(passwordEncoder.encode(newPassword));
+      return user;
+    }
     if (currentPassword == null
         || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "현재 비밀번호가 맞지 않아요.");
@@ -64,6 +70,14 @@ public class MeService {
     }
     user.changePassword(passwordEncoder.encode(newPassword));
     return user;
+  }
+
+  /** 소셜 로그인으로 가입해 전화번호가 없는 회원은 비워 둔 채 저장할 수 있다. 한 번 넣은 번호는 이메일 찾기(USR-08)에 쓰이므로 지울 수 없다 (D-128). */
+  private static String optionalPhone(User user, String rawPhone) {
+    if (user.getPhone() == null && (rawPhone == null || rawPhone.isBlank())) {
+      return null;
+    }
+    return SignupService.normalizePhone(rawPhone);
   }
 
   /**

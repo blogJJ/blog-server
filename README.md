@@ -55,8 +55,16 @@ IntelliJ에서 `BlogServerApplication`을 바로 실행할 때는 Run Configurat
 - main의 CI가 통과하면 `.github/workflows/deploy.yml`이 도커 이미지를 만들어 ssh로 서버에 올리고 `deploy/deploy.sh`로 띄운다. Actions 탭 > Deploy > Run workflow로 직접 돌릴 수도 있다.
 - 필요한 값은 저장소 Settings > Secrets and variables > Actions의 Repository secrets에 넣는다. 이름 목록은 `deploy.yml` 맨 위에 있다. DB는 Crowfoot의 MySQL #2(빈 DB)이고, 서버가 처음 뜰 때 Flyway가 테이블을 만든다. `DB_ADDRESS`는 s4.java21.net이 아니라 내부 IP `10.116.64.14`를 넣는다. 실습 서버의 /etc/hosts는 그 이름을 내부 IP로 바꿔 주지만 도커 컨테이너 안에서는 외부 주소로 가서 `No route to host`가 난다.
 - 더미 데이터는 Run workflow에서 "더미 데이터 넣기"를 켜고 돌리면 서버가 뜬 뒤 서버 안에서 mysql 클라이언트 컨테이너로 `dummy/dummy_data.sql`, `dummy/dummy_data_bulk.sql`, `dummy/dummy_ops.sql`을 넣는다(회원 140명, 블로그 38개, 글 550개, 댓글 2,300개, 좋아요 2,500개, 팔로우 500개, 신고 280건, 참여 신청 50건, 멤버 제재 24건). 대량 파일은 `python3 dummy/make_bulk.py > dummy/dummy_data_bulk.sql`로 다시 만든다. 더미 관리자(admin@example.com)도 비밀번호가 test1234!라서, 실제로 쓰기 시작하면 바꾼다.
-- 서버에서는 `~/blog-server/`에 파일이 있고, 컨테이너 이름은 `<계정>-blog-server`다. 로그는 `docker logs <계정>-blog-server`. 새 버전이 2분 안에 뜨지 않으면 마지막으로 성공한 버전으로 되돌린다.
+- 서버에서는 `~/blog-server/`에 파일이 있고, 앱 컨테이너는 `<계정>-blog-server-blue`/`-green` 두 개를 번갈아 띄운다. 로그는 `docker logs <계정>-blog-server-blue`. 새 컨테이너가 4분(`HEALTH_TIMEOUT` 초) 안에 뜨지 않으면 지우고 돌던 컨테이너를 그대로 둔다.
+- DB 변경(Flyway)은 잠금을 30초까지만 기다린다(`spring.flyway.init-sqls`). 배포 로그에 `Lock wait timeout exceeded`가 보이면 누군가 트랜잭션을 열어 둔 것이다. DB 툴에서 `SHOW FULL PROCESSLIST;`로 오래 `Sleep` 중인 외부 연결을 찾아 커밋하거나 `KILL`한 뒤 다시 배포한다. DB 툴은 자동 커밋을 켜 두고 쓴다.
+- 구글·깃허브 소셜 로그인(T157)은 키를 넣어야 켜진다. 만드는 법과 넣을 secrets는 [docs/social-login.md](docs/social-login.md).
 - nginx 설정(설명서 5단계)은 이 저장소 밖에서 한다. nginx는 `X-Forwarded-Proto`를 넘겨야 한다(안 넘기면 https로 돌려보낸다).
+
+## 릴리즈 노트
+
+- 사이트의 `/release-notes.html`(API `GET /api/release-notes`, `/api/release-notes/{버전}`)은 `src/main/resources/release-notes.json`을 보여 준다. 저장소가 비공개라 서버가 GitHub Releases를 읽지 못해서 파일로 둔다.
+- 사용자에게 보일 변경이 있는 PR은 파일 맨 위에 새 버전을 더한다. MAJOR는 아주 큰 업데이트, MINOR는 기능 추가, PATCH는 버그 수정·작은 변경. 제목은 짧게, 바뀐 점은 사용자가 읽을 쉬운 말로 쓴다.
+- 배포가 성공하면 `.github/workflows/release.yml`이 맨 위 버전으로 태그와 GitHub 릴리즈를 만든다. 새 항목이 없으면(이미 태그가 있으면) 아무것도 하지 않는다.
 
 ## 자주 쓰는 명령
 
@@ -75,7 +83,7 @@ src/main/java/com/blog/
 ├── auth/      회원·인증 (USR, SEC-01~05, 13)
 ├── blog/      블로그·멤버·폐쇄·블랙리스트 (BLG)
 ├── board/     공통 게시판: 글, 댓글, 태그, 이미지 (BRD-01~07, 11)
-├── main/      통합 검색, 메인 피드, 공지 (BRD-08~10)
+├── main/      통합 검색, 메인 피드, 공지 (BRD-08~10), 릴리즈 노트
 ├── social/    팔로우, 구독, 알림, 차단, 신고 (SOC)
 ├── admin/     메인 관리자 (ADM)
 ├── batch/     매일 04:00 배치

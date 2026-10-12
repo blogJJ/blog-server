@@ -33,6 +33,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 누가 테이블에 트랜잭션을 열어 둔 채면 ALTER TABLE이 끝없이 기다리고, 기다리는 동안 그 테이블의 다른 조회까지 막힌다.
+    # 30초 넘게 잠금을 기다리면 "Lock wait timeout exceeded"로 실패하고 서버가 뜨지 않게 한다
+    init-sqls: SET SESSION lock_wait_timeout = 30
 
   jackson:
     time-zone: Asia/Seoul
@@ -88,6 +91,15 @@ server:
     include-message: never
     include-binding-errors: never
     include-exception: false
+  # 서버 세션은 소셜 로그인 도중(구글·깃허브에 다녀오는 몇 분)에만 쓴다 (T157). 로그인 자체는 JWT 쿠키.
+  # 주소에 ;jsessionid가 붙지 않게 쿠키로만, 제공자에서 돌아오는 요청에도 실리게 SameSite=Lax
+  servlet:
+    session:
+      timeout: 15m
+      tracking-modes: cookie
+      cookie:
+        http-only: true
+        same-site: lax
   # 프록시(ALB 등) 뒤에서 X-Forwarded-* 헤더를 믿을지. 이중화 때 설정만 바꾼다 (SC-008)
   forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
@@ -128,6 +140,15 @@ app:
   turnstile:
     site-key: ${TURNSTILE_SITE_KEY:}
     secret-key: ${TURNSTILE_SECRET_KEY:}
+  # 소셜 로그인 (T157, D-128). 아이디·비밀값이 모두 있는 제공자만 켜진다. 비어 있으면 그 버튼이 숨고 서버는 그대로 뜬다.
+  # 만드는 법은 docs/social-login.md. 돌아오는 주소는 {사이트 주소}/login/oauth2/code/google, /login/oauth2/code/github
+  social:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+    github:
+      client-id: ${GH_CLIENT_ID:}
+      client-secret: ${GH_CLIENT_SECRET:}
   # 블로그 마스코트 (BLG-14, D-116). 키가 비어 있으면 Claude를 부르지 않고 태그 단어 사전으로 고른다
   mascot:
     api-key: ${ANTHROPIC_API_KEY:}
