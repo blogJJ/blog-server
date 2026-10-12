@@ -248,10 +248,10 @@ public class CommentService {
     return content;
   }
 
-  /** 탈퇴한 회원은 "탈퇴한 계정"으로 보인다. */
+  /** 탈퇴한 회원은 "탈퇴한 회원"으로 보인다 (D-05). */
   static String nickname(User user) {
     if (!user.isActive() || user.getNickname() == null) {
-      return PostQueryService.HIDDEN_AUTHOR;
+      return PostQueryService.WITHDRAWN_AUTHOR;
     }
     return user.getNickname();
   }

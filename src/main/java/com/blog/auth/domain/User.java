@@ -177,6 +177,16 @@ public class User extends BaseTimeEntity {
     this.notificationKeepDays = days;
   }
 
+  /**
+   * 회원 탈퇴 (USR-05). 로그인용 이메일은 바로 비워 같은 이메일로 다시 가입할 수 있게 한다. 이름·닉네임·전화번호·사진은 30일 뒤 04:00 배치가 지운다
+   * (4.5, D-40).
+   */
+  public void withdraw(LocalDateTime now) {
+    this.status = UserStatus.WITHDRAWN;
+    this.email = null;
+    this.withdrawnAt = now;
+  }
+
   /** 다음 로그인 때 사람 확인이 필요한지 */
   public boolean needsCaptcha() {
     return loginFailCount >= CAPTCHA_AFTER_FAILS;

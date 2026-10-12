@@ -7,6 +7,9 @@ import com.blog.auth.repository.UserRepository;
 import com.blog.auth.service.LoginSessionService;
 import com.blog.auth.service.MeService;
 import com.blog.auth.service.MeService.ProfileForm;
+import com.blog.auth.service.WithdrawService;
+import com.blog.auth.service.WithdrawService.OwnedBlog;
+import com.blog.auth.service.WithdrawService.WithdrawBlockedException;
 import com.blog.board.service.ImageService;
 import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
@@ -17,12 +20,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,7 +36,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/** 내 정보 (T098, USR-07). 본인에게는 이메일·이름·전화번호를 가리지 않고 보여 준다. 바꿀 수 있는 것은 닉네임·전화번호·소개·프로필 사진·비밀번호뿐이다. */
+/**
+ * 내 정보 (T098, USR-07)와 회원 탈퇴 (T092, USR-05). 본인에게는 이메일·이름·전화번호를 가리지 않고 보여 준다. 바꿀 수 있는 것은
+ * 닉네임·전화번호·소개·프로필 사진·비밀번호뿐이다.
+ */
 @RestController
 @RequestMapping("/api/me")
 public class MeController {
@@ -41,6 +50,7 @@ public class MeController {
   private final LoginSessionService sessionService;
   private final AuthCookies authCookies;
   private final RateLimitGuard rateLimitGuard;
+  private final WithdrawService withdrawService;
 
   public MeController(
       UserRepository userRepository,
@@ -48,13 +58,15 @@ public class MeController {
       ImageService imageService,
       LoginSessionService sessionService,
       AuthCookies authCookies,
-      RateLimitGuard rateLimitGuard) {
+      RateLimitGuard rateLimitGuard,
+      WithdrawService withdrawService) {
     this.userRepository = userRepository;
     this.meService = meService;
     this.imageService = imageService;
     this.sessionService = sessionService;
     this.authCookies = authCookies;
     this.rateLimitGuard = rateLimitGuard;
+    this.withdrawService = withdrawService;
   }
 
   /**
@@ -88,6 +100,23 @@ public class MeController {
   }
 
   public record PasswordForm(String currentPassword, String newPassword) {}
+
+  public record WithdrawForm(String password) {}
+
+  /**
+   * 탈퇴할 수 있는지. blogs가 비어 있지 않으면 그 블로그를 위임하거나 폐쇄해야 한다.
+   *
+   * @param guide 화면에 보일 안내
+   */
+  public record WithdrawCheck(boolean allowed, List<OwnedBlog> blogs, String guide) {}
+
+  /** 탈퇴를 막았을 때 본문: 다른 오류처럼 {code, message}에 블로그 목록과 안내를 더한다. */
+  public record WithdrawBlockedResponse(
+      String code, String message, List<OwnedBlog> blogs, String guide) {}
+
+  static final String WITHDRAW_GUIDE =
+      "블로그 관리 화면의 [위임·폐쇄] 탭에서 다른 멤버에게 블로그장을 넘기거나 블로그를 폐쇄해 주세요."
+          + " 폐쇄 예정인 블로그는 폐쇄가 끝난 다음 날부터 탈퇴할 수 있어요.";
 
   @GetMapping
   public MeResponse me(@AuthenticationPrincipal AuthUser authUser) {
@@ -124,6 +153,34 @@ public class MeController {
         sessionService.start(user, rememberMe, request.getHeader(HttpHeaders.USER_AGENT));
     authCookies.write(response, issued.accessToken(), issued.refreshToken(), issued.cookieMaxAge());
     return ResponseEntity.noContent().build();
+  }
+
+  /** 탈퇴 화면에서 먼저 확인한다 (T094) */
+  @GetMapping("/withdraw")
+  public WithdrawCheck withdrawCheck(@AuthenticationPrincipal AuthUser authUser) {
+    List<OwnedBlog> blogs = withdrawService.blockingBlogs(authUser.id());
+    return new WithdrawCheck(blogs.isEmpty(), blogs, blogs.isEmpty() ? null : WITHDRAW_GUIDE);
+  }
+
+  /** 회원 탈퇴 (T092, USR-05). 비밀번호를 다시 확인하고, 통과하면 로그인 쿠키도 지운다 */
+  @PostMapping("/withdraw")
+  public ResponseEntity<Void> withdraw(
+      @AuthenticationPrincipal AuthUser authUser,
+      @RequestBody WithdrawForm form,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    rateLimitGuard.check("me-withdraw", request, 10, Duration.ofMinutes(10));
+    withdrawService.withdraw(authUser.id(), form.password());
+    authCookies.clear(response);
+    return ResponseEntity.noContent().build();
+  }
+
+  @ExceptionHandler(WithdrawBlockedException.class)
+  public ResponseEntity<WithdrawBlockedResponse> withdrawBlocked(WithdrawBlockedException e) {
+    ErrorCode code = e.getErrorCode();
+    return ResponseEntity.status(code.getStatus())
+        .body(
+            new WithdrawBlockedResponse(code.name(), e.getMessage(), e.getBlogs(), WITHDRAW_GUIDE));
   }
 
   /** 프로필 사진 (3MB 1장). 이전 사진은 지운다 */

@@ -235,7 +235,8 @@ public class BlogService {
         TagNormalizer.normalizeAll(form.tags()));
   }
 
-  private void checkLimit(Long ownerId, BlogVisibility visibility, Long excludeBlogId) {
+  /** 생성 개수 제한 (BLG-10). 위임을 받을 때도 받는 사람 기준으로 같은 제한을 본다(TransferService). 부르기 전에 그 회원 행을 잠근다. */
+  void checkLimit(Long ownerId, BlogVisibility visibility, Long excludeBlogId) {
     boolean priv = isPrivate(visibility);
     List<BlogVisibility> group =
         priv

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>블로그장 위임 요청 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/session.js" defer></script>
+    <script src="/js/blog-card.js" defer></script>
+    <script src="/js/transfer.js" defer></script>
+  </head>
+  <body>
+    <!-- 받은 블로그장 위임 요청 수락·거절 (T093, BLG-08, D-16, D-31) -->
+    <main>
+      <div class="page-head">
+        <h1>블로그장 위임 요청</h1>
+      </div>
+      <p class="field__hint">수락하면 바로 그 블로그의 블로그장이 되고, 보낸 사람은 멤버로 남아요. 7일 안에 응답하지 않으면 요청은 자동으로 취소돼요.</p>
+      <ul class="admin-list" id="transfers"></ul>
+      <p class="empty" id="transfers-empty" hidden>받은 위임 요청이 없어요.</p>
+    </main>
+  </body>
+</html>
