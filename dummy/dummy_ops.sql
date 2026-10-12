@@ -17,49 +17,42 @@ SET NAMES utf8mb4;
 SET @seeded := (SELECT COUNT(*) FROM reports WHERE detail = '[예시] 더미 신고 데이터 표시');
 SET @admin := (SELECT id FROM users WHERE email = 'admin@example.com');
 
--- 블로그마다 블로그장이 아닌 멤버(정지 안 됨) 순번
-DROP TEMPORARY TABLE IF EXISTS tmp_members;
-CREATE TEMPORARY TABLE tmp_members AS
-SELECT m.blog_id, m.user_id,
-       ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
-FROM blog_members m
-JOIN blogs b ON b.id = m.blog_id
-JOIN users u ON u.id = m.user_id
-WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
-  AND u.status = 'ACTIVE' AND u.role = 'USER';
-
-DROP TEMPORARY TABLE IF EXISTS tmp_members2, tmp_members3;
-CREATE TEMPORARY TABLE tmp_members2 AS SELECT * FROM tmp_members;
-CREATE TEMPORARY TABLE tmp_members3 AS SELECT * FROM tmp_members;
-
--- 블로그장이 아닌 사람이 쓴 글(블로그마다 최근 3개)
-DROP TEMPORARY TABLE IF EXISTS tmp_posts;
-CREATE TEMPORARY TABLE tmp_posts AS
-SELECT * FROM (
-  SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
-         ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
-  FROM posts p
-  JOIN blogs b ON b.id = p.blog_id
-  JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
-  WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
-) x WHERE rn <= 3;
-
--- 블로그장이 아닌 사람이 쓴 댓글(블로그마다 최근 2개)
-DROP TEMPORARY TABLE IF EXISTS tmp_comments;
-CREATE TEMPORARY TABLE tmp_comments AS
-SELECT * FROM (
-  SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
-         ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
-  FROM comments c
-  JOIN posts p ON p.id = c.post_id
-  JOIN users u ON u.id = c.author_id
-  JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
-  WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
-) x WHERE rn <= 2;
+-- 아래 INSERT마다 같은 WITH 절로 고릅니다(서버 DB 계정에 임시 테이블 권한이 없음).
+--   tmp_members: 블로그마다 블로그장이 아닌 멤버(정지 안 됨) 순번
+--   tmp_posts: 블로그장이 아닌 사람이 쓴 글(블로그마다 최근 3개)
+--   tmp_comments: 블로그장이 아닌 사람이 쓴 댓글(블로그마다 최근 2개)
 
 -- 신고자: 대상 작성자가 아닌 그 블로그 멤버 중 순번이 가장 앞선 사람
 -- 1. 대기 신고: 글 (최근 글 1, 2번째)
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'POST', p.id, p.blog_id, 'BLOG_OWNER',
        ELT(1 + (p.id % 5), 'SPAM', 'ABUSE', 'ADULT', 'ILLEGAL', 'ETC'),
        ELT(1 + (p.id % 4), '같은 홍보 글을 계속 올려요.', '제목과 다른 내용이에요. 확인 부탁드려요.', NULL, '다른 블로그 글을 그대로 가져온 것 같아요.'),
@@ -67,11 +60,39 @@ SELECT r.user_id, 'POST', p.id, p.blog_id, 'BLOG_OWNER',
        'PENDING', NOW() - INTERVAL (p.id % 72) HOUR
 FROM tmp_posts p
 JOIN tmp_members r ON r.blog_id = p.blog_id
- AND r.rn = (SELECT MIN(r2.rn) FROM tmp_members2 r2 WHERE r2.blog_id = p.blog_id AND r2.user_id <> p.author_id)
+ AND r.rn = (SELECT MIN(r2.rn) FROM tmp_members r2 WHERE r2.blog_id = p.blog_id AND r2.user_id <> p.author_id)
 WHERE @seeded = 0 AND p.rn <= 2;
 
 -- 1. 대기 신고: 댓글
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'COMMENT', c.id, c.blog_id, 'BLOG_OWNER',
        ELT(1 + (c.id % 3), 'ABUSE', 'SPAM', 'ETC'),
        ELT(1 + (c.id % 3), '말투가 너무 공격적이에요.', NULL, '댓글마다 같은 링크를 달아요.'),
@@ -79,22 +100,78 @@ SELECT r.user_id, 'COMMENT', c.id, c.blog_id, 'BLOG_OWNER',
        'PENDING', NOW() - INTERVAL (c.id % 48) HOUR
 FROM tmp_comments c
 JOIN tmp_members r ON r.blog_id = c.blog_id
- AND r.rn = (SELECT MIN(r2.rn) FROM tmp_members2 r2 WHERE r2.blog_id = c.blog_id AND r2.user_id <> c.author_id)
+ AND r.rn = (SELECT MIN(r2.rn) FROM tmp_members r2 WHERE r2.blog_id = c.blog_id AND r2.user_id <> c.author_id)
 WHERE @seeded = 0;
 
 -- 1. 대기 신고: 블로그 안 회원 (순번 마지막 멤버를 첫 멤버가 신고)
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'USER', t.user_id, t.blog_id, 'BLOG_OWNER', 'ABUSE',
        '여러 글에 같은 비방 댓글을 달고 있어요.',
        CONCAT('[회원] ', u.nickname), 'PENDING', NOW() - INTERVAL 5 HOUR
 FROM tmp_members t
 JOIN users u ON u.id = t.user_id
-JOIN tmp_members2 r ON r.blog_id = t.blog_id AND r.rn = 1
+JOIN tmp_members r ON r.blog_id = t.blog_id AND r.rn = 1
 WHERE @seeded = 0 AND t.rn > 1
-  AND t.rn = (SELECT MAX(x.rn) FROM tmp_members3 x WHERE x.blog_id = t.blog_id);
+  AND t.rn = (SELECT MAX(x.rn) FROM tmp_members x WHERE x.blog_id = t.blog_id);
 
 -- 2. 이미 처리한 신고: 블로그마다 최근 3번째 글. 블로그 번호에 따라 문제 없음 / 경고 / 3일 정지
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, handled_by, handled_at, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'POST', p.id, p.blog_id, 'BLOG_OWNER', 'SPAM', '광고 글이에요.',
        CONCAT('[글] ', p.title, '\n', LEFT(REPLACE(p.content, '\n', ' '), 200)),
        ELT(1 + (p.blog_id % 3), 'NO_ISSUE', 'WARNED', 'SUSPENDED'),
@@ -102,7 +179,7 @@ SELECT r.user_id, 'POST', p.id, p.blog_id, 'BLOG_OWNER', 'SPAM', '광고 글이�
 FROM tmp_posts p
 JOIN blogs b ON b.id = p.blog_id
 JOIN tmp_members r ON r.blog_id = p.blog_id
- AND r.rn = (SELECT MIN(r2.rn) FROM tmp_members2 r2 WHERE r2.blog_id = p.blog_id AND r2.user_id <> p.author_id)
+ AND r.rn = (SELECT MIN(r2.rn) FROM tmp_members r2 WHERE r2.blog_id = p.blog_id AND r2.user_id <> p.author_id)
 WHERE @seeded = 0 AND p.rn = 3;
 
 -- 2. 처리한 신고에 맞는 멤버 제재 (경고, 3일 정지)
@@ -141,6 +218,34 @@ WHERE @seeded = 0 AND s.reason IN ('광고 글을 반복해서 올렸어요.', '
 
 -- 3. 메인 관리자가 처리할 신고: 블로그장 본인 (블로그마다), 블로그 자체 (블로그 번호 짝수)
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'USER', b.owner_id, b.id, 'ADMIN', 'ABUSE',
        '블로그장이 멤버 댓글을 이유 없이 지워요.',
        CONCAT('[회원] ', u.nickname), 'PENDING', NOW() - INTERVAL 10 HOUR
@@ -150,12 +255,40 @@ JOIN tmp_members r ON r.blog_id = b.id AND r.rn = 1
 WHERE @seeded = 0 AND b.status = 'ACTIVE';
 
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'BLOG', b.id, b.id, 'ADMIN', 'ETC',
        '블로그 소개와 실제 글 주제가 달라요.',
        CONCAT('[블로그] ', b.name, IF(b.description IS NULL, '', CONCAT('\n', b.description))),
        'PENDING', NOW() - INTERVAL 20 HOUR
 FROM blogs b
-JOIN tmp_members2 r ON r.blog_id = b.id AND r.rn = 2
+JOIN tmp_members r ON r.blog_id = b.id AND r.rn = 2
 WHERE @seeded = 0 AND b.status = 'ACTIVE' AND b.id % 2 = 0;
 
 -- 3. 메인 프로필 신고 (블로그 없이): 대량 회원 몇 명
@@ -170,6 +303,34 @@ WHERE @seeded = 0 AND t.email IN ('bulk010@example.com', 'bulk020@example.com', 
 SET @first_blog := (SELECT id FROM blogs WHERE status = 'ACTIVE' ORDER BY created_at, id LIMIT 1);
 
 INSERT INTO reports (reporter_id, target_type, target_id, blog_id, handler_scope, reason, detail, target_snapshot, status, handled_by, handled_at, created_at)
+WITH tmp_members AS (
+  SELECT m.blog_id, m.user_id,
+         ROW_NUMBER() OVER (PARTITION BY m.blog_id ORDER BY m.joined_at, m.user_id) AS rn
+  FROM blog_members m
+  JOIN blogs b ON b.id = m.blog_id
+  JOIN users u ON u.id = m.user_id
+  WHERE b.status = 'ACTIVE' AND m.user_id <> b.owner_id AND m.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+), tmp_posts AS (
+  SELECT * FROM (
+    SELECT p.id, p.blog_id, p.author_id, p.title, p.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY p.created_at DESC, p.id DESC) AS rn
+    FROM posts p
+    JOIN blogs b ON b.id = p.blog_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = p.author_id
+    WHERE p.status = 'PUBLISHED' AND b.status = 'ACTIVE'
+  ) x WHERE rn <= 3
+), tmp_comments AS (
+  SELECT * FROM (
+    SELECT c.id, p.blog_id, c.author_id, u.nickname, c.content,
+           ROW_NUMBER() OVER (PARTITION BY p.blog_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM comments c
+    JOIN posts p ON p.id = c.post_id
+    JOIN users u ON u.id = c.author_id
+    JOIN tmp_members tm ON tm.blog_id = p.blog_id AND tm.user_id = c.author_id
+    WHERE c.status = 'ACTIVE' AND p.status = 'PUBLISHED'
+  ) x WHERE rn <= 2
+)
 SELECT r.user_id, 'USER', b.owner_id, b.id, 'ADMIN', 'ABUSE', '공지 댓글에서 멤버에게 욕설을 했어요.',
        CONCAT('[회원] ', u.nickname), 'WARNED', @admin, NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 4 DAY
 FROM blogs b
@@ -225,7 +386,5 @@ SELECT rep.id, 'USER', t.id, NULL, 'ADMIN', 'ETC', '[예시] 더미 신고 데�
 FROM users t
 JOIN users rep ON rep.email = 'bulk002@example.com'
 WHERE @seeded = 0 AND t.email = 'bulk003@example.com';
-
-DROP TEMPORARY TABLE IF EXISTS tmp_members, tmp_members2, tmp_members3, tmp_posts, tmp_comments;
 
 SELECT handler_scope, status, COUNT(*) AS reports FROM reports GROUP BY handler_scope, status ORDER BY 1, 2;
