@@ -1,6 +1,7 @@
 package com.blog.board.repository;
 
 import com.blog.board.domain.Post;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -18,19 +19,28 @@ public interface PostRepository extends JpaRepository<Post, Long> {
           + " left join fetch p.category where p.id = :id")
   Optional<Post> findDetail(@Param("id") Long id);
 
-  /** 블로그 글 목록 (BRD-02). 공지는 따로 보여 주므로 뺀다. categoryId가 null이면 전체. 최신순. */
+  /**
+   * 블로그 글 목록 (BRD-02). 공지는 따로 보여 주므로 뺀다. categoryId가 null이면 전체. 최신순.
+   *
+   * @param hiddenAuthorIds 보는 사람이 차단한 작성자 (SOC-05). 없으면 BlockService.NONE
+   */
   @Query(
       value =
           "select p from Post p join fetch p.author left join fetch p.category"
               + " where p.blog.id = :blogId and p.status = com.blog.board.domain.PostStatus.PUBLISHED"
               + " and p.notice = false and (:categoryId is null or p.category.id = :categoryId)"
+              + " and p.author.id not in :hidden"
               + " order by p.createdAt desc, p.id desc",
       countQuery =
           "select count(p) from Post p"
               + " where p.blog.id = :blogId and p.status = com.blog.board.domain.PostStatus.PUBLISHED"
-              + " and p.notice = false and (:categoryId is null or p.category.id = :categoryId)")
+              + " and p.notice = false and (:categoryId is null or p.category.id = :categoryId)"
+              + " and p.author.id not in :hidden")
   Page<Post> findPublished(
-      @Param("blogId") Long blogId, @Param("categoryId") Long categoryId, Pageable pageable);
+      @Param("blogId") Long blogId,
+      @Param("categoryId") Long categoryId,
+      @Param("hidden") Collection<Long> hiddenAuthorIds,
+      Pageable pageable);
 
   /** 블로그 공지 (최신 몇 개) */
   @Query(

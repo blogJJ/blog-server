@@ -11,12 +11,12 @@
 # - 공용 서버라 컨테이너·이미지·볼륨 이름 앞에 접속 계정 이름을 붙여 다른 사람 것과 겹치지 않게 한다
 set -euo pipefail
 
-# bash deploy.sh --load-dummy : ~/blog-server/dummy_data.sql과 dummy_data_bulk.sql을 차례로 DB에 넣는다.
+# bash deploy.sh --load-dummy : ~/blog-server/dummy_data.sql, dummy_data_bulk.sql, dummy_ops.sql을 차례로 DB에 넣는다.
 # 서버 안에서 mysql 클라이언트 컨테이너를 띄워 넣는다(DB가 내부 주소라 깃허브에서는 붙지 못한다).
 # 접속 정보는 app.env의 DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD를 쓴다
 if [ "${1:-}" = "--load-dummy" ]; then
   APP_DIR="${APP_DIR:-$HOME/blog-server}"
-  for f in dummy_data.sql dummy_data_bulk.sql; do
+  for f in dummy_data.sql dummy_data_bulk.sql dummy_ops.sql; do
     [ -f "$APP_DIR/$f" ] || continue
     echo "== $f 넣기"
     docker run --rm -i --env-file "$APP_DIR/app.env" mysql:8.4 \

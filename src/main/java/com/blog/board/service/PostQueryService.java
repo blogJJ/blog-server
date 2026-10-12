@@ -16,6 +16,7 @@ import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
 import com.blog.common.security.BlogAuthz;
 import com.blog.common.web.PageResponse;
+import com.blog.social.service.BlockService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,12 +66,14 @@ public class PostQueryService {
    * @param html 걸러낸 본문 HTML. 화면은 이것만 innerHTML로 넣는다
    * @param markdown 고칠 때 쓰는 원문. 작성자에게만 준다
    * @param liked 보는 회원이 좋아요를 눌렀는지
+   * @param authorId 프로필로 가는 링크용. "탈퇴한 계정"이면 null
    */
   public record PostDetail(
       Long id,
       String title,
       String html,
       String markdown,
+      Long authorId,
       String authorNickname,
       Long categoryId,
       String categoryName,
@@ -98,6 +101,7 @@ public class PostQueryService {
   private final BlogAccessService accessService;
   private final BlogAuthz blogAuthz;
   private final ContentRenderer renderer;
+  private final BlockService blockService;
 
   public PostQueryService(
       PostRepository postRepository,
@@ -107,7 +111,8 @@ public class PostQueryService {
       PostLikeRepository likeRepository,
       BlogAccessService accessService,
       BlogAuthz blogAuthz,
-      ContentRenderer renderer) {
+      ContentRenderer renderer,
+      BlockService blockService) {
     this.postRepository = postRepository;
     this.postTagRepository = postTagRepository;
     this.imageRepository = imageRepository;
@@ -116,20 +121,30 @@ public class PostQueryService {
     this.accessService = accessService;
     this.blogAuthz = blogAuthz;
     this.renderer = renderer;
+    this.blockService = blockService;
   }
 
-  /** 블로그 글 목록 (T064). 첫 페이지에만 공지를 같이 준다. size는 10·20·30, 그 밖이면 10. */
+  /**
+   * 블로그 글 목록 (T064). 첫 페이지에만 공지를 같이 준다. size는 10·20·30, 그 밖이면 10. 내가 차단한 회원의 글은 빼지만, 내가 이 블로그 멤버면
+   * 그대로 보인다 (T104, SOC-05, D-36).
+   */
   @Transactional(readOnly = true)
   public PostList list(
       Long blogId, Long viewerId, String shareKey, Long categoryId, int size, int page) {
-    accessService.checkById(blogId, viewerId, shareKey);
+    BlogAccessService.Access access = accessService.checkById(blogId, viewerId, shareKey);
+    List<Long> hidden =
+        access.membership().isPresent()
+            ? BlockService.NONE
+            : blockService.hiddenAuthorIds(viewerId);
     int pageSize = PAGE_SIZES.contains(size) ? size : 10;
     int index = Math.max(page, 1) - 1;
     Page<Post> posts =
-        postRepository.findPublished(blogId, categoryId, PageRequest.of(index, pageSize));
+        postRepository.findPublished(blogId, categoryId, hidden, PageRequest.of(index, pageSize));
     List<Post> notices =
         index == 0 && categoryId == null
-            ? postRepository.findNotices(blogId, PageRequest.of(0, NOTICE_LIMIT))
+            ? postRepository.findNotices(blogId, PageRequest.of(0, NOTICE_LIMIT)).stream()
+                .filter(p -> !hidden.contains(p.getAuthor().getId()))
+                .toList()
             : List.of();
     return new PostList(summaries(notices), PageResponse.of(posts, this::summaries));
   }
@@ -165,6 +180,7 @@ public class PostQueryService {
         post.getTitle(),
         renderer.render(post.getContent()),
         canEdit ? post.getContent() : null,
+        authorId(post),
         authorName(post),
         category == null ? null : category.getId(),
         category == null ? null : category.getName(),
@@ -245,7 +261,7 @@ public class PostQueryService {
   }
 
   /** 서비스를 탈퇴한 작성자는 "탈퇴한 회원"(D-05), 블로그를 떠났거나 강퇴된 작성자는 "탈퇴한 계정"으로 보인다 (BLG-07, BLG-11, D-33). */
-  static String authorName(Post post) {
+  public static String authorName(Post post) {
     User author = post.getAuthor();
     if (!author.isActive() || author.getNickname() == null) {
       return WITHDRAWN_AUTHOR;
@@ -254,5 +270,13 @@ public class PostQueryService {
       return HIDDEN_AUTHOR;
     }
     return author.getNickname();
+  }
+
+  /** 프로필로 갈 작성자 번호. "탈퇴한 계정"·"탈퇴한 회원"으로 보이는 글이면 null */
+  public static Long authorId(Post post) {
+    String name = authorName(post);
+    return HIDDEN_AUTHOR.equals(name) || WITHDRAWN_AUTHOR.equals(name)
+        ? null
+        : post.getAuthor().getId();
   }
 }

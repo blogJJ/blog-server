@@ -1,5 +1,6 @@
 /*
  * 블로그 화면들이 같이 쓰는 조각 (T054~T056): 블로그 카드, 페이지 번호, 공개 범위 이름.
+ * 메인 피드·통합 검색의 글 카드(T110)도 여기 둔다.
  * 회원이 쓴 값(이름·소개·태그·닉네임)은 모두 textContent로 넣는다(innerHTML 금지, SEC-06).
  */
 (function () {
@@ -67,6 +68,53 @@
     return a;
   }
 
+  /** 프로필 화면 주소 (SOC-03) */
+  function profileUrl(userId) {
+    return '/profile.html?id=' + encodeURIComponent(userId);
+  }
+
+  /**
+   * 메인 피드·통합 검색의 글 한 줄 (T110). 어느 블로그 글인지 같이 보여 준다 (D-65).
+   * 작성자가 "탈퇴한 계정"이면 authorId가 없어 프로필 링크를 걸지 않는다.
+   */
+  function postCard(post) {
+    var li = el('li', 'feed-item');
+    var body = el('div', 'feed-item__body');
+    var title = el('a', 'feed-item__title', post.title);
+    title.href = blogUrl(post.blogSlug) + '/posts/' + post.id;
+    body.appendChild(title);
+    if (post.commentCount > 0) {
+      body.appendChild(el('span', 'post-row__comments', '[' + post.commentCount + ']'));
+    }
+    var meta = el('p', 'feed-item__meta');
+    var blog = el('a', 'feed-item__blog', post.blogName);
+    blog.href = blogUrl(post.blogSlug);
+    meta.appendChild(blog);
+    meta.appendChild(document.createTextNode(' · '));
+    if (post.authorId) {
+      var author = el('a', '', post.authorNickname);
+      author.href = profileUrl(post.authorId);
+      meta.appendChild(author);
+    } else {
+      meta.appendChild(document.createTextNode(post.authorNickname));
+    }
+    meta.appendChild(
+      document.createTextNode(
+        ' · ' + formatDate(post.createdAt) + ' · 조회 ' + post.viewCount + ' · 좋아요 ' + post.likeCount
+      )
+    );
+    body.appendChild(meta);
+    li.appendChild(body);
+    if (post.thumbnail) {
+      var img = el('img', 'feed-item__thumb');
+      img.src = post.thumbnail;
+      img.alt = '';
+      img.loading = 'lazy';
+      li.appendChild(img);
+    }
+    return li;
+  }
+
   /** 1부터 세는 페이지 번호. totalPages가 1 이하면 비운다. */
   function pager(container, page, totalPages, onGo) {
     container.replaceChildren();
@@ -114,6 +162,8 @@
   window.BlogUi = {
     el: el,
     card: card,
+    postCard: postCard,
+    profileUrl: profileUrl,
     tagList: tagList,
     pager: pager,
     blogUrl: blogUrl,

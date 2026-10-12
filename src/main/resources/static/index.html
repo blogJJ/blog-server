@@ -9,25 +9,32 @@
     <script src="/js/layout.js" defer></script>
     <script src="/js/session.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
-    <script src="/js/blog-list.js" defer></script>
+    <script src="/js/feed.js" defer></script>
   </head>
   <body>
-    <!-- 메인 블로그 목록·검색 (T054, BLG-02, BLG-03). 피드는 T110에서 더한다 -->
+    <!-- 메인: 피드 탭(최신·인기·팔로우·구독)과 블로그 둘러보기 (T110, BRD-09, BLG-02). 검색은 search.html(BRD-08) -->
     <main>
       <div class="page-head">
-        <h1>블로그 둘러보기</h1>
+        <h1>블로그</h1>
         <a class="button button--primary" href="/blog-new.html" id="new-blog" hidden>블로그 만들기</a>
       </div>
-      <form class="search" id="search-form" role="search">
-        <input id="q" type="search" maxlength="20" placeholder="블로그 이름, 소개, 태그로 찾기" aria-label="블로그 검색" />
+      <form class="search" action="/search.html" method="get" role="search">
+        <input name="q" type="search" minlength="2" maxlength="20" required placeholder="블로그, 글 제목, 태그, 닉네임 찾기" aria-label="통합 검색" />
         <button class="button" type="submit">검색</button>
       </form>
       <div class="tabs" role="tablist" id="tabs">
-        <button class="tabs__item is-current" type="button" role="tab" data-sort="latest">최신순</button>
-        <button class="tabs__item" type="button" role="tab" data-sort="popular">인기순</button>
+        <button class="tabs__item is-current" type="button" role="tab" data-tab="latest">최신 글</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="popular">인기 글</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="following" hidden>팔로우</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="subscribed" hidden>구독</button>
+        <button class="tabs__item" type="button" role="tab" data-tab="blogs">블로그 둘러보기</button>
       </div>
-      <p class="list-caption" id="caption"></p>
-      <div class="blog-grid" id="list"></div>
+      <div class="sub-tabs" id="blog-sort" hidden>
+        <button class="button button--text is-current" type="button" data-sort="latest">최신순</button>
+        <button class="button button--text" type="button" data-sort="popular">인기순</button>
+      </div>
+      <ul class="feed-list" id="feed"></ul>
+      <div class="blog-grid" id="blogs" hidden></div>
       <p class="empty" id="empty" hidden></p>
       <nav class="pager" id="pager" aria-label="페이지"></nav>
     </main>
