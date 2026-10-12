@@ -2,7 +2,6 @@ package com.blog.board.api;
 
 import com.blog.board.service.ImageService;
 import com.blog.board.service.ImageService.Uploaded;
-import com.blog.board.service.ImageType;
 import com.blog.common.ratelimit.RateLimitGuard;
 import com.blog.common.security.AuthUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +24,9 @@ import org.springframework.web.multipart.MultipartFile;
 /** 이미지 올리기·보기 (T062, BRD-05). */
 @RestController
 public class ImageController {
+
+  static final String SVG_CONTENT_SECURITY_POLICY =
+      "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
   private final ImageService imageService;
   private final RateLimitGuard rateLimitGuard;
@@ -50,11 +52,15 @@ public class ImageController {
   public ResponseEntity<InputStreamResource> view(@PathVariable String storedName) {
     InputStream in = imageService.open(storedName);
     MediaType type =
-        ImageType.byStoredName(storedName)
-            .map(t -> MediaType.parseMediaType(t.mimeType()))
+        ImageService.mimeType(storedName)
+            .map(MediaType::parseMediaType)
             .orElse(MediaType.APPLICATION_OCTET_STREAM);
-    return ResponseEntity.ok()
-        .contentType(type)
+    ResponseEntity.BodyBuilder res = ResponseEntity.ok();
+    if (ImageService.SVG_MIME_TYPE.equals(type.toString())) {
+      // 화면에서는 <img>로만 쓰지만 주소를 바로 열어도 스크립트·외부 요청이 돌지 않게 한 번 더 막는다 (T155, D-126)
+      res.header("Content-Security-Policy", SVG_CONTENT_SECURITY_POLICY);
+    }
+    return res.contentType(type)
         .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
         .body(new InputStreamResource(in));
   }

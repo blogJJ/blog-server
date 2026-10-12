@@ -1,0 +1,9 @@
+# Releases의 자동 노트를 묶는 기준 (.github/workflows/release.yml).
+changelog:
+  categories:
+    - title: 의존성 업데이트
+      labels:
+        - dependencies
+    - title: 바뀐 점
+      labels:
+        - "*"

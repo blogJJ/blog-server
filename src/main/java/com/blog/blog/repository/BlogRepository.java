@@ -102,6 +102,17 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
   @Query("select b from Blog b where b.id = :id")
   Optional<Blog> findByIdForUpdate(@Param("id") Long id);
 
+  /**
+   * 대표 이미지가 비어 있을 때만 Claude가 그린 그림을 넣는다 (T155, D-126). 그리는 동안 블로그장이 올린 이미지는 덮어쓰지 않는다.
+   *
+   * @return 넣었으면 1, 이미 이미지가 있거나 폐쇄됐으면 0
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "update Blog b set b.coverImage = :cover where b.id = :id and b.coverImage is null"
+          + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED")
+  int fillEmptyCoverImage(@Param("id") Long id, @Param("cover") String cover);
+
   /** 멤버 수를 DB에서 바로 늘린다. 동시에 여러 명이 들어와도 빠지지 않는다. */
   @Modifying(flushAutomatically = true)
   @Query("update Blog b set b.memberCount = b.memberCount + 1 where b.id = :id")

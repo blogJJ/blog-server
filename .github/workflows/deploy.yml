@@ -127,7 +127,7 @@ jobs:
       - name: Upload to server
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq sshpass > /dev/null
-          opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+          opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=30)
           # 공용 서버라 폴더와 환경변수 파일은 본인만 읽게 둔다. scp -p로 runner의 600 권한을 그대로 옮긴다
           sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
             'mkdir -p ~/blog-server && chmod 700 ~/blog-server'
@@ -137,7 +137,7 @@ jobs:
 
       - name: Start on server
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=accept-new -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
+          sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
             "bash ~/blog-server/deploy.sh '$APP_PORT'"
 
       # 서버가 뜨면서 Flyway가 테이블을 만든 뒤에 넣는다
@@ -145,6 +145,6 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.dummy
         # DB가 학교 내부 주소라 깃허브에서 바로 붙지 못해서 서버 안에서 넣는다
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=accept-new -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
+          sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" \
             'bash ~/blog-server/deploy.sh --load-dummy'
           echo "더미 데이터를 넣었어요"
