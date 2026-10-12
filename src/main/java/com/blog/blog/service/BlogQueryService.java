@@ -8,6 +8,7 @@ import com.blog.blog.domain.BlogMemberRole;
 import com.blog.blog.domain.BlogStatus;
 import com.blog.blog.domain.BlogTag;
 import com.blog.blog.domain.BlogVisibility;
+import com.blog.blog.domain.CloseReason;
 import com.blog.blog.domain.JoinPolicy;
 import com.blog.blog.domain.JoinRequestStatus;
 import com.blog.blog.domain.ManagerPermission;
@@ -58,7 +59,9 @@ public class BlogQueryService {
   /**
    * 블로그 첫 화면 (T055). viewer는 보는 사람 기준 상태.
    *
-   * @param ownerSuspendedUntil 블로그장이 계정 정지 중이면 끝나는 시각. 화면이 "블로그장 정지 중" 안내를 띄운다 (ADM-08)
+   * @param closeReason 폐쇄 예정이면 사유. 화면이 블로그장 박탈·관리자 폐쇄 공지 문구를 고른다 (ADM-02, ADM-07)
+   * @param ownerSuspendedUntil 블로그장이 계정 정지 중이면 끝나는 시각 (ADM-08)
+   * @param ownerNotice 블로그장이 계정 정지 중이면 블로그 맨 위에 띄울 "블로그장 정지 중 (끝나는 날짜)" 공지. 아니면 null (T122, D-100)
    * @param shareKey 정보 수정 권한이 있을 때만 준다
    */
   public record BlogDetail(
@@ -71,11 +74,13 @@ public class BlogQueryService {
       JoinPolicy joinPolicy,
       BlogStatus status,
       LocalDateTime closeScheduledAt,
+      CloseReason closeReason,
       int memberCount,
       int postCount,
       int subscriberCount,
       String ownerNickname,
       LocalDateTime ownerSuspendedUntil,
+      String ownerNotice,
       List<String> tags,
       LocalDateTime createdAt,
       String shareKey,
@@ -223,11 +228,13 @@ public class BlogQueryService {
         blog.getJoinPolicy(),
         blog.getStatus(),
         blog.getCloseScheduledAt(),
+        blog.getCloseReason(),
         blog.getMemberCount(),
         blog.getPostCount(),
         blog.getSubscriberCount(),
         owner.getNickname(),
         owner.isSuspendedAt(now) ? owner.getSuspendedUntil() : null,
+        accessService.ownerSuspensionNotice(blog),
         tagsOf(List.of(blog.getId())).getOrDefault(blog.getId(), List.of()),
         blog.getCreatedAt(),
         canEdit ? blog.getShareKey() : null,

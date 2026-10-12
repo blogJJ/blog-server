@@ -64,7 +64,7 @@ class SecurityConfigTest {
     jdbcTemplate.update("UPDATE users SET role = 'ADMIN' WHERE id = ?", admin.getId());
     mockMvc
         .perform(get("/api/admin/reports").cookie(tokenCookie(admin)))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isOk());
   }
 
   @Test

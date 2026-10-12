@@ -101,6 +101,18 @@ public class Post extends BaseTimeEntity {
     this.deletedAt = now;
   }
 
+  /** 관리자 숨김 (ADM-03) */
+  public void hide() {
+    this.status = PostStatus.HIDDEN;
+  }
+
+  /** 숨김을 풀거나, 삭제한 지 30일 안에 되살린다 (ADM-03, 4.5). */
+  public void restore() {
+    this.status = PostStatus.PUBLISHED;
+    this.deletedBy = null;
+    this.deletedAt = null;
+  }
+
   public boolean isPublished() {
     return status == PostStatus.PUBLISHED;
   }

@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>공개: 누구나. 일부 공개: 공유 링크로 온 사람과 멤버. 비공개: 멤버만.
  *   <li>숨김(ADM-02)·폐쇄된 블로그는 없는 블로그처럼 404. 폐쇄 예정은 평소처럼 보인다 (D-67).
  *   <li>그 블로그에서 정지된 멤버(BLG-13)는 끝나는 날짜를 알려 주고 막는다.
+ *   <li>블로그장이 계정 정지 중이면 블로그 맨 위에 "블로그장 정지 중 (끝나는 날짜)" 공지를 붙인다 (T122, ADM-08, D-100). 관리 권한은
+ *       BlogAuthz가 막는다(D-114).
  * </ul>
  */
 @Service
@@ -99,6 +101,21 @@ public class BlogAccessService {
       throw new BusinessException(ErrorCode.FORBIDDEN, deniedMessage(blog.getVisibility()));
     }
     return new Access(blog, membership, viaLink && !member);
+  }
+
+  /**
+   * 블로그장이 계정 정지 중일 때 블로그 맨 위에 띄울 공지 (T122, ADM-08, D-100). 정지 중이 아니면 null.
+   *
+   * <p>정지가 끝나거나 풀리면 바로 사라진다. 따로 저장하지 않고 요청마다 블로그장의 {@code suspended_until}로 계산한다.
+   */
+  public String ownerSuspensionNotice(Blog blog) {
+    LocalDateTime until = blog.getOwner().getSuspendedUntil();
+    if (!Suspensions.isSuspended(until, LocalDateTime.now(clock))) {
+      return null;
+    }
+    return !until.isBefore(Suspensions.PERMANENT)
+        ? "블로그장 정지 중 (영구)"
+        : "블로그장 정지 중 (" + until.format(UNTIL_FORMAT) + "까지)";
   }
 
   private static String deniedMessage(BlogVisibility visibility) {

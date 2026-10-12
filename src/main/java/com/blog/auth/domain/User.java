@@ -187,6 +187,27 @@ public class User extends BaseTimeEntity {
     this.withdrawnAt = now;
   }
 
+  /** 메인 관리자 계정 정지 (ADM-08). 영구 정지는 {@link Suspensions#PERMANENT} */
+  public void suspendAccount(LocalDateTime until) {
+    this.suspendedUntil = until;
+  }
+
+  /** 계정 정지 해제 (ADM-08) */
+  public void releaseAccountSuspension() {
+    this.suspendedUntil = null;
+  }
+
+  /**
+   * 프로필 초기화 (ADM-08, D-99). 닉네임을 "회원"+회원 번호로 바꾸고 사진·소개를 지운다.
+   *
+   * @return 지운 사진의 저장 이름. 없으면 null
+   */
+  public String resetProfile() {
+    this.nickname = "회원" + id;
+    this.bio = null;
+    return changeProfileImage(null);
+  }
+
   /** 다음 로그인 때 사람 확인이 필요한지 */
   public boolean needsCaptcha() {
     return loginFailCount >= CAPTCHA_AFTER_FAILS;

@@ -146,7 +146,16 @@ public class Blog extends BaseTimeEntity {
     this.closedAt = now;
   }
 
-  /** 위임 수락 (BLG-08). blog_members의 OWNER 행도 같이 바꿔야 한다. */
+  /** 관리자 숨김 (ADM-02). 숨긴 블로그는 없는 블로그처럼 보인다. */
+  public void hide() {
+    this.hidden = true;
+  }
+
+  public void unhide() {
+    this.hidden = false;
+  }
+
+  /** 블로그장을 바꾼다: 위임 수락(BLG-08), 블로그장 박탈 뒤 자동 위임(ADM-07). blog_members의 OWNER 행도 같이 바꿔야 한다. */
   public void changeOwner(User newOwner) {
     this.owner = newOwner;
   }
