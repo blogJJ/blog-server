@@ -3,6 +3,7 @@ package com.blog.blog.domain;
 import com.blog.auth.domain.User;
 import com.blog.common.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -41,6 +42,16 @@ public class Blog extends BaseTimeEntity {
 
   @Column(name = "cover_image", length = 255)
   private String coverImage;
+
+  /** 이름과 태그로 만든 픽셀 마스코트 조합. null이면 아직 안 만듦 (BLG-14, D-116, D-118) */
+  @Convert(converter = MascotDesignConverter.class)
+  @Column(length = 40)
+  private MascotDesign mascot;
+
+  /** 대표 이미지가 없을 때 보여 줄 픽셀 장면. null이면 아직 안 만듦 (BLG-15, D-119) */
+  @Convert(converter = CoverSceneConverter.class)
+  @Column(length = 60)
+  private CoverScene coverScene;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -126,6 +137,14 @@ public class Blog extends BaseTimeEntity {
     this.coverImage = coverImage;
   }
 
+  public void changeMascot(MascotDesign mascot) {
+    this.mascot = mascot;
+  }
+
+  public void changeCoverScene(CoverScene coverScene) {
+    this.coverScene = coverScene;
+  }
+
   /** 폐쇄 예정으로 바꾼다 (BLG-09, D-12). 예정 시각은 서비스가 정한다(누른 날짜 + 7일 04:00). */
   public void scheduleClose(LocalDateTime at, CloseReason reason) {
     this.status = BlogStatus.CLOSING;
@@ -191,6 +210,14 @@ public class Blog extends BaseTimeEntity {
 
   public String getCoverImage() {
     return coverImage;
+  }
+
+  public MascotDesign getMascot() {
+    return mascot;
+  }
+
+  public CoverScene getCoverScene() {
+    return coverScene;
   }
 
   public BlogVisibility getVisibility() {

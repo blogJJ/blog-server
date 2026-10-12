@@ -134,10 +134,19 @@
       usageStatistics: false,
       placeholder: '내용을 입력해 주세요.',
       hooks: { addImageBlobHook: uploadImage },
-      events: { change: updateCount }
+      events: { change: updateCount },
+      theme: window.Theme && window.Theme.current() === 'dark' ? 'dark' : 'light'
     });
     updateCount();
   }
+
+  // 쓰는 중에 밝은/어두운 모드를 바꾸면 에디터 색도 따라 바꾼다 (D-117)
+  document.addEventListener('theme:change', function (e) {
+    var root = document.querySelector('#editor .toastui-editor-defaultUI');
+    if (root) {
+      root.classList.toggle('toastui-editor-dark', e.detail === 'dark');
+    }
+  });
 
   async function init() {
     try {

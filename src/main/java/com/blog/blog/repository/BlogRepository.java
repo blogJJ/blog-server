@@ -119,4 +119,18 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
       "update Blog b set b.postCount = case when b.postCount + :delta < 0 then 0"
           + " else b.postCount + :delta end where b.id = :id")
   void addPostCount(@Param("id") Long id, @Param("delta") int delta);
+
+  /** 마스코트나 픽셀 장면을 아직 안 만든 블로그 (BLG-14, BLG-15, D-116, D-119). 폐쇄된 블로그는 뺀다. */
+  @Query(
+      "select b.id from Blog b where (b.mascot is null or b.coverScene is null)"
+          + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED order by b.id")
+  List<Long> findIdsWithoutMascot(Pageable pageable);
+
+  /** 다른 블로그가 쓰는 같은 바탕 그림의 마스코트 값 (D-118). 폐쇄된 블로그는 뺀다. */
+  @Query(
+      value =
+          "select mascot from blogs where mascot like concat(:base, '.%')"
+              + " and id <> :blogId and status <> 'CLOSED'",
+      nativeQuery = true)
+  List<String> findMascotsInUse(@Param("base") String base, @Param("blogId") Long blogId);
 }

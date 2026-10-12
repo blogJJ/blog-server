@@ -35,8 +35,29 @@
     var menu = el('nav', 'site-header__menu');
     menu.setAttribute('aria-label', '상단 메뉴');
     inner.appendChild(menu);
+    inner.appendChild(themeButton());
     header.appendChild(inner);
     return { header: header, menu: menu };
+  }
+
+  /** 밝은/어두운 모드 버튼 (D-117). 바꾸는 일은 theme.js가 한다 */
+  function themeButton() {
+    var button = el('button', 'theme-toggle');
+    button.type = 'button';
+    function sync() {
+      var dark = window.Theme && window.Theme.current() === 'dark';
+      button.textContent = dark ? '☀️' : '🌙';
+      button.setAttribute('aria-label', dark ? '밝은 모드로 바꾸기' : '어두운 모드로 바꾸기');
+      button.title = button.getAttribute('aria-label');
+    }
+    button.addEventListener('click', function () {
+      if (window.Theme) {
+        window.Theme.toggle();
+      }
+    });
+    document.addEventListener('theme:change', sync);
+    sync();
+    return button;
   }
 
   function buildFooter() {

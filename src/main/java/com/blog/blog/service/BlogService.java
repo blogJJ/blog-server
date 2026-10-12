@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,6 +101,7 @@ public class BlogService {
   private final AccountGuard accountGuard;
   private final BlogSubscriptionRepository subscriptionRepository;
   private final NotificationService notificationService;
+  private final ApplicationEventPublisher events;
   private final int publicLimit;
   private final int privateLimit;
 
@@ -112,6 +114,7 @@ public class BlogService {
       AccountGuard accountGuard,
       BlogSubscriptionRepository subscriptionRepository,
       NotificationService notificationService,
+      ApplicationEventPublisher events,
       @Value("${blog.limit.public:3}") int publicLimit,
       @Value("${blog.limit.private:5}") int privateLimit) {
     if (publicLimit < 1 || publicLimit > 5) {
@@ -125,6 +128,7 @@ public class BlogService {
     this.accountGuard = accountGuard;
     this.subscriptionRepository = subscriptionRepository;
     this.notificationService = notificationService;
+    this.events = events;
     this.publicLimit = publicLimit;
     this.privateLimit = privateLimit;
   }
@@ -154,6 +158,7 @@ public class BlogService {
     }
     memberRepository.save(new BlogMember(blog, owner, BlogMemberRole.OWNER));
     saveTags(blog, f.tags());
+    events.publishEvent(new MascotService.BlogInfoChanged(blog.getId()));
     return blog;
   }
 
@@ -175,10 +180,17 @@ public class BlogService {
       checkLimit(blog.getOwner().getId(), f.visibility(), blog.getId());
     }
     boolean becomesPrivate = !isPrivate(blog.getVisibility()) && isPrivate(f.visibility());
+    // 이름이나 태그가 바뀌면 마스코트를 다시 고른다 (D-116)
+    boolean mascotInputChanged =
+        !blog.getName().equals(f.name())
+            || !Set.copyOf(tagNames(blog.getId())).equals(Set.copyOf(f.tags()));
     blog.updateInfo(f.name(), f.description(), f.visibility(), f.joinPolicy());
     ShareLinkService.syncWithVisibility(blog);
     blogTagRepository.deleteByBlogId(blog.getId());
     saveTags(blog, f.tags());
+    if (mascotInputChanged) {
+      events.publishEvent(new MascotService.BlogInfoChanged(blog.getId()));
+    }
     if (becomesPrivate) {
       notificationService.notifyAll(
           subscriptionRepository.findSubscriberIds(blog.getId()),
@@ -275,6 +287,12 @@ public class BlogService {
 
   private static boolean isPrivate(BlogVisibility visibility) {
     return visibility == BlogVisibility.PRIVATE;
+  }
+
+  private List<String> tagNames(Long blogId) {
+    return blogTagRepository.findWithTagByBlogIdIn(List.of(blogId)).stream()
+        .map(bt -> bt.getTag().getName())
+        .toList();
   }
 
   private void saveTags(Blog blog, List<String> names) {

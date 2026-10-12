@@ -1,20 +1,73 @@
 /* 공통 스타일 (T027). PC와 모바일 모두 맞춘다(4.2). 지원 브라우저는 Chrome·Safari 최신 버전(OPS-06). */
 :root {
+  /* 정돈된 목록형 (D-117). 색은 모두 여기 토큰으로 쓰고, 어두운 모드는 아래에서 토큰만 바꾼다 */
+  color-scheme: light;
   --color-bg: #ffffff;
-  --color-surface: #f7f7f8;
-  --color-text: #1f2328;
-  --color-muted: #6b7280;
-  --color-border: #e5e7eb;
-  --color-primary: #ff5544;
+  --color-surface: #f2f4f6;
+  --color-surface-strong: #e5e8eb;
+  --color-text: #191f28;
+  --color-text-sub: #4e5968;
+  --color-muted: #8b95a1;
+  --color-border: #eceef1;
+  --color-primary: #f04452;
   --color-primary-text: #ffffff;
-  --color-danger: #d92d20;
-  --radius: 8px;
+  --color-primary-soft: #fff0f1;
+  --color-danger: #e5303f;
+  --color-warn-soft: #fff4e5;
+  --color-toast: #191f28;
+  --color-toast-text: #ffffff;
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  --shadow-color: rgba(0, 0, 0, 0.12);
+  --radius: 10px;
   --header-height: 56px;
   --content-width: 960px;
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
     "Malgun Gothic", sans-serif;
   color: var(--color-text);
   background: var(--color-bg);
+}
+
+/* 어두운 모드: 기기 설정이 어둡고 사용자가 밝게를 고르지 않았을 때, 또는 사용자가 어둡게를 골랐을 때 (theme.js) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #17171c;
+    --color-surface: #222229;
+    --color-surface-strong: #2e2e36;
+    --color-text: #ececf0;
+    --color-text-sub: #b9bcc5;
+    --color-muted: #8a8f9b;
+    --color-border: #2c2c34;
+    --color-primary: #ff5a67;
+    --color-primary-text: #ffffff;
+    --color-primary-soft: #3a1f24;
+    --color-danger: #ff6b76;
+    --color-warn-soft: #3a2f1c;
+    --color-toast: #ececf0;
+    --color-toast-text: #17171c;
+    --color-overlay: rgba(0, 0, 0, 0.6);
+    --shadow-color: rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #17171c;
+  --color-surface: #222229;
+  --color-surface-strong: #2e2e36;
+  --color-text: #ececf0;
+  --color-text-sub: #b9bcc5;
+  --color-muted: #8a8f9b;
+  --color-border: #2c2c34;
+  --color-primary: #ff5a67;
+  --color-primary-text: #ffffff;
+  --color-primary-soft: #3a1f24;
+  --color-danger: #ff6b76;
+  --color-warn-soft: #3a2f1c;
+  --color-toast: #ececf0;
+  --color-toast-text: #17171c;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --shadow-color: rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -38,6 +91,13 @@ body {
 
 a {
   color: inherit;
+}
+
+/* 입력 칸도 밝은/어두운 모드를 따른다. :where라 아래 개별 규칙이 이긴다 (D-117) */
+:where(input, select, textarea) {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 
 main {
@@ -69,10 +129,40 @@ main {
 }
 
 .site-header__logo {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 19px;
   font-weight: 700;
   text-decoration: none;
-  color: var(--color-primary);
+  color: var(--color-text);
+}
+
+/* 정돈된 목록형 로고: 빨간 네모 하나 (D-117) */
+.site-header__logo::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-primary);
+}
+
+/* 밝은/어두운 모드 버튼 (theme.js, layout.js) */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--color-surface);
 }
 
 .site-header__menu {
@@ -134,12 +224,13 @@ main {
   justify-content: center;
   min-height: 36px;
   padding: 0 14px;
-  border: 1px solid var(--color-border);
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--color-surface);
+  color: var(--color-text-sub);
   font: inherit;
   font-size: 14px;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
@@ -150,6 +241,15 @@ main {
   color: var(--color-primary-text);
 }
 
+.button:hover {
+  background: var(--color-surface-strong);
+}
+
+.button--primary:hover {
+  background: var(--color-primary);
+  filter: brightness(0.95);
+}
+
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -157,6 +257,9 @@ main {
 
 /* 하단 (개인정보 처리방침 링크는 모든 화면에, 4.6) */
 .site-footer {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
   border-top: 1px solid var(--color-border);
   padding: 20px 16px;
   color: var(--color-muted);
@@ -178,10 +281,10 @@ main {
   max-width: calc(100% - 32px);
   padding: 12px 16px;
   border-radius: var(--radius);
-  background: #1f2328;
-  color: #ffffff;
+  background: var(--color-toast);
+  color: var(--color-toast-text);
   font-size: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px var(--shadow-color);
 }
 
 /* 오류 화면 (static/error, T136) */
@@ -387,7 +490,7 @@ main {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
 }
 
 .dialog {
@@ -396,7 +499,7 @@ main {
   padding: 24px;
   border-radius: var(--radius);
   background: var(--color-bg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 32px var(--shadow-color);
 }
 
 .dialog h2 {
@@ -492,9 +595,9 @@ main {
 }
 
 .tabs__item.is-current {
-  border-bottom-color: var(--color-primary);
+  border-bottom-color: var(--color-text);
   color: var(--color-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .tabs__item[hidden] {
@@ -530,6 +633,18 @@ main {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.blog-card__title .mascot {
+  flex: none;
+}
+
+/* 마스코트 캔버스는 20칸이고 몸은 (2,4)부터 16칸이다. 2px 격자(40px)로 또렷하게 그리고,
+   모자·장식 자리인 위쪽·왼쪽 여백만큼 당겨 줄 높이와 왼쪽 맞춤은 몸(32px) 기준으로 둔다 */
+.blog-card__title .mascot svg {
+  width: 40px;
+  height: 40px;
+  margin: -8px 0 0 -4px;
 }
 
 .blog-card__desc {
@@ -689,6 +804,18 @@ main {
   margin: 0;
 }
 
+/* 블로그 마스코트 그림 (BLG-14, D-116). 카드와 같은 식으로 4px 격자(80px), 몸은 64px */
+.blog-hero__mascot {
+  display: inline-flex;
+  flex: none;
+}
+
+.blog-hero__mascot .mascot svg {
+  width: 80px;
+  height: 80px;
+  margin: -16px 0 0 -8px;
+}
+
 .blog-hero__desc {
   white-space: pre-line;
 }
@@ -800,6 +927,21 @@ main {
   margin-top: 8px;
 }
 
+/* 대표 이미지가 없을 때의 픽셀 장면. canvas는 pixel-cover.js가 폭에 맞춰 정수 배로 키운다 (D-119) */
+.blog-cover--scene {
+  max-height: none;
+  overflow: hidden;
+  line-height: 0;
+  background: var(--color-surface);
+}
+
+.blog-card__scene {
+  height: auto;
+  overflow: hidden;
+  line-height: 0;
+  background: var(--color-surface);
+}
+
 /* 대표 이미지 오른쪽 아래 블로그 관리 버튼 */
 .blog-cover-wrap {
   position: relative;
@@ -817,7 +959,7 @@ main {
   right: 12px;
   bottom: 12px;
   background: var(--color-bg);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 4px var(--shadow-color);
 }
 
 .cover-preview {
@@ -947,7 +1089,7 @@ main {
   height: 140px;
   object-fit: cover;
   border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px var(--shadow-color);
 }
 
 .post-row__title:hover .post-row__thumb {
@@ -1353,7 +1495,7 @@ main {
 }
 
 .badge--warn {
-  background: #fff1f0;
+  background: var(--color-primary-soft);
   color: var(--color-danger);
 }
 
@@ -1408,7 +1550,7 @@ main {
   flex: none;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--color-surface, #f3f3f3);
+  background: var(--color-surface);
 }
 
 .profile-photo__actions {
@@ -1455,7 +1597,7 @@ main {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-overlay);
 }
 
 .notif-panel {
@@ -1467,8 +1609,8 @@ main {
   display: flex;
   flex-direction: column;
   width: min(380px, 100vw);
-  background: var(--color-bg, #fff);
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+  background: var(--color-bg);
+  box-shadow: -4px 0 16px var(--shadow-color);
 }
 
 .notif-backdrop[hidden],
@@ -1537,7 +1679,7 @@ main {
 }
 
 .notif-item--unread {
-  background: #fff4f2;
+  background: var(--color-primary-soft);
 }
 
 .notif-item__body {
@@ -1615,7 +1757,7 @@ a.site-header__nickname {
 }
 
 .feed-item__title {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -1638,6 +1780,7 @@ a.site-header__nickname {
 
 .feed-item__blog {
   font-weight: 600;
+  color: var(--color-primary);
 }
 
 .feed-item__thumb {
@@ -1798,7 +1941,7 @@ a.site-header__nickname {
   height: 8px;
   margin-left: 6px;
   border-radius: 4px;
-  background: var(--color-primary, #3b82f6);
+  background: var(--color-primary);
   vertical-align: middle;
 }
 
