@@ -3,6 +3,7 @@ package com.blog.blog.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.blog.blog.domain.Mascot;
+import com.blog.blog.domain.MascotDesign;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -34,10 +35,20 @@ class ClaudeMascotClientTest {
 
   @Test
   void readsStructuredChoiceAndSendsOnlyNameAndTags() throws IOException {
-    start(200, response("{\"mascot\":\"OWL\"}", "end_turn"));
+    start(
+        200,
+        response(
+            "{\"base\":\"OWL\",\"tone\":\"SKY\",\"hat\":\"BERET\",\"charm\":\"STAR\"}",
+            "end_turn"));
     ClaudeMascotClient client = client();
 
-    assertThat(client.choose("공부방", List.of("자격증", "스터디"))).contains(Mascot.OWL);
+    assertThat(client.choose("공부방", List.of("자격증", "스터디")))
+        .contains(
+            new MascotDesign(
+                Mascot.OWL,
+                MascotDesign.Tone.SKY,
+                MascotDesign.Hat.BERET,
+                MascotDesign.Charm.STAR));
     assertThat(lastBody.get())
         .contains("claude-opus-5-5")
         .contains("공부방")

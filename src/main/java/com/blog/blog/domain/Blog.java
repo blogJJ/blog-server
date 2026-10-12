@@ -43,10 +43,10 @@ public class Blog extends BaseTimeEntity {
   @Column(name = "cover_image", length = 255)
   private String coverImage;
 
-  /** 태그로 고른 픽셀 동물. null이면 아직 안 고름 (BLG-14, D-116) */
-  @Convert(converter = MascotConverter.class)
-  @Column(length = 20)
-  private Mascot mascot;
+  /** 이름과 태그로 만든 픽셀 마스코트 조합. null이면 아직 안 만듦 (BLG-14, D-116, D-118) */
+  @Convert(converter = MascotDesignConverter.class)
+  @Column(length = 40)
+  private MascotDesign mascot;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -132,7 +132,7 @@ public class Blog extends BaseTimeEntity {
     this.coverImage = coverImage;
   }
 
-  public void changeMascot(Mascot mascot) {
+  public void changeMascot(MascotDesign mascot) {
     this.mascot = mascot;
   }
 
@@ -203,7 +203,7 @@ public class Blog extends BaseTimeEntity {
     return coverImage;
   }
 
-  public Mascot getMascot() {
+  public MascotDesign getMascot() {
     return mascot;
   }
 

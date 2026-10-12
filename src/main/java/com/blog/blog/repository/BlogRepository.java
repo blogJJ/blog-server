@@ -125,4 +125,12 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
       "select b.id from Blog b where b.mascot is null"
           + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED order by b.id")
   List<Long> findIdsWithoutMascot(Pageable pageable);
+
+  /** 다른 블로그가 쓰는 같은 바탕 그림의 마스코트 값 (D-118). 폐쇄된 블로그는 뺀다. */
+  @Query(
+      value =
+          "select mascot from blogs where mascot like concat(:base, '.%')"
+              + " and id <> :blogId and status <> 'CLOSED'",
+      nativeQuery = true)
+  List<String> findMascotsInUse(@Param("base") String base, @Param("blogId") Long blogId);
 }

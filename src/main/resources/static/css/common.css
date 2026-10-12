@@ -639,6 +639,14 @@ main {
   flex: none;
 }
 
+/* 마스코트 캔버스는 20칸이고 몸은 (2,4)부터 16칸이다. 2px 격자(40px)로 또렷하게 그리고,
+   모자·장식 자리인 위쪽·왼쪽 여백만큼 당겨 줄 높이와 왼쪽 맞춤은 몸(32px) 기준으로 둔다 */
+.blog-card__title .mascot svg {
+  width: 40px;
+  height: 40px;
+  margin: -8px 0 0 -4px;
+}
+
 .blog-card__desc {
   margin: 0;
   color: var(--color-muted);
@@ -796,10 +804,16 @@ main {
   margin: 0;
 }
 
-/* 블로그 마스코트 그림 (BLG-14, D-116) */
+/* 블로그 마스코트 그림 (BLG-14, D-116). 카드와 같은 식으로 4px 격자(80px), 몸은 64px */
 .blog-hero__mascot {
   display: inline-flex;
   flex: none;
+}
+
+.blog-hero__mascot .mascot svg {
+  width: 80px;
+  height: 80px;
+  margin: -16px 0 0 -8px;
 }
 
 .blog-hero__desc {

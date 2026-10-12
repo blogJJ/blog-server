@@ -8,6 +8,7 @@ import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogVisibility;
 import com.blog.blog.domain.JoinPolicy;
 import com.blog.blog.domain.Mascot;
+import com.blog.blog.domain.MascotDesign;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.support.IntegrationTest;
 import java.time.LocalDateTime;
@@ -18,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** 마스코트 저장과 비어 있는 블로그 찾기 (T148, BLG-14, D-116). 테스트에는 API 키가 없어 단어 사전으로 고른다. */
+/** 마스코트 저장, 겹치지 않는 조합, 비어 있는 블로그 찾기 (T148, BLG-14, D-116, D-118). 테스트에는 API 키가 없어 단어 사전으로 고른다. */
 @IntegrationTest
 class MascotServiceTest {
 
@@ -29,19 +30,49 @@ class MascotServiceTest {
   @Autowired JdbcTemplate jdbc;
 
   @Test
-  void assignsFromTagsAndStoresLowercaseKey() {
+  void assignsFromTagsAndStoresCombination() {
     Blog blog = newBlog("민준의 식탁", List.of("집밥", "레시피"));
     assertThat(blogRepository.findIdsWithoutMascot(PageRequest.of(0, 10_000)))
         .contains(blog.getId());
 
-    assertThat(mascotService.assign(blog.getId())).isEqualTo(Mascot.BEAR);
+    MascotDesign design = mascotService.assign(blog.getId());
 
+    assertThat(design.base()).isEqualTo(Mascot.BEAR);
     assertThat(
             jdbc.queryForObject(
                 "select mascot from blogs where id = ?", String.class, blog.getId()))
-        .isEqualTo("bear");
+        .isEqualTo(design.value())
+        .matches("bear\\.[a-z]+\\.[a-z]+\\.[a-z]+");
     assertThat(blogRepository.findIdsWithoutMascot(PageRequest.of(0, 10_000)))
         .doesNotContain(blog.getId());
+  }
+
+  @Test
+  void sameNameAndTagsStillGetDifferentPictures() {
+    Blog first = newBlog("같은 이름", List.of("집밥"));
+    Blog second = newBlog("같은 이름", List.of("집밥"));
+
+    MascotDesign a = mascotService.assign(first.getId());
+    MascotDesign b = mascotService.assign(second.getId());
+
+    assertThat(b.base()).isEqualTo(a.base());
+    assertThat(b.value()).isNotEqualTo(a.value());
+  }
+
+  @Test
+  void reassigningGivesANewPicture() {
+    Blog blog = newBlog("민준의 식탁", List.of("집밥"));
+    MascotDesign before = mascotService.assign(blog.getId());
+
+    assertThat(mascotService.assign(blog.getId()).value()).isNotEqualTo(before.value());
+  }
+
+  @Test
+  void legacyBaseOnlyValueStillReads() {
+    Blog blog = newBlog("이름", List.of());
+    jdbc.update("update blogs set mascot = 'cat' where id = ?", blog.getId());
+    assertThat(blogRepository.findById(blog.getId()).orElseThrow().getMascot())
+        .isEqualTo(MascotDesign.plain(Mascot.CAT));
   }
 
   @Test

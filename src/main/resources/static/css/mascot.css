@@ -1,4 +1,4 @@
-/* 블로그 마스코트 (mascot.js): 동물 10종, 사물 8종. 사이트 테마 변수에 기대지 않는다. */
+/* 블로그 마스코트 (mascot.js): 동물 10종, 사물 8종 + 색조·모자·장식. 사이트 테마 변수에 기대지 않는다. */
 .mascot {
   display: inline-block;
   line-height: 0;
@@ -87,6 +87,21 @@
   animation: mascot-wiggle 0.48s steps(1, end) 1;
 }
 
+/* 장식: 몸과 따로 1픽셀 둥실, 반짝이는 것은 가끔 깜빡 */
+.mascot__charm {
+  animation: mascot-float 1.8s steps(1, end) infinite;
+}
+
+.mascot__charm--star .mascot__charm-art,
+.mascot__charm--sparkle .mascot__charm-art {
+  animation: mascot-twinkle 2.4s steps(1, end) infinite;
+}
+
+.mascot__charm--heart .mascot__charm-art {
+  animation: mascot-twinkle 3.6s steps(1, end) infinite;
+  animation-delay: -1.5s;
+}
+
 @keyframes mascot-bob {
   0% { transform: translateY(0); }
   50% { transform: translateY(-1px); }
@@ -133,18 +148,33 @@
   100% { opacity: 0; }
 }
 
-/* 좌우로 1픽셀(=폭의 1/16)씩 */
+@keyframes mascot-float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(1px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes mascot-twinkle {
+  0% { opacity: 1; }
+  80% { opacity: 0.35; }
+  88% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* 좌우로 1픽셀(=폭의 1/20)씩 */
 @keyframes mascot-wiggle {
   0% { transform: translateX(0); }
-  25% { transform: translateX(-6.25%); }
-  50% { transform: translateX(6.25%); }
-  75% { transform: translateX(-6.25%); }
+  25% { transform: translateX(-5%); }
+  50% { transform: translateX(5%); }
+  75% { transform: translateX(-5%); }
   100% { transform: translateX(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .mascot__body,
   .mascot__frame,
+  .mascot__charm,
+  .mascot__charm-art,
   .mascot:hover svg {
     animation: none;
   }
