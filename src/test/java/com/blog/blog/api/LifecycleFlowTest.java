@@ -113,6 +113,59 @@ class LifecycleFlowTest {
   }
 
   @Test
+  void ownerCancelsPendingTransfer() throws Exception {
+    User owner = newUser();
+    User member = newUser();
+    long blogId = createBlog(owner);
+    join(member, blogId);
+    long transferId = requestTransfer(owner, blogId, member);
+
+    // 블로그마다 대기 중인 요청은 하나 (D-123)
+    call(owner, post("/api/blogs/" + blogId + "/transfers"), to(member))
+        .andExpect(status().isConflict());
+    call(member, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
+        .andExpect(status().isForbidden());
+
+    call(owner, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
+        .andExpect(status().isNoContent());
+    assertThat(
+            jdbc.queryForObject(
+                "select status from blog_owner_transfers where id = ?", String.class, transferId))
+        .isEqualTo("CANCELED");
+    assertThat(notifications(member, "OWNER_TRANSFER_RESULT")).isEqualTo(1);
+    call(member, post("/api/transfers/" + transferId + "/accept"), null)
+        .andExpect(status().isConflict());
+    call(owner, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
+        .andExpect(status().isConflict());
+
+    // 취소한 뒤에는 다시 요청할 수 있다
+    requestTransfer(owner, blogId, member);
+  }
+
+  @Test
+  void suspendedMemberCannotLeave() throws Exception {
+    User owner = newUser();
+    User member = newUser();
+    long blogId = createBlog(owner);
+    join(member, blogId);
+    jdbc.update(
+        "update blog_members set suspended_until = now() + interval 3 day where blog_id = ? and user_id = ?",
+        blogId,
+        member.getId());
+
+    // 떠났다가 다시 참여해 정지를 피하지 못하게 한다 (D-125)
+    call(member, post("/api/blogs/" + blogId + "/leave"), null)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value(containsString("정지")));
+
+    jdbc.update(
+        "update blog_members set suspended_until = null where blog_id = ? and user_id = ?",
+        blogId,
+        member.getId());
+    call(member, post("/api/blogs/" + blogId + "/leave"), null).andExpect(status().isNoContent());
+  }
+
+  @Test
   void closingCancelsPendingTransferAndBlocksNewOnes() throws Exception {
     User owner = newUser();
     User member = newUser();

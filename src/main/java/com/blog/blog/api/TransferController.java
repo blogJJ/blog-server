@@ -50,6 +50,15 @@ public class TransferController {
         .orElseGet(() -> ResponseEntity.noContent().build());
   }
 
+  /** 관리 화면: 대기 중인 요청을 블로그장이 취소한다 (D-124) */
+  @PostMapping("/api/blogs/{blogId}/transfers/pending/cancel")
+  @PreAuthorize("@blogAuthz.isOwner(#blogId)")
+  public ResponseEntity<Void> cancel(
+      @AuthenticationPrincipal AuthUser user, @PathVariable Long blogId) {
+    transferService.cancelByOwner(blogId, user.id());
+    return ResponseEntity.noContent().build();
+  }
+
   /** 위임 수락 화면: 내가 받은 대기 중인 요청 */
   @GetMapping("/api/me/transfers")
   public List<TransferRow> mine(@AuthenticationPrincipal AuthUser user) {
