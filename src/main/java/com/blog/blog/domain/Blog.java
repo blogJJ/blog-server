@@ -3,6 +3,7 @@ package com.blog.blog.domain;
 import com.blog.auth.domain.User;
 import com.blog.common.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -41,6 +42,11 @@ public class Blog extends BaseTimeEntity {
 
   @Column(name = "cover_image", length = 255)
   private String coverImage;
+
+  /** 태그로 고른 픽셀 동물. null이면 아직 안 고름 (BLG-14, D-116) */
+  @Convert(converter = MascotConverter.class)
+  @Column(length = 20)
+  private Mascot mascot;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -126,6 +132,10 @@ public class Blog extends BaseTimeEntity {
     this.coverImage = coverImage;
   }
 
+  public void changeMascot(Mascot mascot) {
+    this.mascot = mascot;
+  }
+
   /** 폐쇄 예정으로 바꾼다 (BLG-09, D-12). 예정 시각은 서비스가 정한다(누른 날짜 + 7일 04:00). */
   public void scheduleClose(LocalDateTime at, CloseReason reason) {
     this.status = BlogStatus.CLOSING;
@@ -191,6 +201,10 @@ public class Blog extends BaseTimeEntity {
 
   public String getCoverImage() {
     return coverImage;
+  }
+
+  public Mascot getMascot() {
+    return mascot;
   }
 
   public BlogVisibility getVisibility() {

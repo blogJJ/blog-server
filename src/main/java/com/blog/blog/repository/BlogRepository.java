@@ -119,4 +119,10 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
       "update Blog b set b.postCount = case when b.postCount + :delta < 0 then 0"
           + " else b.postCount + :delta end where b.id = :id")
   void addPostCount(@Param("id") Long id, @Param("delta") int delta);
+
+  /** 마스코트를 아직 안 고른 블로그 (BLG-14, D-116). 폐쇄된 블로그는 뺀다. */
+  @Query(
+      "select b.id from Blog b where b.mascot is null"
+          + " and b.status <> com.blog.blog.domain.BlogStatus.CLOSED order by b.id")
+  List<Long> findIdsWithoutMascot(Pageable pageable);
 }

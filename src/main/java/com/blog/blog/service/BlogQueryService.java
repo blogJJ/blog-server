@@ -49,6 +49,7 @@ public class BlogQueryService {
       String name,
       String description,
       String coverImage,
+      String mascot,
       BlogVisibility visibility,
       BlogStatus status,
       int memberCount,
@@ -60,6 +61,7 @@ public class BlogQueryService {
   /**
    * 블로그 첫 화면 (T055). viewer는 보는 사람 기준 상태.
    *
+   * @param mascot 마스코트 동물 이름(bear 등). 아직 안 골랐으면 null (BLG-14, D-116)
    * @param closeReason 폐쇄 예정이면 사유. 화면이 블로그장 박탈·관리자 폐쇄 공지 문구를 고른다 (ADM-02, ADM-07)
    * @param ownerSuspendedUntil 블로그장이 계정 정지 중이면 끝나는 시각 (ADM-08)
    * @param ownerNotice 블로그장이 계정 정지 중이면 블로그 맨 위에 띄울 "블로그장 정지 중 (끝나는 날짜)" 공지. 아니면 null (T122, D-100)
@@ -71,6 +73,7 @@ public class BlogQueryService {
       String name,
       String description,
       String coverImage,
+      String mascot,
       BlogVisibility visibility,
       JoinPolicy joinPolicy,
       BlogStatus status,
@@ -277,6 +280,7 @@ public class BlogQueryService {
         blog.getName(),
         blog.getDescription(),
         ImageService.url(blog.getCoverImage()),
+        mascotKey(blog),
         blog.getVisibility(),
         blog.getJoinPolicy(),
         blog.getStatus(),
@@ -370,6 +374,7 @@ public class BlogQueryService {
                     b.getName(),
                     b.getDescription(),
                     ImageService.url(b.getCoverImage()),
+                    mascotKey(b),
                     b.getVisibility(),
                     b.getStatus(),
                     b.getMemberCount(),
@@ -378,6 +383,11 @@ public class BlogQueryService {
                     tags.getOrDefault(b.getId(), List.of()),
                     b.getCreatedAt()))
         .toList();
+  }
+
+  /** 마스코트 이름(bear 등). 아직 안 골랐으면 null이고, 화면이 블로그 이름으로 기본 동물을 보여 준다 (D-116). */
+  private static String mascotKey(Blog blog) {
+    return blog.getMascot() == null ? null : blog.getMascot().key();
   }
 
   private Map<Long, List<String>> tagsOf(List<Long> blogIds) {

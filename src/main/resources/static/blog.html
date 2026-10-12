@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>블로그</title>
     <link rel="stylesheet" href="/css/common.css" />
+    <link rel="stylesheet" href="/css/mascot.css" />
+    <script src="/js/theme.js"></script>
     <script src="/js/api.js" defer></script>
     <script src="/js/layout.js" defer></script>
     <script src="/js/session.js" defer></script>
+    <script src="/js/mascot.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
     <script src="/js/form-dialog.js" defer></script>
     <script src="/js/report.js" defer></script>
@@ -32,6 +35,7 @@
         </div>
         <header class="blog-hero">
           <div class="blog-hero__title">
+            <span class="blog-hero__mascot" id="mascot"></span>
             <h1 id="name"></h1>
             <span class="badge badge--muted" id="visibility" hidden></span>
           </div>

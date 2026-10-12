@@ -45,6 +45,10 @@
       a.appendChild(cover);
     }
     var title = el('div', 'blog-card__title');
+    if (window.Mascot) {
+      // 태그로 고른 픽셀 동물. 아직 안 골랐으면 이름으로 정해지는 기본 동물 (BLG-14, D-116)
+      title.appendChild(window.Mascot.element(blog.mascot, { size: 32, seed: blog.name }));
+    }
     title.appendChild(el('strong', '', blog.name));
     if (badge) {
       title.appendChild(el('span', 'badge', badge));

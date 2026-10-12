@@ -11,6 +11,7 @@
 #   JWT_SECRET, HASH_SECRET                      openssl rand -base64 48 로 만든 값. 한 번 정하면 바꾸지 않는다
 #   MAIL_USERNAME, MAIL_PASSWORD                 Gmail 주소와 앱 비밀번호
 #   TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY     Cloudflare Turnstile 키
+#   ANTHROPIC_API_KEY (선택)                      블로그 마스코트를 Claude로 고른다. 없으면 태그 단어 사전으로 고른다 (D-116)
 name: Deploy
 
 on:
@@ -56,6 +57,7 @@ jobs:
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - name: Check secrets
         run: |
@@ -118,6 +120,9 @@ jobs:
           put MAIL_PASSWORD "$MAIL_PASSWORD"
           put TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY"
           put TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY"
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            put ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+          fi
 
       - name: Upload to server
         run: |

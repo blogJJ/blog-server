@@ -12,3 +12,7 @@ app:
   # 테스트에서 올린 이미지는 build 아래에 둔다
   storage:
     local-dir: build/test-uploads
+  # 테스트는 블로그 저장 뒤 따로 도는 마스코트 고르기를 끈다. MascotServiceTest가 직접 부른다
+  mascot:
+    enabled: false
+    api-key: ""

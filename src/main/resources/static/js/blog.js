@@ -42,6 +42,9 @@
     $('blocked').hidden = true;
     $('blog').hidden = false;
     $('name').textContent = blog.name;
+    if (window.Mascot) {
+      $('mascot').replaceChildren(window.Mascot.element(blog.mascot, { size: 64, seed: blog.name }));
+    }
     $('cover').hidden = !blog.coverImage;
     if (blog.coverImage) {
       $('cover').src = blog.coverImage;

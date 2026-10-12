@@ -4,6 +4,7 @@ CSP(script-src 'self')를 지키려고 CDN 대신 우리 서버에서 내보낸�
 
 - `toastui-editor-all.min.js`: `@toast-ui/editor@3.2.2`와 한국어 언어 파일, prosemirror 의존성을 esbuild로 한 파일(IIFE)로 묶은 것. `window.toastui.Editor`로 쓴다.
 - `toastui-editor.css`: 패키지의 `dist/toastui-editor.css` 그대로.
+- `toastui-editor-dark.css`: 패키지의 `dist/theme/toastui-editor-dark.css` 그대로. 어두운 모드에서 쓴다 (D-117).
 - 라이선스: Toast UI Editor와 prosemirror는 MIT, 함께 묶인 DOMPurify는 Apache 2.0 또는 MPL 2.0. 각 라이선스 문구는 js 파일 끝에 들어 있다.
 
 다시 만드는 방법:
