@@ -63,6 +63,7 @@
   function buildFooter() {
     var footer = el('footer', 'site-footer');
     footer.appendChild(link('/notices.html', '', '공지사항'));
+    footer.appendChild(link('/release-notes.html', '', '릴리즈 노트')); // T159, D-130
     footer.appendChild(link('/privacy.html', '', '개인정보 처리방침'));
     return footer;
   }
