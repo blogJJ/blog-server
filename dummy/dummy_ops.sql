@@ -10,6 +10,8 @@
 --   3. 메인 관리자가 처리할 신고(handler_scope = ADMIN): 블로그장 본인·블로그 자체 신고, 메인 프로필 신고
 --   4. 메인 관리자가 블로그장에게 준 경고 1건(가장 먼저 만든 블로그)과 알림
 --   5. 승인제 블로그의 대기 참여 신청(블로그마다 3명까지)과 블로그장 알림
+--   6. 가장 먼저 만든 블로그의 블로그장이 받을 댓글·대댓글·좋아요·팔로우·구독 알림
+--      (그 블로그장이 쓴 글 3개, 거기 달린 댓글과 좋아요, 팔로워 12명을 함께 넣습니다)
 --   블랙리스트는 이름·이메일·전화번호 해시에 서버 비밀값이 필요해 넣지 않습니다.
 
 SET NAMES utf8mb4;
@@ -386,5 +388,109 @@ SELECT rep.id, 'USER', t.id, NULL, 'ADMIN', 'ETC', '[예시] 더미 신고 데�
 FROM users t
 JOIN users rep ON rep.email = 'bulk002@example.com'
 WHERE @seeded = 0 AND t.email = 'bulk003@example.com';
+
+-- 6. 가장 먼저 만든 블로그의 블로그장이 받을 댓글·대댓글·좋아요·팔로우·구독 알림
+--    1~5와 따로 한 번만 들어갑니다(블로그장이 쓴 첫 글 제목으로 확인).
+SET @owner := (SELECT owner_id FROM blogs WHERE id = @first_blog);
+SET @seeded6 := (SELECT COUNT(*) FROM posts WHERE blog_id = @first_blog AND author_id = @owner AND title = '반가워요, 블로그장입니다');
+
+INSERT INTO posts (blog_id, author_id, title, content, is_notice, created_at)
+SELECT @first_blog, @owner, t.title, t.content, t.notice, NOW() - INTERVAL t.h HOUR
+FROM (
+  SELECT '반가워요, 블로그장입니다' AS title, '블로그를 새로 맡게 됐어요.\n\n앞으로 글도 자주 올리고 댓글도 열심히 달게요. 잘 부탁드려요!' AS content, TRUE AS notice, 50 AS h
+  UNION ALL SELECT '이번 주 추천 레시피 모음', '멤버분들이 올려 주신 글 중에 반응이 좋았던 것만 골라 봤어요.\n\n- 제육볶음\n- 크림 파스타\n- 군고구마', FALSE, 30
+  UNION ALL SELECT '댓글 이벤트 합니다', '이 글에 가장 해 보고 싶은 요리를 댓글로 남겨 주세요.\n\n추첨해서 다음 글 주제로 정할게요.', FALSE, 8
+) t
+WHERE @seeded6 = 0 AND @owner IS NOT NULL;
+
+-- 블로그장 글에 멤버 댓글 (글마다 멤버 앞 4명)
+INSERT INTO comments (post_id, author_id, content, created_at)
+WITH m AS (
+  SELECT bm.user_id, ROW_NUMBER() OVER (ORDER BY bm.joined_at, bm.user_id) AS rn
+  FROM blog_members bm JOIN users u ON u.id = bm.user_id
+  WHERE bm.blog_id = @first_blog AND bm.user_id <> @owner AND bm.suspended_until IS NULL
+    AND u.status = 'ACTIVE' AND u.role = 'USER'
+)
+SELECT p.id, m.user_id,
+       ELT(m.rn, '환영해요! 앞으로 자주 들를게요.', '좋은 글 감사합니다 :)', '저는 김치찌개요!', '다음 글도 기대할게요.'),
+       p.created_at + INTERVAL (m.rn * 2) HOUR
+FROM posts p JOIN m ON m.rn <= 4
+WHERE @seeded6 = 0 AND p.blog_id = @first_blog AND p.author_id = @owner
+  AND p.title IN ('반가워요, 블로그장입니다', '이번 주 추천 레시피 모음', '댓글 이벤트 합니다');
+
+INSERT INTO notifications (receiver_id, actor_id, tab, type, target_type, target_id, message, is_read, created_at)
+SELECT @owner, c.author_id, 'COMMENT', 'COMMENT', 'POST', p.id,
+       CONCAT(u.nickname, '님이 내 글 ''', p.title, '''에 댓글을 남겼어요.'), FALSE, c.created_at
+FROM comments c JOIN posts p ON p.id = c.post_id JOIN users u ON u.id = c.author_id
+WHERE @seeded6 = 0 AND p.blog_id = @first_blog AND p.author_id = @owner AND c.parent_id IS NULL
+  AND p.title IN ('반가워요, 블로그장입니다', '이번 주 추천 레시피 모음', '댓글 이벤트 합니다');
+
+-- 블로그장이 멤버 글에 단 댓글과, 그 댓글에 달린 대댓글 (멤버 글 2개)
+INSERT INTO comments (post_id, author_id, content, created_at)
+SELECT p.id, @owner, '정성 가득한 글이네요. 공지에 소개해도 될까요?', NOW() - INTERVAL 20 HOUR
+FROM posts p
+WHERE @seeded6 = 0 AND p.blog_id = @first_blog AND p.author_id <> @owner AND p.status = 'PUBLISHED'
+ORDER BY p.created_at DESC, p.id DESC LIMIT 2;
+
+INSERT INTO comments (post_id, author_id, parent_id, reply_to_user_id, content, created_at)
+SELECT c.post_id, p.author_id, c.id, @owner, '물론이죠! 감사합니다 :)', c.created_at + INTERVAL 3 HOUR
+FROM comments c JOIN posts p ON p.id = c.post_id
+WHERE @seeded6 = 0 AND c.author_id = @owner AND c.content = '정성 가득한 글이네요. 공지에 소개해도 될까요?';
+
+INSERT INTO notifications (receiver_id, actor_id, tab, type, target_type, target_id, message, is_read, created_at)
+SELECT @owner, r.author_id, 'COMMENT', 'REPLY', 'POST', r.post_id,
+       CONCAT(u.nickname, '님이 내 댓글에 답글을 남겼어요.'), FALSE, r.created_at
+FROM comments r JOIN users u ON u.id = r.author_id
+WHERE @seeded6 = 0 AND r.reply_to_user_id = @owner AND r.content = '물론이죠! 감사합니다 :)';
+
+-- 블로그장 글에 좋아요 (글마다 멤버 앞 6명)
+INSERT IGNORE INTO post_likes (post_id, user_id, created_at)
+WITH m AS (
+  SELECT bm.user_id, ROW_NUMBER() OVER (ORDER BY bm.joined_at DESC, bm.user_id) AS rn
+  FROM blog_members bm JOIN users u ON u.id = bm.user_id
+  WHERE bm.blog_id = @first_blog AND bm.user_id <> @owner AND u.status = 'ACTIVE' AND u.role = 'USER'
+)
+SELECT p.id, m.user_id, p.created_at + INTERVAL m.rn HOUR
+FROM posts p JOIN m ON m.rn <= 6
+WHERE @seeded6 = 0 AND p.blog_id = @first_blog AND p.author_id = @owner
+  AND p.title IN ('반가워요, 블로그장입니다', '이번 주 추천 레시피 모음', '댓글 이벤트 합니다');
+
+INSERT INTO notifications (receiver_id, actor_id, tab, type, target_type, target_id, message, is_read, created_at)
+SELECT @owner, l.user_id, 'LIKE', 'POST_LIKE', 'POST', p.id,
+       CONCAT(u.nickname, '님이 내 글 ''', p.title, '''을(를) 좋아해요.'), FALSE, l.created_at
+FROM post_likes l JOIN posts p ON p.id = l.post_id JOIN users u ON u.id = l.user_id
+WHERE @seeded6 = 0 AND p.blog_id = @first_blog AND p.author_id = @owner
+  AND p.title IN ('반가워요, 블로그장입니다', '이번 주 추천 레시피 모음', '댓글 이벤트 합니다');
+
+-- 글·블로그 숫자 맞추기
+UPDATE posts p
+SET p.like_count = (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id),
+    p.comment_count = (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 'ACTIVE')
+WHERE @seeded6 = 0 AND p.blog_id = @first_blog;
+
+UPDATE blogs b
+SET b.post_count = (SELECT COUNT(*) FROM posts p WHERE p.blog_id = b.id AND p.status = 'PUBLISHED')
+WHERE @seeded6 = 0 AND b.id = @first_blog;
+
+-- 팔로워 12명 (대량 회원 bulk040~bulk051)
+INSERT IGNORE INTO user_follows (follower_id, followee_id, created_at)
+SELECT u.id, @owner, NOW() - INTERVAL (CAST(SUBSTRING(u.email, 5, 3) AS UNSIGNED) - 39) * 3 HOUR
+FROM users u
+WHERE @seeded6 = 0 AND @owner IS NOT NULL AND u.status = 'ACTIVE' AND u.id <> @owner
+  AND u.email BETWEEN 'bulk040@example.com' AND 'bulk051@example.com';
+
+INSERT INTO notifications (receiver_id, actor_id, tab, type, target_type, target_id, message, is_read, created_at)
+SELECT @owner, f.follower_id, 'FOLLOW', 'FOLLOW', 'USER', f.follower_id,
+       CONCAT(u.nickname, '님이 나를 팔로우해요.'), FALSE, f.created_at
+FROM user_follows f JOIN users u ON u.id = f.follower_id
+WHERE @seeded6 = 0 AND f.followee_id = @owner AND u.email BETWEEN 'bulk040@example.com' AND 'bulk051@example.com';
+
+-- 구독 알림: 이 블로그장이 가진 블로그의 최근 구독 15건
+INSERT INTO notifications (receiver_id, actor_id, tab, type, target_type, target_id, message, is_read, created_at)
+SELECT @owner, s.user_id, 'FOLLOW', 'BLOG_SUBSCRIBE', 'USER', s.user_id,
+       CONCAT(u.nickname, '님이 ''', b.name, ''' 블로그를 구독해요.'), FALSE, s.created_at
+FROM blog_subscriptions s JOIN blogs b ON b.id = s.blog_id JOIN users u ON u.id = s.user_id
+WHERE @seeded6 = 0 AND b.owner_id = @owner AND s.user_id <> @owner
+ORDER BY s.created_at DESC, s.id DESC LIMIT 15;
 
 SELECT handler_scope, status, COUNT(*) AS reports FROM reports GROUP BY handler_scope, status ORDER BY 1, 2;
