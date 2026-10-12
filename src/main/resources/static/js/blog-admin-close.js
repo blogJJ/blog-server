@@ -84,7 +84,7 @@
     $('transfer-pending').hidden = !pending;
     $('transfer-form').hidden = !!pending;
     if (pending) {
-      $('transfer-pending').textContent =
+      $('transfer-pending-text').textContent =
         pending.toNickname + '님에게 보낸 위임 요청이 응답을 기다리고 있어요 (' + dateTime(pending.expiresAt) + '까지).';
       return;
     }
@@ -109,6 +109,19 @@
     try {
       await Api.post(base() + '/transfers', { toUserId: Number(select.value) });
       Api.toast('위임 요청을 보냈어요. 상대가 수락하면 알림으로 알려 드려요.');
+    } catch (e) {
+      Api.showError(e);
+    }
+    load();
+  }
+
+  async function cancelTransfer() {
+    if (!window.confirm('보낸 위임 요청을 취소할까요? 받는 멤버에게 알림이 가요.')) {
+      return;
+    }
+    try {
+      await Api.post(base() + '/transfers/pending/cancel');
+      Api.toast('위임 요청을 취소했어요.');
     } catch (e) {
       Api.showError(e);
     }
@@ -158,6 +171,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     $('transfer-form').addEventListener('submit', requestTransfer);
+    $('transfer-cancel').addEventListener('click', cancelTransfer);
     $('close-blog').addEventListener('click', closeBlog);
     $('revoke-close').addEventListener('click', revokeClose);
   });
