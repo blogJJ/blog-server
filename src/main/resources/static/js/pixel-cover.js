@@ -4,8 +4,10 @@
  * 192x80 논리 해상도 프레임버퍼에 직접 픽셀을 칠한 뒤, 시간대 주변광과
  * 램프/창문 빛을 디더링된 단계로 입히고 정수 배율로 캔버스에 올린다.
  * 같은 spec이면 항상 같은 그림, seed가 다르면 소품·팔레트·구름이 달라진다.
- * 장면 28개, 색 8개. 장면마다 소품 칸(벽 장식, 선반 소품, 바닥 소품, 작은 동물 등)을 따로 골라
+ * 장면 40개, 색 8개. 장면마다 소품 칸(벽 장식, 선반 소품, 바닥 소품, 작은 동물 등)을 따로 골라
  * 경우의 수를 곱으로 늘리고, spec.prop(태그에서 고른 소품 주제)이 있으면 그 주제의 소품을 먼저 고른다 (T158, D-129).
+ * 섞기 모드(spec.mix, 저장값 일곱째 칸)는 장면 위에 배경 20개(창밖·뒤 풍경), 계절·행사 9개, 벽·바닥 재질,
+ * 가구 색, 마스코트 자세, 좌우 뒤집기를 따로 겹친다. 일곱째 칸이 없는 예전 값은 그림이 그대로다.
  *
  * 공개 API: window.PixelCover
  */
@@ -183,7 +185,19 @@
       bedroom: '아늑한 방',
       'street-market': '시장·길거리 음식',
       riverside: '강변',
-      greenhouse: '온실·식물'
+      greenhouse: '온실·식물',
+      laundromat: '빨래방',
+      classroom: '교실·공부',
+      gym: '헬스장',
+      'record-shop': '레코드 가게',
+      convenience: '편의점',
+      office: '사무실',
+      subway: '지하철',
+      'bus-stop': '버스 정류장',
+      hanok: '한옥',
+      farm: '농장·텃밭',
+      'space-station': '우주정거장',
+      pojangmacha: '포장마차'
     },
     time: { dawn: '새벽', day: '낮', sunset: '노을', night: '밤' },
     weather: { clear: '맑음', cloudy: '흐림', rain: '비', snow: '눈', petals: '벚꽃', leaves: '낙엽' },
@@ -215,6 +229,40 @@
       game: '게임',
       code: '개발'
     },
+    // 섞기 모드의 배경(창밖·뒤 풍경)과 계절·행사. 저장값 일곱째 칸(study.night.rain.mint.4821.cat.sea~xmas)이다 (D-129)
+    backdrop: {
+      hills: '언덕',
+      trees: '숲길',
+      city: '도시',
+      street: '거리',
+      sea: '바다',
+      mount: '설산',
+      snow: '눈밭',
+      desert: '사막',
+      space: '우주',
+      autumn: '단풍 숲',
+      sakura: '벚꽃길',
+      rice: '논밭 시골',
+      harbor: '항구',
+      under: '바닷속',
+      towers: '야경 빌딩',
+      aurora: '오로라',
+      jungle: '정글',
+      tulip: '튤립 꽃밭',
+      canyon: '협곡',
+      lake: '호수'
+    },
+    event: {
+      bloom: '봄꽃',
+      sun: '여름',
+      fall: '가을',
+      frost: '겨울',
+      xmas: '크리스마스',
+      boo: '핼러윈',
+      bday: '생일',
+      wet: '비 웅덩이',
+      flies: '반딧불이'
+    },
     mascot: {
       bear: '곰',
       cat: '고양이',
@@ -242,6 +290,8 @@
   var PALETTES = Object.keys(LABELS.palette);
   var MASCOT_KEYS = Object.keys(LABELS.mascot);
   var PROPS = Object.keys(LABELS.prop);
+  var BACKDROPS = Object.keys(LABELS.backdrop);
+  var EVENTS = Object.keys(LABELS.event);
   // 처음 14개 장면과 5개 색. 저장값이 없는 블로그는 주소로 장면을 정하는데(specFor), 목록이 늘어도 그 그림이 바뀌지 않게 이 목록에서만 고른다
   var LEGACY_SCENES = SCENES.slice(0, 14);
   var LEGACY_PALETTES = PALETTES.slice(0, 5);
@@ -328,6 +378,7 @@
     this.e = new Uint8Array(W * H);
     this.em = 0;
     this.lights = [];
+    this.wins = [];
     this.noclip();
   }
   Gfx.prototype.clear = function () {
@@ -335,6 +386,7 @@
     this.e.fill(0);
     this.em = 0;
     this.lights.length = 0;
+    this.wins.length = 0;
     this.noclip();
   };
   Gfx.prototype.noclip = function () {
@@ -575,6 +627,15 @@
     this.sunX = R.r(0.2, 0.8);
     this.moonFull = R.ch(0.3);
     this.hint = spec.prop || null;
+    // 일곱째 칸이 있을 때만 섞는다. 없으면 아래 값이 모두 비어 예전 그림 그대로다 (D-129)
+    this.mix = !!spec.mix;
+    this.bd = null;
+    this.ev = null;
+    if (this.mix) {
+      this.bd = fitBd(spec.scene, spec.backdrop);
+      this.ev = spec.event || null;
+      mixLayers(this);
+    }
   }
 
   function tone(env, c) {
@@ -600,7 +661,7 @@
   }
 
   function stars(g, env, x, y, w, h, t) {
-    var amt = env.T.stars * ({ cloudy: 0.4, rain: 0, snow: 0 }[env.weather] === undefined ? 1 : { cloudy: 0.4, rain: 0, snow: 0 }[env.weather]);
+    var amt = env.starK != null ? env.starK : env.T.stars * ({ cloudy: 0.4, rain: 0, snow: 0 }[env.weather] === undefined ? 1 : { cloudy: 0.4, rain: 0, snow: 0 }[env.weather]);
     var n = fl(env.stars.length * amt * Math.min(1, (w * h) / 3000 + 0.25));
     for (var i = 0; i < n; i++) {
       var s = env.stars[i];
@@ -641,6 +702,8 @@
   }
 
   function celestial(g, env, x, y, w, h) {
+    if (env.bd === 'space') return planet(g, env, x, y, w, h);
+    if (env.bd === 'under') return;
     if (env.weather === 'rain' || env.weather === 'snow') return;
     var tm = env.time;
     var sx = x + fl(env.sunX * w);
@@ -727,6 +790,7 @@
   }
 
   function clouds(g, env, x, y, w, h, t, scale, filter) {
+    if (env.bd === 'space' || env.bd === 'under') return;
     var sc0 = scale || clamp(h / 36, 0.6, 1.5);
     var span = w + 40;
     for (var i = 0; i < env.clouds.length; i++) {
@@ -741,7 +805,7 @@
   function distant(g, env, x, y, w, h, kind, t) {
     var low = env.skyLow;
     var sd = env.seed;
-    var snow = env.weather === 'snow';
+    var snow = snowy(env);
     var xx;
     var yy;
     var i;
@@ -815,6 +879,8 @@
         g.r(lx - 1, y + h - 17, 3, 2, env.time === 'day' ? tone(env, '#d8dccc') : '#ffe08a');
         if (env.time !== 'day') halo(g, lx, y + h - 16, 1, 4, '#ffe9a8', 0.6);
       }
+    } else if (kind) {
+      scenery(g, env, x, y, w, h, kind, t);
     }
   }
 
@@ -826,6 +892,7 @@
     var xx;
     var yy;
     dens = dens || 1;
+    if (env.bd === 'space' || env.bd === 'under') return;
     var night = env.time === 'night';
     if (wt === 'rain') {
       n = rnd(((w * h) / 42) * dens);
@@ -906,6 +973,7 @@
         }
       }
     }
+    if (env.wallX) wallTex(g, env, floorY, env.wallX);
     if (st === 3 || o.wainscot) {
       var wy = o.wainY || floorY - 20;
       g.r(0, wy, W, floorY - wy, P.wallD);
@@ -925,6 +993,10 @@
     g.r(0, floorY - 3, W, 1, P.trimL);
     g.r(0, floorY, W, H - floorY, P.floor);
     g.r(0, floorY, W, 1, P.floorD);
+    if (env.floorX) {
+      floorTex(g, env, floorY, env.floorX);
+      return;
+    }
     if (o.tiles) {
       for (y = floorY + 1; y < H; y++) {
         var row = fl((y - floorY - 1) / 3);
@@ -982,7 +1054,10 @@
     g.clip(x, y, w, h, function (qx, qy) {
       return inside(qx, qy, 2);
     });
-    outside(g, env, x + 2, y + 2, w - 4, h - 4, t, o.view);
+    outside(g, env, x + 2, y + 2, w - 4, h - 4, t, env.bd || o.view);
+    g.wins.push([x + 2, y + 2, w - 4, h - 4, function (qx, qy) {
+      return inside(qx, qy, 2);
+    }]);
     if (o.inner) o.inner(x + 2, y + 2, w - 4, h - 4);
     if (!o.open) {
       for (var k = 0; k < h + w; k++) {
@@ -1559,6 +1634,17 @@
     if (!m) return null;
     o = o || {};
     var sleep = o.sleep != null ? o.sleep : env.time === 'night';
+    var pose = env.pose;
+    if (pose) {
+      // 섞기 모드의 자세: 반대로 보기, 깡충, 낮잠, 밤에도 깨어 있기
+      if (o.sleep == null && pose === 'nap') sleep = true;
+      if (o.sleep == null && pose === 'awake') sleep = false;
+      if (pose === 'flip') o = { flip: !o.flip, sleep: o.sleep };
+      if (pose === 'hop' && !sleep) {
+        var hp0 = mod(t + env.seed, 18);
+        if (hp0 < 3) yb -= hp0 === 1 ? 2 : 1;
+      }
+    }
     var blink = !sleep && mod(t + (env.seed % 23), 37) === 0;
     var y = yb - m.h;
     g.br(x + 1, yb, m.w - 2, 1, env.P.ink, 0.28);
@@ -1726,8 +1812,8 @@
       moreOf(g, env, L, t, 'study');
       if (L.spot === 'shelf') mascot(g, env, 160, 57, t, { flip: true });
       else mascot(g, env, 2, 51, t);
-      if (env.weather === 'petals' || env.weather === 'leaves') {
-        var cols = env.weather === 'leaves' ? ['#e9873b', '#d0533a', '#f2b648'] : ['#ffc4d6', '#ff9fbf', '#ffe3ec'];
+      if (blossomy(env) || autumnal(env)) {
+        var cols = autumnal(env) ? ['#e9873b', '#d0533a', '#f2b648'] : ['#ffc4d6', '#ff9fbf', '#ffe3ec'];
         for (var i = 0; i < 5; i++) {
           var tt = mod(t * 1.1 + i * 31, 150);
           var qx = wx + ww - 4 + tt;
@@ -2246,6 +2332,7 @@
         }
       }
       drawLayer(L.far, farL, farD);
+      if (env.bd) distant(g, env, 0, 54, W, 26, env.bd, t);
       if (L.balloon) {
         var bx = L.bx + rnd(Math.sin(t * 0.05) * 3);
         var by = 22 + rnd(Math.sin(t * 0.08) * 2);
@@ -2312,7 +2399,7 @@
       celestial(g, env, 0, 0, W, 60);
       g.em = 0;
       clouds(g, env, 0, 0, W, 40, t, 0.9);
-      distant(g, env, 0, 30, W, 36, 'city', t);
+      distant(g, env, 0, 30, W, 36, bk(env, 'city'), t);
       var cols = [mix(P.wallD, '#6a6f8a', 0.5), mix(P.trim, '#6a5a6a', 0.4), mix(P.accent2, '#5a6378', 0.6), mix(P.woodD, '#5a5060', 0.4)];
       var night = env.time !== 'day';
       for (i = 0; i < L.b.length; i++) {
@@ -2554,7 +2641,7 @@
           g.p(x, y, sn ? (shadow ? snowD : snowC) : (shadow ? mcD : mc));
         }
       }
-      distant(g, env, 0, 30, W, 22, 'trees', t);
+      distant(g, env, 0, 30, W, 22, bk(env, 'trees'), t);
       // lake mirrors whatever is above it
       var water = hx('#3a6aa0');
       for (y = 50; y < 66; y++) {
@@ -2710,12 +2797,12 @@
 
   function tree(g, env, x, yb, r, t) {
     var P = env.P;
-    var snow = env.weather === 'snow';
-    var fall = env.weather === 'leaves';
+    var snow = snowy(env);
+    var fall = autumnal(env);
     var c = fall ? hx('#e08a3a') : P.leaf;
     var cD = fall ? hx('#b45a2a') : P.leafD;
     var cL = fall ? hx('#f6c05a') : P.leafL;
-    var blossom = env.weather === 'petals';
+    var blossom = blossomy(env);
     if (blossom) {
       c = hx('#ffc4d6');
       cD = hx('#e890b0');
@@ -2747,14 +2834,14 @@
       var P = env.P;
       var x;
       var y;
-      var snow = env.weather === 'snow';
+      var snow = snowy(env);
       g.em = 1;
       skyBg(g, env, 0, 0, W, 48);
       stars(g, env, 0, 0, W, 44, t);
       celestial(g, env, 0, 0, W, 48);
       g.em = 0;
       clouds(g, env, 0, 0, W, 34, t);
-      distant(g, env, 0, 22, W, 26, 'trees', t);
+      distant(g, env, 0, 22, W, 26, bk(env, 'trees'), t);
       moreOf(g, env, L, t, 'park', 0);
       var grass = snow ? hx('#eef3fa') : P.leaf;
       var grassD = snow ? hx('#ccd8ea') : P.leafD;
@@ -3010,6 +3097,7 @@
       celestial(g, env, 0, 0, W, 44);
       g.em = 0;
       clouds(g, env, 0, 0, W, 30, t);
+      if (env.bd) distant(g, env, 0, 22, W, 18, env.bd, t);
       var deep = mix(env.skyMid, '#1a4a8a', 0.6);
       var shallow = hx('#4ab8c8');
       for (y = 40; y < 67; y++) {
@@ -3124,9 +3212,12 @@
       g.em = 0;
       clouds(g, env, 0, 0, W, 30, t);
       var mc = mix(env.skyLow, '#8a9ac0', 0.45);
-      for (x = 0; x < W; x++) {
-        var my = 22 + Math.abs(mod(x + env.seed % 40, 70) - 35) * 0.5;
-        for (y = fl(my); y < 46; y++) g.p(x, y, y < my + 4 ? '#f6f8fc' : mc);
+      if (env.bd) distant(g, env, 0, 14, W, 32, env.bd, t);
+      else {
+        for (x = 0; x < W; x++) {
+          var my = 22 + Math.abs(mod(x + env.seed % 40, 70) - 35) * 0.5;
+          for (y = fl(my); y < 46; y++) g.p(x, y, y < my + 4 ? '#f6f8fc' : mc);
+        }
       }
       moreOf(g, env, L, t, 'snowfield', 0);
       var s1 = hx('#eef3fa');
@@ -4324,7 +4415,7 @@
 
   function grass(g, env, y0, y1, salt) {
     var P = env.P;
-    var snow = env.weather === 'snow';
+    var snow = snowy(env);
     var gc = snow ? hx('#eef3fa') : P.leaf;
     var gD = snow ? hx('#ccd8ea') : P.leafD;
     for (var y = y0; y < y1; y++) {
@@ -4334,7 +4425,7 @@
 
   function flowerDots(g, env, x0, y0, w, h, n, salt) {
     var P = env.P;
-    var cols = env.weather === 'snow' ? ['#ffffff'] : [P.accent, '#ffffff', '#ffd25a', P.accent2];
+    var cols = snowy(env) ? ['#ffffff'] : [P.accent, '#ffffff', '#ffd25a', P.accent2];
     for (var k = 0; k < n; k++) {
       var fx = x0 + fl(hash(env.seed + salt, k) * w);
       var fy = y0 + fl(hash(env.seed + salt, k + 99) * h);
@@ -4548,7 +4639,7 @@
       var x;
       skyTop(g, env, 58, t, 30);
       flyer(g, env, L.fly, 60, 14, t);
-      distant(g, env, 0, 18, W, 40, 'city', t);
+      distant(g, env, 0, 18, W, 40, bk(env, 'city'), t);
       // neighbour building tops behind the rail
       var nb = mix(env.skyLow, '#5d6788', 0.5);
       g.r(0, 34, 26, 24, nb);
@@ -4721,7 +4812,7 @@
       var x;
       var y;
       skyTop(g, env, 54, t, 30);
-      distant(g, env, 0, 20, W, 30, 'hills', t);
+      distant(g, env, 0, 20, W, 30, bk(env, 'hills'), t);
       var gnd = L.lake ? 58 : 50;
       if (L.lake) {
         water(g, env, 50, 58, t, mix(env.skyMid, '#1a4a6a', 0.5), mix(env.skyLow, '#4a98b8', 0.5));
@@ -4866,6 +4957,7 @@
       var y;
       skyTop(g, env, 60, t, 30);
       flyer(g, env, L.fly, 150, 12, t);
+      if (env.bd) distant(g, env, 0, 20, W, 40, env.bd, t);
       var far = mix(env.skyLow, '#7a8ab0', 0.4);
       var farD = mix(far, '#2e3656', 0.25);
       var snowC = hx('#f4f6fb');
@@ -4917,7 +5009,7 @@
       // near slope with a zig-zag trail
       var near = P.leaf;
       var nearD = P.leafD;
-      if (env.weather === 'snow') {
+      if (snowy(env)) {
         near = hx('#eef3fa');
         nearD = hx('#ccd8ea');
       }
@@ -5002,8 +5094,18 @@
     stars(g, env, 0, y0, W, h, t);
     celestial(g, env, 0, y0, W, h + 8);
     clouds(g, env, 0, y0, W, fl(h * 0.4), t * 2);
+    var still = null;
+    if (env.bd) {
+      var tk = { hills: 'hills', sea: 'sea', rice: 'fields', tulip: 'fields', city: 'city', towers: 'city', street: 'city', snow: 'snow', mount: 'snow', aurora: 'snow', trees: 'forest', autumn: 'forest', jungle: 'forest', sakura: 'forest' }[env.bd];
+      if (tk) kind = tk;
+      else {
+        still = env.bd;
+        kind = env.bd === 'harbor' || env.bd === 'lake' ? 'sea' : 'hills';
+      }
+    }
+    if (still) scenery(g, env, 0, y0, W, h, still, t);
     var far = mix(env.skyLow, kind === 'snow' ? '#e8eef6' : '#7a8ab0', 0.5);
-    var mid = kind === 'snow' ? hx('#f4f7fb') : (kind === 'sea' ? hx('#3a7ab0') : P.leaf);
+    var mid = kind === 'snow' ? hx('#f4f7fb') : (kind === 'sea' ? hx('#3a7ab0') : (env.bd === 'autumn' ? hx('#d8843a') : (env.bd === 'sakura' ? hx('#f0b0c8') : P.leaf)));
     var midD = kind === 'snow' ? hx('#ccd8ea') : (kind === 'sea' ? hx('#2a5a90') : P.leafD);
     var o1 = t * 0.6;
     var o2 = t * 2.2;
@@ -5012,7 +5114,7 @@
       var wx = x + o1;
       var fy = y0 + h * 0.5 + Math.sin(wx * 0.05) * h * 0.12 + Math.sin(wx * 0.13) * 1.5;
       if (kind === 'city') fy = y0 + h * 0.45 + (fl(wx / 9) % 3) * 3 + (hash(fl(wx / 9), 3) * 6);
-      for (y = fl(fy); y < y1; y++) g.p(x, y, far);
+      if (!still) for (y = fl(fy); y < y1; y++) g.p(x, y, far);
       if (kind === 'city' && env.time !== 'day' && mod(fl(wx), 3) === 0 && hash(fl(wx), fl(fy)) < 0.5) g.p(x, fl(fy) + 3, env.litC);
       var wx2 = x + o2;
       var my = kind === 'sea' ? y0 + h * 0.7 : y0 + h * 0.72 + Math.sin(wx2 * 0.04 + 2) * h * 0.06;
@@ -5944,7 +6046,8 @@
       }
       g.em = 0;
       clouds(g, env, 0, 0, W, 30, t);
-      if (L.glow) {
+      if (env.bd) distant(g, env, 0, 40, W, 22, env.bd, t);
+      else if (L.glow) {
         for (x = 0; x < W; x++) {
           var hb = 56 + fl(hash(fl(x / 4), 9) * 4);
           for (y = hb; y < 62; y++) g.p(x, y, tone(env, mix(env.skyLow, '#4a536f', 0.6)));
@@ -5956,7 +6059,7 @@
         var hy = 60 - Math.sin((x / W) * PI) * 8 + Math.sin(x * 0.11) * 1;
         for (y = fl(hy); y < H; y++) g.p(x, y, (x * 7 + y * 13) % 19 === 0 ? P.leafD : (y < hy + 1 ? P.leafL : P.leaf));
       }
-      if (env.weather === 'snow') for (x = 0; x < W; x++) for (y = 70; y < H; y++) if (bay(x, y) < 0.5) g.p(x, y, '#eef3fa');
+      if (snowy(env)) for (x = 0; x < W; x++) for (y = 70; y < H; y++) if (bay(x, y) < 0.5) g.p(x, y, '#eef3fa');
       if (L.dome !== 'none') {
         var dx = L.dome === 'left' ? 28 : 160;
         g.r(dx - 16, 38, 32, 18, P.paper);
@@ -6178,7 +6281,7 @@
       var x;
       var y;
       skyTop(g, env, 46, t, 22);
-      distant(g, env, 0, 6, W, 42, 'street', t);
+      distant(g, env, 0, 6, W, 42, bk(env, 'street'), t);
       // cobbles
       var cob = mix(P.paper, P.metal, 0.5);
       for (y = 48; y < H; y++) {
@@ -6272,7 +6375,7 @@
       var x;
       skyTop(g, env, 42, t, 24);
       flyer(g, env, L.fly, 130, 10, t);
-      distant(g, env, 0, 14, W, 28, L.far, t);
+      distant(g, env, 0, 14, W, 28, bk(env, L.far), t);
       if (L.farT !== 'none') farThing(g, env, L.farT, L.ftx, 40, t);
       water(g, env, 40, 62, t, mix(env.skyMid, '#1a4a7a', 0.55), mix(env.skyLow, '#4a9ab8', 0.5));
       g.r(0, 40, W, 1, mix(env.skyLow, WHITE, 0.25));
@@ -6328,7 +6431,7 @@
         g.p(x, sy - 1, mix(env.skyLow, WHITE, 0.35));
         for (var yy = sy; yy < H; yy++) g.p(x, yy, yy < sy + 2 ? P.leafD : ((x * 7 + yy * 13) % 17 === 0 ? P.leafD : P.leaf));
       }
-      if (env.weather === 'snow') for (x = 0; x < W; x++) for (yy = 64; yy < H; yy++) if (bay(x, yy) < 0.6) g.p(x, yy, '#eef3fa');
+      if (snowy(env)) for (x = 0; x < W; x++) for (yy = 64; yy < H; yy++) if (bay(x, yy) < 0.6) g.p(x, yy, '#eef3fa');
       var path = mix(P.paper, P.woodL, 0.5);
       g.r(0, 68, W, 5, path);
       g.r(0, 68, W, 1, mix(path, P.ink, 0.15));
@@ -6369,7 +6472,7 @@
       var x;
       var y;
       g.em = 1;
-      outside(g, env, 0, 0, W, 62, t, env.weather === 'snow' ? 'hills' : L.view);
+      outside(g, env, 0, 0, W, 62, t, env.bd || (snowy(env) ? 'hills' : L.view));
       g.em = 0;
       // glass sheen
       for (var k = 0; k < 60; k++) {
@@ -6772,6 +6875,2198 @@
     }
   );
 
+  // ---- more scenes (T158, D-129): 빨래방, 교실, 헬스장, 레코드 가게, 편의점, 사무실
+
+  // 둥근 문 세탁기 한 대. 돌아가는 중이면 빨래가 문 안에서 돈다
+  function washer(g, env, x, y, w, h, body, on, t, salt) {
+    var P = env.P;
+    var bD = mix(body, P.ink, 0.25);
+    g.br(x + 1, y + h, w, 1, P.ink, 0.25);
+    g.r(x, y, w, h, body);
+    g.r(x, y, w, 1, mix(body, WHITE, 0.4));
+    g.r(x + w - 1, y, 1, h, bD);
+    g.r(x + 1, y + 2, w - 2, 4, bD);
+    g.r(x + 2, y + 3, 6, 2, mix(P.ink, '#203040', 0.5));
+    g.em = 1;
+    g.p(x + 3, y + 3, on ? (mod(t + salt, 6) < 3 ? '#7cff9a' : '#3ad870') : '#5a6a70');
+    g.r(x + 5, y + 3, 2, 1, on ? '#ffd36e' : '#5a6a70');
+    g.em = 0;
+    g.p(x + w - 4, y + 4, P.metalL);
+    g.p(x + w - 6, y + 4, P.metalL);
+    var cx = x + fl(w / 2);
+    var cy = y + 6 + fl((h - 6) / 2);
+    var r = Math.min(fl(w / 2) - 2, fl((h - 6) / 2) - 1);
+    disc(g, cx, cy, r, P.metalD);
+    disc(g, cx, cy, r - 1, P.metalL);
+    disc(g, cx, cy, r - 2, mix('#203040', env.skyLow, 0.2));
+    var cols = [P.accent, P.accent2, '#ffffff', P.leaf, '#f6d04a'];
+    var n = 5;
+    for (var k = 0; k < n; k++) {
+      var a = (on ? t * 0.55 : 0) + k * ((PI * 2) / n) + salt;
+      var rr = on ? r - 3 : 1;
+      var px = cx + rnd(Math.cos(a) * rr);
+      var py = on ? cy + rnd(Math.sin(a) * rr) : cy + r - 3 - (k % 2);
+      if (!on) px = cx - 3 + k + (k > 2 ? 1 : 0);
+      g.r(px, py, 2, 1 + (k & 1), cols[(k + salt) % cols.length]);
+    }
+    if (on && mod(t + salt, 4) < 2) g.p(cx - 1, cy - r + 3, mix(WHITE, '#bfe0ee', 0.4));
+    g.b(cx - r + 2, cy - r + 3, WHITE, 0.5);
+    g.b(cx - r + 3, cy - r + 2, WHITE, 0.5);
+  }
+
+  SC.laundromat = {
+    still: 4,
+    setup: function (env, R) {
+      var n = R.pick([4, 5, 5]);
+      var on = [];
+      for (var i = 0; i < n; i++) on.push(R.ch(0.6));
+      return {
+        wallStyle: R.i(0, 2),
+        n: n,
+        on: on,
+        body: R.pick(['paper', 'metal', 'paper', 'accent2L']),
+        stack: R.ch(0.5),
+        left: R.ch(0.5),
+        shape: R.pick(['rect', 'rect', 'arch']),
+        sign: R.pick(['coin', 'neon', 'clock', 'none']),
+        table: R.pick(['basket', 'folded', 'both']),
+        cup: hp(R, env, 'cup', CUPS),
+        art: hp(R, env, 'wall', ['poster', 'calendar', 'cork', 'clock', 'neon']),
+        floor: hp(R, env, 'floor', ['basket', 'bag', 'umbrella', 'bigplant', 'none']),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'none', 'mouse']),
+        spot: R.pick(['table', 'chair', 'top'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      room(g, env, L, 64, { tiles: mix(P.floor, P.paper, 0.45) });
+      var body = P[L.body];
+      var mx0 = L.left ? 74 : 6;
+      var mw = 22;
+      var wx = L.left ? 10 : mx0 + L.n * mw + 8;
+      var ww = Math.min(52, (L.left ? mx0 - 8 : W - 6) - wx);
+      win(g, env, wx, 8, ww, 28, t, { shape: L.shape, panes: 4, sill: true });
+      // fluorescent strip
+      g.em = 1;
+      g.r(mx0 + 4, 1, L.n * mw - 8, 2, env.time === 'day' ? '#eef4f6' : '#f6fbff');
+      g.em = 0;
+      g.light(mx0 + (L.n * mw) / 2, 4, 80, [0.85, 0.95, 1], env.lampK * 0.45, { sy: 1.4 });
+      for (var i = 0; i < L.n; i++) {
+        var x0 = mx0 + i * mw;
+        washer(g, env, x0 + 1, 42, mw - 2, 22, body, L.on[i], t, i * 3 + 1);
+        if (L.stack && i % 2 === 0) washer(g, env, x0 + 1, 18, mw - 2, 22, mix(body, P.metal, 0.3), L.on[(i + 1) % L.n], t, i * 3 + 2);
+      }
+      // sign over the machines
+      var sx = mx0 + (L.stack ? mw + 2 : 6);
+      if (!L.stack || L.n > 1) {
+        if (L.sign === 'coin') {
+          g.r(sx, 8, 26, 8, P.accent);
+          g.r(sx + 1, 9, 24, 6, P.accentL);
+          for (x = 0; x < 4; x++) g.r(sx + 3 + x * 6, 11, 4, 2, P.accentD);
+          disc(g, sx + 30, 12, 3, '#f6d04a');
+          g.p(sx + 30, 12, '#c8a02a');
+        } else if (L.sign === 'neon') {
+          g.em = 1;
+          var nc = mod(t, 40) === 0 ? mix(P.accent2, P.ink, 0.5) : P.accent2L;
+          g.r(sx, 9, 18, 1, nc);
+          g.r(sx, 14, 18, 1, nc);
+          g.r(sx, 9, 1, 6, nc);
+          g.r(sx + 17, 9, 1, 6, nc);
+          for (x = 0; x < 3; x++) g.r(sx + 3 + x * 5, 11, 3, 2, nc);
+          g.em = 0;
+          if (env.time !== 'day') g.light(sx + 9, 12, 24, [0.7, 0.9, 1], 0.35, { n: 3 });
+        } else if (L.sign === 'clock') {
+          clock(g, env, sx + 8, 11, 5, t);
+        }
+      }
+      // folding table / bench at the open side
+      var tx = L.left ? 8 : mx0 + L.n * mw + 6;
+      var tw = Math.min(56, (L.left ? mx0 - 4 : W - 4) - tx);
+      if (tw > 24) {
+        g.r(tx, 54, tw, 2, P.woodL);
+        g.r(tx, 56, tw, 1, P.woodD);
+        g.r(tx + 2, 57, 2, 19, P.metalD);
+        g.r(tx + tw - 4, 57, 2, 19, P.metalD);
+        var bx = tx + 4;
+        if (L.table !== 'folded') {
+          g.r(bx, 47, 14, 7, P.woodL);
+          for (x = bx + 1; x < bx + 14; x += 2) g.r(x, 48, 1, 5, P.woodD);
+          g.r(bx + 2, 45, 4, 2, P.accent);
+          g.r(bx + 7, 44, 5, 3, '#ffffff');
+          bx += 17;
+        }
+        if (L.table !== 'basket') {
+          var fc = [P.accent2, P.paper, P.accent, P.leafL];
+          for (var f = 0; f < 4; f++) g.r(bx, 51 - f * 2, 12, 2, fc[(f + env.seed) % 4]);
+          bx += 14;
+        }
+        if (bx + 6 < tx + tw) cupOf(g, env, L.cup, bx + 2, 54, P.accent, t);
+      }
+      wallArt(g, env, L.art, L.left ? 52 : 150, 40, t, 3);
+      if (L.floor !== 'none') floorThing(g, env, L.floor, L.left ? 46 : mx0 + L.n * mw - 2, 77, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 182 - 12 : 4, 77, t, !L.left);
+      var mxp = L.spot === 'top' && !L.stack ? mx0 + mw * 2 + 3 : (L.spot === 'chair' ? tx + 8 : tx + tw - 22);
+      var myp = L.spot === 'top' && !L.stack ? 42 : (L.spot === 'chair' ? 76 : 54);
+      if (L.spot === 'chair') {
+        g.r(mxp - 2, 70, 20, 2, P.accent2);
+        g.r(mxp, 72, 2, 6, P.metalD);
+        g.r(mxp + 14, 72, 2, 6, P.metalD);
+        myp = 70;
+      }
+      mascot(g, env, mxp, myp, t);
+    }
+  };
+
+  SC.classroom = {
+    still: 6,
+    setup: function (env, R) {
+      return {
+        wallStyle: R.pick([0, 3]),
+        board: R.pick(['math', 'map', 'motif', 'timetable', 'letters']),
+        motif: hp(R, env, 'motif', MOTIFS),
+        wins: R.pick([1, 2]),
+        left: R.ch(0.5),
+        desks: [R.pick(['book', 'apple', 'pencils', 'globe', 'none']), R.pick(['book', 'bag', 'cup', 'none']), R.pick(['book', 'apple', 'plant', 'none'])],
+        cup: hp(R, env, 'cup', CUPS),
+        art: hp(R, env, 'wall', ['calendar', 'map', 'pennant', 'cork', 'clock', 'banner']),
+        shelf: R.ch(0.6),
+        plant: hp(R, env, 'plant', PLANTS2.concat(['tall', 'trail'])),
+        critter: hp(R, env, 'critter', ['bird', 'none', 'chick', 'none', 'hamster']),
+        seat: R.i(0, 2),
+        chalk: R.pick(['#ffffff', '#ffe08a', '#ffb0c0'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      room(g, env, L, 58);
+      var bx = L.left ? 64 : 12;
+      var bw = 92;
+      // chalkboard
+      g.r(bx - 2, 8, bw + 4, 30, P.woodD);
+      g.r(bx, 10, bw, 26, hx('#2f5a46'));
+      for (y = 10; y < 36; y++) for (x = bx; x < bx + bw; x++) if (bay(x, y) < 0.08) g.p(x, y, '#3a6a54');
+      var ch = hx(L.chalk);
+      var cw = mix(ch, '#2f5a46', 0.25);
+      if (L.board === 'math') {
+        for (y = 0; y < 4; y++) textRow(g, bx + 5, 14 + y * 5, 40 - y * 6, env.seed, y, cw);
+        g.r(bx + 52, 22, 12, 1, ch);
+        for (x = 0; x < 20; x++) g.p(bx + 54 + x, 32 - rnd(Math.sqrt(x) * 3.5), ch);
+        g.r(bx + 54, 16, 1, 17, cw);
+        g.r(bx + 54, 32, 24, 1, cw);
+      } else if (L.board === 'map') {
+        for (y = 0; y < 18; y++) {
+          for (x = 0; x < bw - 16; x++) {
+            var v = Math.sin((x + env.seed % 30) * 0.13) + Math.sin(y * 0.4 + x * 0.05) * 0.8;
+            if (v > 0.7) g.p(bx + 8 + x, 14 + y, mix(ch, '#2f5a46', 0.45));
+            if (v > 0.7 && v < 0.82) g.p(bx + 8 + x, 14 + y, cw);
+          }
+        }
+        g.p(bx + 40, 22, '#ff6a5a');
+      } else if (L.board === 'motif') {
+        motif(g, L.motif, bx + 20, 16, ch, cw);
+        motif(g, L.motif, bx + 60, 20, cw, cw);
+        textRow(g, bx + 32, 30, 30, env.seed, 1, cw);
+      } else if (L.board === 'timetable') {
+        for (x = 0; x <= 5; x++) g.r(bx + 6 + x * 14, 13, 1, 20, cw);
+        for (y = 0; y <= 4; y++) g.r(bx + 6, 13 + y * 5, 70, 1, cw);
+        for (y = 0; y < 4; y++) for (x = 0; x < 5; x++) if (hash(x + env.seed, y) < 0.7) g.r(bx + 9 + x * 14, 15 + y * 5, 6 + fl(hash(x, y + env.seed) * 4), 1, [ch, '#ffe08a', '#a8e0ff'][(x + y) % 3]);
+      } else {
+        for (y = 0; y < 3; y++) {
+          for (x = 0; x < 7; x++) {
+            var lx = bx + 8 + x * 11;
+            var ly = 14 + y * 7;
+            if (hash(x, y + env.seed) < 0.25) continue;
+            var k = fl(hash(x + 7, y + env.seed) * 4);
+            g.r(lx, ly, 5, 1, cw);
+            if (k & 1) g.r(lx + 2, ly, 1, 5, cw);
+            else g.r(lx, ly + 2, 5, 1, cw);
+            if (k & 2) g.r(lx + 4, ly + 1, 1, 4, cw);
+          }
+        }
+      }
+      // chalk tray
+      g.r(bx - 2, 38, bw + 4, 2, P.woodL);
+      g.r(bx + 10, 37, 4, 1, ch);
+      g.r(bx + 16, 37, 3, 1, '#ffb0c0');
+      g.r(bx + bw - 14, 36, 8, 2, P.paperD);
+      clock(g, env, bx + bw / 2, 4, 3, t);
+      // windows on the free side
+      var wx0 = L.left ? 6 : bx + bw + 10;
+      var wsp = L.left ? 52 : W - 6 - wx0;
+      var wn = L.wins;
+      var wwid = fl((wsp - (wn - 1) * 4) / wn);
+      for (var w = 0; w < wn; w++) win(g, env, wx0 + w * (wwid + 4), 8, wwid, 30, t, { panes: 4, sill: true, curtain: w === 0 ? P.paper : null, cw: 5 });
+      if (L.shelf) {
+        // cubbies under the windows
+        var sx = wx0;
+        g.r(sx, 46, wsp, 12, P.woodL);
+        for (x = 0; x < wsp - 2; x += 9) {
+          g.r(sx + 1 + x, 47, 8, 10, P.woodD);
+          g.r(sx + 2 + x, 49, 6, 8, P.books[(x / 9 + env.seed) % P.books.length]);
+        }
+        plant(g, env, sx + wsp - 8, 46, L.plant, t, 4);
+      } else {
+        wallArt(g, env, L.art, wx0 + 6, 44, t, 5);
+      }
+      // student desks
+      for (var d = 0; d < 3; d++) {
+        var dx = 14 + d * 60;
+        g.r(dx, 62, 34, 3, P.woodL);
+        g.r(dx, 65, 34, 1, P.woodD);
+        g.r(dx + 2, 66, 2, 12, P.metalD);
+        g.r(dx + 30, 66, 2, 12, P.metalD);
+        g.r(dx + 4, 66, 26, 3, P.metal);
+        // chair back behind the desk
+        g.r(dx + 10, 55, 14, 6, P.accent2);
+        g.r(dx + 10, 55, 14, 1, P.accent2L);
+        var it = L.desks[d];
+        if (it === 'book') {
+          g.r(dx + 4, 60, 10, 2, P.paper);
+          g.r(dx + 4, 61, 10, 1, P.accent);
+        } else if (it === 'apple') {
+          g.ell(dx + 6, 59, 2, 2, '#e8483a');
+          g.p(dx + 6, 56, P.leafD);
+        } else if (it === 'pencils') {
+          g.r(dx + 4, 60, 9, 2, P.accent);
+          g.r(dx + 6, 59, 6, 1, '#f6d04a');
+        } else if (it === 'globe') {
+          disc(g, dx + 7, 57, 3, '#5aa0d8');
+          g.p(dx + 6, 56, P.leaf);
+          g.p(dx + 8, 58, P.leaf);
+          g.r(dx + 5, 61, 5, 1, P.woodD);
+        } else if (it === 'bag') {
+          g.r(dx + 22, 56, 9, 6, P.accent);
+          g.r(dx + 24, 54, 5, 2, P.accentD);
+        } else if (it === 'cup') {
+          cupOf(g, env, L.cup, dx + 26, 62, P.paper, t);
+        } else if (it === 'plant') {
+          plant(g, env, dx + 26, 62, 'cactus', t, 2);
+        }
+      }
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 40 : 160, 46, t, L.left);
+      mascot(g, env, 14 + L.seat * 60 + 12, 62, t);
+    }
+  };
+
+  SC.gym = {
+    still: 8,
+    setup: function (env, R) {
+      return {
+        wallStyle: R.i(0, 1),
+        main: R.pick(['treadmill', 'bike', 'bench']),
+        hang: R.pick(['bag', 'rings', 'none']),
+        rack: R.pick(['dumbbells', 'kettle', 'plates']),
+        mat: R.pick(['accent', 'accent2', 'leaf', 'rug']),
+        left: R.ch(0.5),
+        art: hp(R, env, 'wall', ['banner', 'pennant', 'poster', 'clock', 'neon']),
+        cup: hp(R, env, 'cup', ['bottle', 'bottle', 'glass']),
+        floor: hp(R, env, 'floor', ['bag', 'skate', 'basket', 'bigplant', 'none']),
+        ball: R.ch(0.6),
+        spot: R.pick(['mat', 'main'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      room(g, env, L, 60, { tiles: mix(P.ink, P.floor, 0.45) });
+      // mirror wall
+      var mx0 = L.left ? 100 : 8;
+      g.r(mx0, 10, 84, 40, P.metalD);
+      g.r(mx0 + 1, 11, 82, 38, mix(env.skyLow, P.wall, 0.55));
+      for (var k = 0; k < 6; k++) {
+        g.b(mx0 + 10 + k * 13, 46, WHITE, 0.2);
+        g.line(mx0 + 6 + k * 13, 48, mx0 + 30 + k * 13, 12, mix(mix(env.skyLow, P.wall, 0.55), WHITE, 0.18));
+      }
+      // 거울 속 방: 바닥선, 맞은편 창, 흐린 기구 그림자
+      var mg = mix(env.skyLow, P.wall, 0.55);
+      g.r(mx0 + 1, 40, 82, 9, mix(mg, P.floor, 0.5));
+      g.r(mx0 + 1, 40, 82, 1, mix(mg, P.trim, 0.5));
+      g.r(mx0 + (L.left ? 8 : 52), 16, 20, 16, mix(mg, env.skyLow, 0.6));
+      g.r(mx0 + (L.left ? 17 : 61), 16, 1, 16, mix(mg, P.frame, 0.5));
+      g.r(mx0 + (L.left ? 8 : 52), 23, 20, 1, mix(mg, P.frame, 0.5));
+      for (var q = 0; q < 3; q++) g.r(mx0 + 30 + q * 7, 34 - q * 2, 4, 6 + q * 2, mix(mg, P.ink, 0.12));
+      g.r(mx0 + 41, 11, 1, 38, P.metalD);
+      // window on the other side
+      var wx = L.left ? 10 : 112;
+      win(g, env, wx, 8, 34, 30, t, { panes: 4, sill: true });
+      wallArt(g, env, L.art, L.left ? 60 : 160, 12, t, 6);
+      // mat
+      var mc = P[L.mat];
+      var matX = L.left ? 112 : 18;
+      g.r(matX, 72, 46, 4, mc);
+      g.r(matX, 72, 46, 1, mix(mc, WHITE, 0.3));
+      g.r(matX + 40, 70, 6, 6, mix(mc, P.ink, 0.2));
+      // equipment
+      var ex = L.left ? 40 : 128;
+      if (L.main === 'treadmill') {
+        g.r(ex, 70, 42, 5, P.ink);
+        g.r(ex + 1, 70, 40, 1, P.metal);
+        for (x = 0; x < 40; x += 4) g.p(ex + 1 + mod(x - t, 40), 71, P.metalL);
+        g.line(ex + 36, 70, ex + 40, 50, P.metalD);
+        g.r(ex + 34, 48, 10, 4, P.metalD);
+        g.em = 1;
+        g.r(ex + 35, 49, 6, 2, mod(t, 10) < 5 ? '#7cff9a' : '#3ad870');
+        g.em = 0;
+      } else if (L.main === 'bike') {
+        disc(g, ex + 10, 70, 5, P.ink);
+        disc(g, ex + 10, 70, 3, P.metal);
+        var a = t * 0.6;
+        g.line(ex + 10, 70, ex + 10 + rnd(Math.cos(a) * 3), 70 + rnd(Math.sin(a) * 3), P.metalL);
+        g.line(ex + 10, 70, ex + 22, 56, P.accent);
+        g.line(ex + 22, 56, ex + 30, 76, P.accent);
+        g.r(ex + 18, 54, 8, 2, P.ink);
+        g.line(ex + 12, 64, ex + 8, 52, P.accent);
+        g.r(ex + 4, 50, 8, 2, P.metalD);
+        g.r(ex + 4, 76, 30, 2, P.metalD);
+      } else {
+        g.r(ex, 64, 34, 4, P.accent);
+        g.r(ex, 64, 34, 1, P.accentL);
+        g.r(ex + 4, 68, 2, 9, P.metalD);
+        g.r(ex + 28, 68, 2, 9, P.metalD);
+        g.r(ex + 26, 40, 2, 24, P.metalD);
+        g.r(ex + 34, 40, 2, 37, P.metalD);
+        g.r(ex + 18, 44, 26, 1, P.metalL);
+        g.r(ex + 18, 41, 3, 7, P.ink);
+        g.r(ex + 41, 41, 3, 7, P.ink);
+      }
+      // rack
+      var rx = L.left ? 6 : 84;
+      g.r(rx, 60, 28, 2, P.metalD);
+      g.r(rx + 1, 62, 2, 14, P.metalD);
+      g.r(rx + 25, 62, 2, 14, P.metalD);
+      g.r(rx, 68, 28, 2, P.metalD);
+      for (var i = 0; i < 4; i++) {
+        var px = rx + 3 + i * 6;
+        if (L.rack === 'dumbbells') {
+          g.r(px, 57, 1, 3, P.ink);
+          g.r(px + 3, 57, 1, 3, P.ink);
+          g.r(px + 1, 58, 2, 1, P.metalL);
+          g.r(px, 65, 1, 3, P.accent);
+          g.r(px + 3, 65, 1, 3, P.accent);
+          g.r(px + 1, 66, 2, 1, P.metalL);
+        } else if (L.rack === 'kettle') {
+          g.ell(px + 2, 58, 2, 2, i % 2 ? P.accent : P.ink);
+          g.r(px + 1, 55, 3, 1, P.metalD);
+          g.ell(px + 2, 66, 2, 2, P.accent2);
+        } else {
+          disc(g, px + 2, 57 - (i % 2), 3, i % 2 ? P.ink : P.accent);
+          g.p(px + 2, 57 - (i % 2), P.metalL);
+        }
+      }
+      if (L.hang === 'bag') {
+        var sw = rnd(Math.sin(t * 0.3) * 2);
+        var hx0 = L.left ? 74 : 104;
+        g.line(hx0, 0, hx0 + sw, 18, P.metalD);
+        g.r(hx0 - 4 + sw, 18, 9, 22, P.accentD);
+        g.r(hx0 - 4 + sw, 18, 2, 22, P.accent);
+        g.r(hx0 - 4 + sw, 24, 9, 1, P.ink);
+        g.r(hx0 - 4 + sw, 34, 9, 1, P.ink);
+      } else if (L.hang === 'rings') {
+        var rx2 = L.left ? 70 : 100;
+        for (var s = 0; s < 2; s++) {
+          var sw2 = rnd(Math.sin(t * 0.2 + s) * 1);
+          g.line(rx2 + s * 10, 0, rx2 + s * 10 + sw2, 20, P.woodDD);
+          g.ell(rx2 + s * 10 + sw2, 23, 2, 3, P.woodL);
+          g.ell(rx2 + s * 10 + sw2, 23, 1, 2, P.wall);
+        }
+      }
+      if (L.ball) {
+        var bx = L.left ? 178 : 4;
+        disc(g, bx + 5, 71, 6, P.accent2);
+        g.r(bx, 70, 11, 1, P.accent2L);
+      }
+      cupOf(g, env, L.cup, matX + 50, 76, P.accent, t);
+      if (L.floor !== 'none') floorThing(g, env, L.floor, L.left ? 156 : 64, 77, t);
+      if (L.spot === 'main' && L.main === 'treadmill') mascot(g, env, ex + 12 + (mod(t, 4) < 2 ? 0 : 1), 70, t, { sleep: false });
+      else if (L.spot === 'main' && L.main === 'bench') mascot(g, env, ex + 6, 64, t);
+      else mascot(g, env, matX + 14, 72, t);
+    }
+  };
+
+  SC['record-shop'] = {
+    still: 10,
+    setup: function (env, R) {
+      return {
+        wallStyle: R.i(0, 2),
+        cols: R.i(6, 8),
+        deck: R.pick(['turntable', 'turntable', 'cassette']),
+        neon: hp(R, env, 'motif', ['note', 'heart', 'star', 'moon']),
+        crates: R.pick([2, 3]),
+        speaker: R.ch(0.7),
+        left: R.ch(0.5),
+        art: hp(R, env, 'wall', ['poster', 'neon', 'photos', 'pennant']),
+        cup: hp(R, env, 'cup', CUPS),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'pup', 'none']),
+        spot: R.pick(['counter', 'crate', 'floor']),
+        phones: R.ch(0.5)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      room(g, env, L, 60);
+      // record wall: sleeves in a grid
+      var gx0 = L.left ? 70 : 8;
+      var gy0 = 8;
+      for (var r = 0; r < 3; r++) {
+        g.r(gx0 - 2, gy0 + r * 13 + 11, L.cols * 14 + 2, 2, P.woodL);
+        for (var c = 0; c < L.cols; c++) {
+          var sx = gx0 + c * 14;
+          var sy = gy0 + r * 13;
+          var h0 = hash(env.seed + c, r);
+          var col = [P.accent, P.accent2, P.leaf, P.paper, '#f6d04a', P.ink, P.accentL, P.accent2D][fl(h0 * 8)];
+          g.r(sx, sy, 11, 11, col);
+          var col2 = mix(col, h0 > 0.5 ? WHITE : P.ink, 0.45);
+          var kind = fl(hash(r, c + env.seed) * 5);
+          if (kind === 0) disc(g, sx + 5, sy + 5, 3, col2);
+          else if (kind === 1) for (y = 0; y < 11; y += 3) g.r(sx, sy + y, 11, 1, col2);
+          else if (kind === 2) motif(g, MOTIFS[fl(h0 * MOTIFS.length)], sx + 2, sy + 2, col2, col2);
+          else if (kind === 3) g.r(sx + 2, sy + 2, 7, 4, col2);
+          else {
+            disc(g, sx + 8, sy + 5, 4, P.ink);
+            g.r(sx, sy, 7, 11, col);
+          }
+        }
+      }
+      // neon sign + window
+      var nx = L.left ? 16 : 150;
+      g.em = 1;
+      var nc = mod(t, 50) === 0 ? mix(P.accent2, P.ink, 0.6) : P.accent2L;
+      motif(g, L.neon, nx, 8, nc, nc);
+      g.em = 0;
+      if (env.time !== 'day') g.light(nx + 3, 10, 22, [1, 0.6, 0.85], 0.35, { n: 3 });
+      win(g, env, L.left ? 8 : 140, 22, 46, 24, t, { panes: 2, sill: true });
+      // crates of records
+      var cx0 = L.left ? 74 : 20;
+      for (var k = 0; k < L.crates; k++) {
+        var bx = cx0 + k * 26;
+        g.r(bx, 62, 22, 12, P.wood);
+        g.r(bx, 62, 22, 1, P.woodL);
+        g.r(bx, 67, 22, 1, P.woodD);
+        g.r(bx + 2, 74, 2, 4, P.woodDD);
+        g.r(bx + 18, 74, 2, 4, P.woodDD);
+        for (x = 0; x < 10; x++) {
+          var lean = x === 4 ? -2 : 0;
+          g.r(bx + 2 + x * 2 + lean, 55 + (x % 3), 1, 8 - (x % 3), P.books[(x + k * 3 + env.seed) % P.books.length]);
+        }
+      }
+      // counter with deck
+      var kx = L.left ? 6 : 128;
+      g.r(kx, 52, 58, 3, P.woodL);
+      g.r(kx + 1, 55, 56, 21, P.woodD);
+      g.r(kx + 4, 58, 50, 1, P.woodDD);
+      if (L.deck === 'turntable') {
+        g.r(kx + 4, 47, 22, 5, P.ink);
+        g.r(kx + 4, 47, 22, 1, P.metalD);
+        g.ell(kx + 13, 48, 8, 1, '#1a1a20');
+        var ang = t * 0.7;
+        g.p(kx + 13 + rnd(Math.cos(ang) * 6), 48 + (Math.sin(ang) > 0 ? 1 : 0), P.metalL);
+        g.r(kx + 12, 48, 3, 1, P.accent);
+        g.line(kx + 23, 46, kx + 18, 48, P.metalL);
+        if (env.time !== 'day' || mod(t, 8) < 4) {
+          for (var q = 0; q < 2; q++) {
+            var ny = 40 - mod(t * 0.5 + q * 8, 14);
+            motif(g, 'note', kx + 6 + q * 9 + rnd(Math.sin(t * 0.2 + q) * 2), ny, P.accent2L, P.accent2L);
+          }
+        }
+      } else {
+        g.r(kx + 4, 45, 22, 7, P.metalD);
+        g.r(kx + 6, 46, 18, 4, P.ink);
+        disc(g, kx + 10, 48, 1, mod(t, 4) < 2 ? P.metalL : P.metal);
+        disc(g, kx + 20, 48, 1, mod(t, 4) < 2 ? P.metal : P.metalL);
+      }
+      if (L.speaker) {
+        g.r(kx + 30, 40, 10, 12, P.ink);
+        disc(g, kx + 35, 43, 2, P.metalD);
+        disc(g, kx + 35, 48, 3, P.metalD);
+        g.p(kx + 35, 48, mod(t, 3) ? P.metal : P.metalL);
+      }
+      if (L.phones) {
+        g.r(kx + 44, 47, 8, 1, P.ink);
+        g.r(kx + 43, 47, 2, 4, P.accent);
+        g.r(kx + 51, 47, 2, 4, P.accent);
+      }
+      cupOf(g, env, L.cup, kx + 48, 52, P.paper, t);
+      wallArt(g, env, L.art, L.left ? 34 : 166, 50, t, 7);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 160 : 98, 77, t, L.left, env.time === 'night');
+      var mx = L.spot === 'counter' ? kx + 30 : (L.spot === 'crate' ? cx0 + 4 : (L.left ? 130 : 64));
+      var my = L.spot === 'counter' ? (L.speaker ? 40 : 52) : (L.spot === 'crate' ? 55 : 77);
+      if (L.spot === 'counter' && L.speaker) mx = kx + 28;
+      mascot(g, env, mx, my, t);
+    }
+  };
+
+  var SNACKS = ['ramen', 'chips', 'candy', 'bread', 'cans', 'boxes'];
+
+  SC.convenience = {
+    still: 3,
+    setup: function (env, R) {
+      return {
+        wallStyle: 0,
+        aisles: [R.pick(SNACKS), R.pick(SNACKS), R.pick(SNACKS)],
+        drinks: R.i(0, 1000),
+        left: R.ch(0.5),
+        hot: R.pick(['buns', 'odeng', 'sausage']),
+        cup: hp(R, env, 'cup', ['iced', 'bottle', 'glass']),
+        poster: R.pick(['sale', 'ice', 'onigiri']),
+        floor: hp(R, env, 'floor', ['umbrella', 'basket', 'boxes', 'none']),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'none']),
+        spot: R.pick(['counter', 'aisle', 'door'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      room(g, env, L, 60, { tiles: mix(P.paper, P.floor, 0.3) });
+      g.em = 1;
+      for (x = 20; x < W; x += 48) g.r(x, 1, 28, 2, '#f8fcff');
+      g.em = 0;
+      g.light(96, 4, 110, [0.9, 0.97, 1], Math.max(0.25, env.lampK), { sy: 1.1 });
+      // big front window with the street behind
+      var wx = L.left ? 120 : 6;
+      win(g, env, wx, 6, 66, 32, t, { panes: 2, sill: false, open: false, view: 'street' });
+      // poster on the glass
+      var px = wx + 46;
+      if (L.poster === 'sale') {
+        g.r(px, 22, 14, 10, '#e8483a');
+        g.r(px + 2, 24, 10, 3, '#ffe08a');
+        g.r(px + 2, 28, 6, 2, WHITE);
+      } else if (L.poster === 'ice') {
+        g.r(px, 20, 14, 12, '#7fd0f0');
+        g.r(px + 5, 22, 4, 6, P.accent2L);
+        g.r(px + 6, 28, 2, 3, P.woodL);
+      } else {
+        g.r(px, 20, 14, 12, P.paper);
+        g.r(px + 3, 23, 8, 6, WHITE);
+        g.r(px + 3, 27, 8, 2, P.ink);
+      }
+      // drink fridge
+      var fx = L.left ? 6 : 128;
+      g.r(fx, 6, 58, 54, P.metalD);
+      g.em = 1;
+      for (var d = 0; d < 3; d++) {
+        var dx = fx + 2 + d * 19;
+        g.r(dx, 8, 17, 50, mix('#dff4ff', env.skyLow, 0.1));
+        for (var sh = 0; sh < 4; sh++) {
+          var sy = 18 + sh * 11;
+          g.r(dx, sy, 17, 1, P.metalL);
+          for (var b = 0; b < 5; b++) {
+            var hv = hash(L.drinks + d * 7 + sh, b);
+            var bc = ['#e8483a', '#3a8ad0', '#5ab86a', '#f6d04a', '#f0a0c0', '#ffffff', '#8a5a3a'][fl(hv * 7)];
+            var bh = 5 + fl(hv * 4);
+            g.r(dx + 1 + b * 3, sy - bh, 2, bh, bc);
+            g.p(dx + 1 + b * 3, sy - bh - 1, mix(bc, P.ink, 0.3));
+          }
+        }
+      }
+      g.em = 0;
+      for (d = 0; d < 3; d++) {
+        g.r(fx + 2 + d * 19 + 15, 26, 1, 8, P.metalL);
+        g.b(fx + 5 + d * 19, 10, WHITE, 0.4);
+      }
+      g.light(fx + 29, 30, 50, [0.8, 0.95, 1], 0.35, { n: 4 });
+      // aisle shelf in front
+      var shelfX = L.left ? 6 : 80;
+      var shelfW = L.left ? 108 : 44;
+      for (var row = 0; row < 3; row++) {
+        var ry = 50 + row * 9;
+        var kind = L.aisles[row];
+        g.r(shelfX, ry, shelfW, 1, P.metalD);
+        for (x = shelfX + 1; x < shelfX + shelfW - 3; x += 4) {
+          var c1 = [P.accent, P.accent2, '#f6d04a', P.leaf, '#ffffff'][fl(hash(x, row + L.drinks) * 5)];
+          if (kind === 'ramen') {
+            g.r(x, ry - 5, 3, 5, c1);
+            g.r(x, ry - 5, 3, 1, WHITE);
+          } else if (kind === 'chips') {
+            g.r(x, ry - 6, 3, 6, c1);
+            g.p(x + 1, ry - 4, mix(c1, WHITE, 0.5));
+          } else if (kind === 'candy') {
+            g.r(x, ry - 3, 3, 3, c1);
+            g.p(x + 1, ry - 4, c1);
+          } else if (kind === 'bread') {
+            g.ell(x + 1, ry - 2, 2, 1, '#e8b878');
+            g.r(x, ry - 1, 3, 1, c1);
+          } else if (kind === 'cans') {
+            g.r(x, ry - 4, 3, 4, c1);
+            g.r(x, ry - 4, 3, 1, P.metalL);
+          } else {
+            g.r(x, ry - 6, 4, 6, c1);
+            g.r(x, ry - 6, 1, 6, mix(c1, P.ink, 0.25));
+          }
+        }
+      }
+      g.r(shelfX, 50, 1, 28, P.metalD);
+      g.r(shelfX + shelfW - 1, 50, 1, 28, P.metalD);
+      // counter + hot case
+      var kx = L.left ? 122 : 8;
+      g.r(kx, 52, 64, 3, P.paper);
+      g.r(kx + 1, 55, 62, 22, P.accent);
+      g.r(kx + 1, 60, 62, 2, P.paper);
+      g.r(kx + 4, 44, 10, 8, P.ink);
+      g.em = 1;
+      g.r(kx + 5, 45, 8, 3, '#7cff9a');
+      g.em = 0;
+      g.r(kx + 18, 40, 20, 12, P.metalD);
+      g.em = 1;
+      g.r(kx + 19, 41, 18, 10, '#ffe0a8');
+      g.em = 0;
+      for (var hb = 0; hb < 3; hb++) {
+        if (L.hot === 'buns') g.ell(kx + 22 + hb * 6, 48, 2, 2, '#fff4e0');
+        else if (L.hot === 'odeng') g.r(kx + 21 + hb * 6, 43, 2, 7, '#d8a060');
+        else g.r(kx + 20 + hb * 6, 46, 5, 2, '#c8503a');
+      }
+      steam(g, kx + 28, 40, t, 6, 3);
+      g.light(kx + 28, 46, 20, [1, 0.8, 0.5], 0.3, { n: 3 });
+      cupOf(g, env, L.cup, kx + 46, 52, P.accent2, t);
+      g.r(kx + 52, 49, 6, 3, '#f6d04a');
+      g.r(kx + 53, 48, 4, 1, WHITE);
+      if (L.floor !== 'none') floorThing(g, env, L.floor, L.left ? 106 : 66, 77, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 60 : 136, 77, t, !L.left);
+      var mx = L.spot === 'counter' ? kx + 36 : (L.spot === 'aisle' ? shelfX + fl(shelfW / 2) - 8 : (L.left ? 100 : 70));
+      mascot(g, env, mx, L.spot === 'aisle' ? 78 : 77, t);
+    }
+  };
+
+  SC.office = {
+    still: 9,
+    setup: function (env, R) {
+      return {
+        wallStyle: R.i(0, 1),
+        nwin: R.pick([2, 3]),
+        screens: [R.pick(['code', 'chart', 'doc', 'mail']), R.pick(['code', 'chart', 'doc', 'video'])],
+        board: R.pick(['notes', 'chart', 'plan']),
+        chair: R.pick(['accent', 'accent2', 'ink', 'leafD']),
+        plant: hp(R, env, 'plant', PLANTS2.concat(['tall'])),
+        cup: hp(R, env, 'cup', CUPS),
+        tr: hp(R, env, 'trinket', TRINKETS),
+        cooler: R.ch(0.6),
+        left: R.ch(0.5),
+        critter: hp(R, env, 'critter', ['none', 'none', 'kitty', 'pup']),
+        spot: R.pick(['desk', 'chair'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      room(g, env, L, 60);
+      // tall windows
+      var n = L.nwin;
+      var ww = n === 2 ? 50 : 34;
+      var x0 = L.left ? 8 : W - 8 - (n * ww + (n - 1) * 4);
+      for (var i = 0; i < n; i++) win(g, env, x0 + i * (ww + 4), 4, ww, 40, t, { panes: 4, sill: false, view: 'city' });
+      g.r(x0 - 3, 44, n * ww + (n - 1) * 4 + 6, 2, P.metalL);
+      // whiteboard on the remaining wall
+      var bx = L.left ? x0 + n * ww + (n - 1) * 4 + 8 : 8;
+      var bw = Math.min(56, (L.left ? W - 6 : x0 - 6) - bx);
+      if (bw > 24) {
+        g.r(bx, 8, bw, 26, P.metalD);
+        g.r(bx + 1, 9, bw - 2, 24, '#f8f8f4');
+        if (L.board === 'notes') {
+          for (var k = 0; k < 6; k++) {
+            var nx = bx + 3 + (k % 3) * fl((bw - 6) / 3);
+            var ny = 11 + fl(k / 3) * 10;
+            g.r(nx, ny, 8, 7, ['#ffe08a', '#ffb0c0', '#a8e0ff', '#b8f0a8'][k % 4]);
+            g.r(nx + 1, ny + 2, 5, 1, mix(P.ink, '#f8f8f4', 0.5));
+          }
+        } else if (L.board === 'chart') {
+          for (k = 0; k < 6; k++) {
+            var hh = 4 + fl(hash(k, env.seed) * 14);
+            g.r(bx + 5 + k * 7, 31 - hh, 4, hh, [P.accent, P.accent2][k % 2]);
+          }
+          g.line(bx + 4, 28, bx + bw - 6, 13, '#e8483a');
+        } else {
+          for (k = 0; k < 4; k++) {
+            g.r(bx + 4, 12 + k * 5, 4, 3, [P.accent, P.accent2, P.leaf, '#f6d04a'][k]);
+            g.r(bx + 10, 13 + k * 5, 6 + fl(hash(k, env.seed + 1) * (bw - 22)), 1, mix(P.ink, '#f8f8f4', 0.4));
+          }
+        }
+        g.r(bx + 4, 34, bw - 8, 1, P.metalD);
+        g.r(bx + 8, 33, 4, 1, '#3a6ad0');
+      }
+      // desks with monitors (two seats)
+      for (var s = 0; s < 2; s++) {
+        var dx = (L.left ? 92 : 8) + s * 50;
+        g.r(dx, 58, 46, 3, P.woodL);
+        g.r(dx, 61, 46, 1, P.woodD);
+        g.r(dx + 2, 62, 2, 16, P.metalD);
+        g.r(dx + 42, 62, 2, 16, P.metalD);
+        // partition behind
+        g.r(dx - 1, 46, 48, 12, mix(P.metal, P.wall, 0.5));
+        g.r(dx - 1, 46, 48, 1, P.metalL);
+        g.r(dx + 12, 40, 22, 14, P.ink);
+        g.em = 1;
+        var sk = L.screens[s];
+        if (sk === 'code') codeScreen(g, env, dx + 13, 41, 20, 12, t);
+        else {
+          g.r(dx + 13, 41, 20, 12, sk === 'video' ? '#203050' : '#eef4fa');
+          if (sk === 'chart') {
+            for (k = 0; k < 5; k++) g.r(dx + 15 + k * 4, 51 - 2 - fl(hash(k + s, env.seed) * 7), 2, 2 + fl(hash(k + s, env.seed) * 7), [P.accent, P.accent2][k % 2]);
+          } else if (sk === 'doc') {
+            for (k = 0; k < 4; k++) g.r(dx + 15, 43 + k * 2, 8 + fl(hash(k, s) * 8), 1, '#8a96aa');
+          } else if (sk === 'mail') {
+            for (k = 0; k < 4; k++) {
+              g.r(dx + 14, 42 + k * 3, 18, 2, k === 1 ? '#cfe0ff' : '#eef4fa');
+              g.r(dx + 15, 42 + k * 3, 4, 1, '#3a6ad0');
+            }
+          } else {
+            disc(g, dx + 23, 47, 3, '#ffffff');
+            g.p(dx + 23, 47, '#203050');
+            g.r(dx + 14, 51, fl(mod(t, 60) / 3.3), 1, '#e8483a');
+          }
+        }
+        g.em = 0;
+        if (env.time !== 'day') g.light(dx + 23, 47, 22, [0.75, 0.85, 1], 0.4, { n: 3 });
+        g.r(dx + 21, 54, 4, 4, P.metalD);
+        g.r(dx + 17, 57, 12, 1, P.metalD);
+        g.r(dx + 6, 56, 9, 2, P.paper);
+        if (s === 0) cupOf(g, env, L.cup, dx + 38, 58, P.accent, t);
+        else trinket(g, env, L.tr, dx + 38, 58, t);
+      }
+      // chair in front of the first desk
+      var cx = (L.left ? 92 : 8) + 14;
+      g.r(cx, 62, 16, 4, P[L.chair]);
+      g.r(cx, 50, 3, 14, P[L.chair]);
+      g.r(cx + 7, 66, 2, 8, P.metalD);
+      g.r(cx + 2, 75, 12, 1, P.metalD);
+      // corner: cooler or big plant
+      var ox = L.left ? 170 : 108;
+      if (L.cooler) {
+        g.r(ox, 56, 12, 22, P.paper);
+        g.r(ox + 1, 40, 10, 16, mix('#a8d8f0', env.skyLow, 0.2));
+        g.r(ox + 1, 40, 10, 2, '#7fb8e0');
+        g.r(ox + 3, 60, 3, 2, '#3a8ad0');
+        g.r(ox + 7, 60, 3, 2, '#e8483a');
+        if (mod(t, 30) < 4) g.p(ox + 5, 46 + mod(t, 4), WHITE);
+      } else {
+        plant(g, env, ox + 6, 77, L.plant, t, 9);
+        g.r(ox + 2, 70, 9, 8, P.pot);
+      }
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 60 : 160, 77, t, L.left, env.time === 'night');
+      if (L.spot === 'chair') mascot(g, env, cx, 62, t);
+      else mascot(g, env, (L.left ? 92 : 8) + 50 + 4, 58, t);
+    }
+  };
+
+  // ---- more scenes (T158, D-129): 지하철, 버스 정류장, 한옥, 농장, 우주정거장, 포장마차
+
+  SC.subway = {
+    still: 14,
+    setup: function (env, R) {
+      return {
+        line: R.pick(['accent', 'accent2', 'leaf', '#3a8ad0', '#f0a030']),
+        tile: R.pick(['paper', 'wallL', 'accent2L']),
+        ads: [R.pick(PAINTINGS), hp(R, env, 'wall', ['poster', 'map', 'calendar', 'neon'])],
+        train: R.pick(['pass', 'stop', 'none']),
+        bench: R.ch(0.6),
+        item: R.pick(['bag', 'umbrella', 'basket', 'none']),
+        critter: hp(R, env, 'critter', ['none', 'none', 'pup', 'bird']),
+        cup: hp(R, env, 'cup', CUPS),
+        mx: R.i(30, 140)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var lc = P[L.line] || hx(L.line);
+      var tc = P[L.tile] || P.wallL;
+      // far wall tiles beyond the tracks
+      g.r(0, 0, W, 48, tc);
+      for (y = 0; y < 48; y += 4) g.r(0, y, W, 1, mix(tc, P.ink, 0.1));
+      for (y = 0; y < 48; y += 4) for (x = (y / 4) & 1 ? 3 : 0; x < W; x += 6) g.p(x, y + 1, mix(tc, P.ink, 0.08));
+      g.r(0, 10, W, 3, lc);
+      g.r(0, 13, W, 1, mix(lc, P.ink, 0.3));
+      // station name board
+      g.r(70, 18, 52, 12, P.paper);
+      g.r(70, 18, 52, 2, lc);
+      for (var k = 0; k < 4; k++) g.r(78 + k * 9, 22, 6, 5, P.ink);
+      g.r(74, 28, 44, 1, P.paperDD);
+      // ads
+      if (env.bd) {
+        // 섞기 모드면 광고판이 그 배경의 여행 광고가 된다
+        g.em = 1;
+        outside(g, env, 14, 18, 30, 20, t, env.bd);
+        g.r(14, 34, 30, 4, P.paper);
+        g.r(16, 35, 14, 2, lc);
+        g.em = 0;
+      } else painting(g, env, L.ads[0], 14, 18, 30, 20, t);
+      g.r(13, 17, 32, 1, P.metalD);
+      wallArt(g, env, L.ads[1], 150, 18, t, 8);
+      // ceiling lights
+      g.em = 1;
+      for (x = 16; x < W; x += 40) g.r(x, 1, 20, 2, '#f6fbff');
+      g.em = 0;
+      for (x = 26; x < W; x += 40) g.light(x, 3, 40, [0.9, 0.97, 1], 0.5, { n: 4 });
+      // track pit
+      g.r(0, 48, W, 8, mix(P.ink, '#2a2a30', 0.4));
+      g.r(0, 52, W, 1, P.metalL);
+      g.r(0, 54, W, 1, P.metalL);
+      for (x = 2; x < W; x += 7) g.r(x, 53, 4, 3, P.woodDD);
+      // train
+      var tp = L.train === 'pass' ? mod(t * 4, 600) - 200 : (L.train === 'stop' ? 6 : -999);
+      if (tp > -190 && tp < W) {
+        var tx = L.train === 'pass' ? W - tp - 180 : tp;
+        g.r(tx, 18, 180, 34, P.metalL);
+        g.r(tx, 18, 180, 2, P.metal);
+        g.r(tx, 40, 180, 3, lc);
+        g.r(tx, 50, 180, 2, P.ink);
+        for (var wv = 0; wv < 6; wv++) {
+          var wx2 = tx + 8 + wv * 29;
+          if (wv === 2 || wv === 5) {
+            g.r(wx2, 22, 16, 28, P.metal);
+            g.r(wx2 + 7, 22, 1, 28, P.metalD);
+            g.em = 1;
+            g.r(wx2 + 2, 24, 4, 10, '#fff6dc');
+            g.r(wx2 + 10, 24, 4, 10, '#fff6dc');
+            g.em = 0;
+          } else {
+            g.em = 1;
+            g.r(wx2, 24, 22, 12, env.time === 'day' ? '#d8eaf4' : '#fff1c2');
+            g.em = 0;
+            if (hash(wv, env.seed) < 0.5) g.r(wx2 + 6, 30, 5, 6, P.ink);
+          }
+        }
+      }
+      // platform
+      g.r(0, 56, W, H - 56, P.floor);
+      g.r(0, 56, W, 2, P.paperD);
+      for (x = 0; x < W; x++) if (((x >> 1) + 1) % 2 === 0) g.p(x, 59, '#f6d04a');
+      g.r(0, 60, W, 2, '#f6d04a');
+      for (x = 0; x < W; x += 3) g.p(x, 61, '#c8a02a');
+      for (y = 64; y < H; y += 5) g.r(0, y, W, 1, P.floorD);
+      // pillar
+      g.r(172, 0, 12, 60, mix(tc, P.metal, 0.4));
+      g.r(172, 0, 2, 60, P.metalL);
+      g.r(172, 24, 12, 4, lc);
+      if (L.bench) {
+        g.r(100, 68, 36, 3, P.wood);
+        g.r(100, 68, 36, 1, P.woodL);
+        g.r(102, 71, 2, 7, P.metalD);
+        g.r(132, 71, 2, 7, P.metalD);
+        cupOf(g, env, L.cup, 130, 68, P.accent, t);
+      }
+      if (L.item !== 'none') floorThing(g, env, L.item, 40, 78, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, 160, 78, t, true);
+      mascot(g, env, L.bench ? 108 : L.mx, L.bench ? 68 : 76, t, { sleep: false });
+    }
+  };
+
+  SC['bus-stop'] = {
+    still: 11,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['street', 'city', 'trees', 'hills']),
+        shelter: R.pick(['accent', 'accent2', 'metal', 'leafD']),
+        ad: R.pick(PAINTINGS),
+        bus: R.pick(['accent', 'accent2', 'leaf', '#3a8ad0', '#f6c63a']),
+        busOn: R.pick(['come', 'stop', 'none', 'none']),
+        thing: hp(R, env, 'street', ['bin', 'hydrant', 'mailbox', 'vending', 'bike', 'none']),
+        tree: R.ch(0.6),
+        fly: hp(R, env, 'fly', FLYERS),
+        critter: hp(R, env, 'critter', ['bird', 'pup', 'none', 'kitty', 'none']),
+        floor: hp(R, env, 'floor', ['umbrella', 'bag', 'basket', 'none']),
+        left: R.ch(0.5)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      skyTop(g, env, 46, t, 24);
+      flyer(g, env, L.fly, 40, 10, t);
+      distant(g, env, 0, 10, W, 36, bk(env, L.far), t);
+      // road
+      g.r(0, 46, W, 12, mix(P.ink, '#5a5a66', 0.5));
+      for (x = 0; x < W; x += 16) g.r(x + mod(-t, 16), 51, 8, 1, '#f0f0e0');
+      // bus
+      var bp = L.busOn === 'come' ? mod(t * 3, 500) - 120 : (L.busOn === 'stop' ? 20 : -999);
+      if (bp > -110 && bp < W + 10) {
+        var bxp = L.left ? W - bp - 90 : bp;
+        if (L.busOn === 'stop') bxp = L.left ? 96 : 6;
+        var bc = P[L.bus] || hx(L.bus);
+        g.r(bxp, 28, 90, 26, bc);
+        g.r(bxp, 28, 90, 2, mix(bc, WHITE, 0.3));
+        g.r(bxp, 48, 90, 2, mix(bc, P.ink, 0.3));
+        g.em = 1;
+        for (var w = 0; w < 6; w++) g.r(bxp + 4 + w * 14, 32, 11, 9, env.time === 'day' ? mix(env.skyLow, WHITE, 0.3) : '#fff1c2');
+        g.r(L.left ? bxp + 86 : bxp, 33, 4, 6, env.time === 'day' ? '#d8eaf4' : '#fff6c0');
+        g.em = 0;
+        disc(g, bxp + 16, 54, 4, P.ink);
+        disc(g, bxp + 16, 54, 1, P.metalL);
+        disc(g, bxp + 72, 54, 4, P.ink);
+        disc(g, bxp + 72, 54, 1, P.metalL);
+        g.r(bxp + 40, 36, 10, 2, P.ink);
+      }
+      // sidewalk
+      g.r(0, 58, W, 2, P.paperD);
+      g.r(0, 60, W, H - 60, mix(P.paperD, P.floor, 0.4));
+      for (x = 0; x < W; x += 12) g.r(x, 60, 1, H - 60, mix(P.paperD, P.ink, 0.15));
+      // shelter
+      var sx = L.left ? 108 : 24;
+      var sc = P[L.shelter];
+      g.r(sx - 2, 26, 64, 3, sc);
+      g.r(sx - 2, 29, 64, 1, mix(sc, P.ink, 0.3));
+      g.r(sx, 29, 2, 46, sc);
+      g.r(sx + 58, 29, 2, 46, sc);
+      g.br(sx + 2, 30, 56, 40, mix(env.skyLow, WHITE, 0.4), 0.25);
+      g.r(sx + 2, 30, 56, 1, mix(sc, WHITE, 0.3));
+      painting(g, env, L.ad, sx + 36, 34, 18, 26, t);
+      g.r(sx + 35, 33, 20, 1, P.metalD);
+      g.r(sx + 35, 60, 20, 1, P.metalD);
+      if (env.time !== 'day') g.light(sx + 45, 46, 26, [1, 0.95, 0.85], 0.4, { n: 3 });
+      // bench
+      g.r(sx + 4, 64, 30, 3, P.wood);
+      g.r(sx + 4, 64, 30, 1, P.woodL);
+      g.r(sx + 6, 67, 2, 8, P.metalD);
+      g.r(sx + 30, 67, 2, 8, P.metalD);
+      // sign pole
+      var px = L.left ? 96 : 92;
+      g.r(px, 30, 2, 46, P.metalD);
+      disc(g, px + 1, 28, 5, P.accent2);
+      disc(g, px + 1, 28, 3, P.paper);
+      g.r(px - 1, 27, 5, 2, P.accent2);
+      g.r(px - 4, 40, 10, 12, P.paper);
+      for (var k = 0; k < 4; k++) g.r(px - 3, 42 + k * 2, 6 + (k % 2), 1, P.paperDD);
+      if (L.tree) {
+        var tx = L.left ? 30 : 170;
+        g.r(tx, 50, 3, 26, P.woodDD);
+        var leaf = autumnal(env) ? '#e0863a' : (snowy(env) ? '#eef3fa' : (blossomy(env) ? '#f6b8cc' : P.leaf));
+        g.ell(tx + 1, 40, 12, 10, leaf);
+        g.ell(tx - 2, 37, 7, 5, mix(leaf, WHITE, 0.2));
+        g.ell(tx + 6, 44, 5, 4, mix(leaf, P.ink, 0.15));
+      }
+      if (L.thing !== 'none') streetThing(g, env, L.thing, L.left ? 70 : 150, 77, t);
+      if (L.floor !== 'none') floorThing(g, env, L.floor, sx + 40, 76, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 10 : 130, 78, t, L.left);
+      mascot(g, env, sx + 12, 64, t, { sleep: false });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  SC.hanok = {
+    still: 5,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['mount', 'hills', 'trees']),
+        tree: R.pick(['persimmon', 'pine', 'plum']),
+        doors: R.pick(['shut', 'open', 'half']),
+        pots: R.i(3, 6),
+        lantern: R.ch(0.6),
+        line: R.ch(0.45),
+        wall: R.ch(0.7),
+        left: R.ch(0.5),
+        critter: hp(R, env, 'critter', ['bird', 'kitty', 'none', 'chick', 'none']),
+        cup: hp(R, env, 'cup', ['tea', 'teapot', 'tea']),
+        fly: hp(R, env, 'fly', ['none', 'kite', 'flock', 'lanterns', 'none'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var snow = snowy(env);
+      skyTop(g, env, 50, t, 26);
+      flyer(g, env, L.fly, 150, 10, t);
+      distant(g, env, 0, 12, W, 34, bk(env, L.far), t);
+      // courtyard ground
+      g.r(0, 62, W, H - 62, snow ? hx('#eef3fa') : hx('#d8c8a0'));
+      for (y = 63; y < H; y++) for (x = 0; x < W; x++) if (bay(x, y) < 0.08) g.p(x, y, snow ? '#d4dfec' : '#c0ae84');
+      // stone wall with tiles at the back
+      if (L.wall) {
+        for (x = 0; x < W; x++) {
+          for (y = 44; y < 54; y++) {
+            var st = ((fl((x + (fl((y - 44) / 3) & 1) * 3) / 6) * 7 + fl((y - 44) / 3) * 3) % 5);
+            g.p(x, y, (x + (fl((y - 44) / 3) & 1) * 3) % 6 === 0 || (y - 44) % 3 === 0 ? '#8a8478' : ['#bab2a2', '#c8c0ae', '#a8a090', '#b4ac9a', '#c2baa8'][st]);
+          }
+        }
+        g.r(0, 42, W, 2, '#4a4e5a');
+        g.r(0, 41, W, 1, snow ? '#f4f8ff' : '#5e6270');
+      }
+      // house
+      var hx0 = L.left ? 70 : 12;
+      var hw = 110;
+      g.r(hx0 + 4, 56, hw - 8, 6, '#b8b0a0');
+      g.r(hx0 + 4, 56, hw - 8, 1, '#d0c8b8');
+      // maru (wooden porch)
+      g.r(hx0 + 8, 50, hw - 16, 3, P.woodL);
+      g.r(hx0 + 8, 53, hw - 16, 3, P.woodD);
+      for (x = hx0 + 10; x < hx0 + hw - 8; x += 4) g.p(x, 51, P.wood);
+      // walls & doors
+      g.r(hx0 + 10, 26, hw - 20, 24, '#f2ead8');
+      var nd = 4;
+      var dw = fl((hw - 20) / nd);
+      for (var d = 0; d < nd; d++) {
+        var dx = hx0 + 10 + d * dw;
+        g.r(dx, 26, 1, 24, P.woodD);
+        var open = L.doors === 'open' || (L.doors === 'half' && d === 1);
+        if (open) {
+          g.r(dx + 2, 28, dw - 4, 22, mix(P.wallD, P.ink, 0.4));
+          g.r(dx + 3, 40, dw - 6, 3, P.accent);
+          if (env.time !== 'day') g.light(dx + dw / 2, 38, 24, env.T.lamp, env.lampK, { n: 4 });
+        } else {
+          var lit = env.time !== 'day';
+          if (lit) g.em = 1;
+          g.r(dx + 2, 28, dw - 4, 20, lit ? '#ffe6b0' : '#fbf6ea');
+          g.em = 0;
+          for (x = dx + 2; x < dx + dw - 2; x += 3) g.r(x, 28, 1, 20, P.woodL);
+          for (y = 28; y < 48; y += 4) g.r(dx + 2, y, dw - 4, 1, P.woodL);
+        }
+      }
+      // pillars
+      for (x = hx0 + 9; x <= hx0 + hw - 11; x += fl((hw - 20) / 2)) g.r(x, 22, 3, 34, P.woodD);
+      // tiled roof with upturned eaves
+      var roofC = snow ? hx('#f2f6fc') : hx('#4a4e5a');
+      var roofD = snow ? hx('#ccd8ea') : hx('#353842');
+      for (y = 0; y < 14; y++) {
+        var inset = Math.max(0, 10 - y * 1.5);
+        var lift = 0;
+        for (x = hx0 - 6 + inset; x < hx0 + hw + 6 - inset; x++) {
+          var ex = Math.min(x - (hx0 - 6), hx0 + hw + 6 - x);
+          lift = ex < 10 ? rnd((10 - ex) * 0.35) : 0;
+          var yy = 8 + y - lift;
+          g.p(x, yy, (x % 4 === 0 && y > 2) ? roofD : roofC);
+        }
+      }
+      g.r(hx0 + 14, 6, hw - 28, 3, roofD);
+      g.r(hx0 + 10, 21, hw - 20, 2, P.accent2D);
+      g.r(hx0 + 10, 20, hw - 20, 1, '#3a8a6a');
+      if (L.lantern) {
+        for (var ln = 0; ln < 2; ln++) {
+          var lx = hx0 + 22 + ln * (hw - 44);
+          var sw = rnd(Math.sin(t * 0.15 + ln) * 1);
+          g.r(lx + sw, 23, 1, 3, P.ink);
+          g.em = env.time !== 'day' ? 1 : 0;
+          g.r(lx - 2 + sw, 26, 5, 6, '#3a5ad0');
+          g.r(lx - 2 + sw, 28, 5, 2, '#e84a3a');
+          g.em = 0;
+          if (env.time !== 'day') g.light(lx, 29, 20, [1, 0.6, 0.5], 0.4, { n: 3 });
+        }
+      }
+      // jangdokdae (onggi pots)
+      var jx = L.left ? 10 : 132;
+      g.r(jx - 2, 66, 50, 3, '#a8a090');
+      for (var p = 0; p < L.pots; p++) {
+        var px = jx + 2 + (p % 4) * 11 + (p >= 4 ? 5 : 0);
+        var pyb = 66 - (p >= 4 ? 5 : 0);
+        var big = p % 2 === 0 ? 1 : 0;
+        g.ell(px + 4, pyb - 4 - big, 4 + big, 4 + big, '#6a3a24');
+        g.r(px + 1, pyb - 9 - big * 2, 7, 2, snow ? hx('#f4f8ff') : hx('#4a2a1a'));
+        g.p(px + 2, pyb - 6, '#8a5a3a');
+      }
+      // tree
+      var tx = L.left ? 60 : 130;
+      if (L.tree === 'pine') {
+        g.r(tx, 40, 3, 26, '#6a4a30');
+        g.line(tx + 1, 46, tx + 10, 38, '#6a4a30');
+        g.ell(tx + 2, 36, 10, 3, snow ? '#e8f0f6' : '#2f6a40');
+        g.ell(tx + 10, 34, 7, 2, snow ? '#e8f0f6' : '#3a7a48');
+        g.ell(tx - 2, 30, 7, 2, snow ? '#f4f8ff' : '#2f6a40');
+      } else {
+        g.r(tx, 42, 3, 24, '#5a3a24');
+        g.line(tx + 1, 46, tx - 8, 36, '#5a3a24');
+        g.line(tx + 2, 44, tx + 10, 34, '#5a3a24');
+        var bloom = L.tree === 'plum' ? (snow ? '#ffffff' : '#ffb0c8') : (autumnal(env) || !blossomy(env) ? '#e8803a' : '#ffd0a0');
+        var leafC = L.tree === 'persimmon' && !snow ? (autumnal(env) ? '#c8803a' : P.leaf) : null;
+        if (leafC) {
+          g.ell(tx + 1, 34, 13, 8, leafC);
+          g.ell(tx - 3, 31, 7, 4, mix(leafC, WHITE, 0.2));
+        }
+        for (var b = 0; b < 14; b++) {
+          var bx = tx + 1 + rnd((hash(b, 5) - 0.5) * 24);
+          var by = 28 + fl(hash(b, 6) * 14);
+          g.p(bx, by, bloom);
+          if (L.tree === 'persimmon') g.p(bx + 1, by, bloom);
+        }
+      }
+      if (L.line) {
+        var lx0 = L.left ? 4 : 120;
+        g.line(lx0, 52, lx0 + 60, 50, P.paperDD);
+        for (var c = 0; c < 4; c++) {
+          var cx = lx0 + 8 + c * 13;
+          g.r(cx, 51, 7, 7 + (c % 2) * 2, [P.paper, P.accent2L, '#ffffff', P.accentL][c]);
+        }
+      }
+      // tray of tea on the maru
+      g.r(hx0 + 40, 48, 14, 2, P.woodDD);
+      cupOf(g, env, L.cup, hx0 + 44, 48, P.paper, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 40 : 170, 75, t, !L.left);
+      mascot(g, env, hx0 + 60, 50, t);
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  var CROPS = ['cabbage', 'corn', 'pumpkin', 'berry', 'sprout'];
+
+  SC.farm = {
+    still: 6,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['hills', 'trees', 'hills']),
+        barn: R.pick(['#c84a3a', '#c8783a', P0(env, R)]),
+        crops: [R.pick(CROPS), R.pick(CROPS)],
+        fence: R.pick(['post', 'rail', 'none']),
+        extra: R.pick(['scarecrow', 'tractor', 'well', 'silo']),
+        critters: [hp(R, env, 'critter', ['chick', 'duck', 'bunny', 'none']), hp(R, env, 'critter', ['chick', 'pup', 'kitty', 'none'])],
+        fly: hp(R, env, 'fly', ['flock', 'kite', 'balloon', 'none', 'none']),
+        left: R.ch(0.5)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var snow = snowy(env);
+      skyTop(g, env, 50, t, 26);
+      flyer(g, env, L.fly, 60, 12, t);
+      distant(g, env, 0, 14, W, 34, bk(env, L.far), t);
+      grass(g, env, 48, H, 3);
+      // barn
+      var bx = L.left ? 128 : 8;
+      var bc = hx(L.barn);
+      g.r(bx, 30, 50, 26, bc);
+      for (x = bx; x < bx + 50; x += 4) g.r(x, 30, 1, 26, mix(bc, P.ink, 0.2));
+      for (y = 0; y < 12; y++) g.r(bx - 2 + y * 2, 30 - y, 54 - y * 4, 1, snow ? '#f4f8ff' : mix(bc, P.ink, 0.35));
+      g.r(bx + 16, 38, 18, 18, P.paper);
+      g.r(bx + 18, 40, 14, 16, mix(bc, P.ink, 0.2));
+      g.line(bx + 18, 40, bx + 31, 55, P.paper);
+      g.line(bx + 31, 40, bx + 18, 55, P.paper);
+      g.r(bx + 22, 22, 6, 5, P.paper);
+      g.r(bx + 23, 23, 4, 3, env.time === 'day' ? P.ink : env.litC);
+      // fields
+      for (var f = 0; f < 2; f++) {
+        var fx = L.left ? 8 + f * 58 : 70 + f * 60;
+        var fw = 52;
+        g.r(fx, 60, fw, 18, snow ? hx('#e0e6ee') : hx('#8a6a48'));
+        for (y = 62; y < 78; y += 5) g.r(fx, y, fw, 1, snow ? '#c8d4e4' : '#6a4e34');
+        if (snow) continue;
+        var kind = L.crops[f];
+        for (y = 61; y < 78; y += 5) {
+          for (x = fx + 3; x < fx + fw - 3; x += 7) {
+            if (kind === 'cabbage') {
+              g.ell(x + 2, y, 3, 2, P.leafL);
+              g.ell(x + 2, y, 1, 1, P.leaf);
+            } else if (kind === 'corn') {
+              g.r(x + 2, y - 8, 1, 9, P.leafD);
+              g.r(x + 3, y - 6, 2, 4, '#f6d04a');
+              g.p(x, y - 4, P.leaf);
+              g.p(x + 4, y - 2, P.leaf);
+            } else if (kind === 'pumpkin') {
+              g.ell(x + 2, y, 3, 2, '#e8803a');
+              g.p(x + 2, y - 3, P.leafD);
+            } else if (kind === 'berry') {
+              g.ell(x + 2, y, 3, 1, P.leaf);
+              g.p(x + 1, y + 1, '#e8483a');
+              g.p(x + 4, y, '#e8483a');
+            } else {
+              g.p(x + 2, y, P.leafL);
+              g.p(x + 1, y - 1, P.leaf);
+              g.p(x + 3, y - 1, P.leaf);
+            }
+          }
+        }
+      }
+      // fence
+      if (L.fence !== 'none') {
+        for (x = 0; x < W; x += 8) {
+          g.r(x, 50, 2, 8, P.woodL);
+          g.p(x, 49, P.woodL);
+        }
+        g.r(0, 52, W, 1, P.woodD);
+        if (L.fence === 'rail') g.r(0, 55, W, 1, P.woodD);
+      }
+      var ex = L.left ? 74 : 132;
+      if (L.extra === 'scarecrow') {
+        ex = L.left ? 34 : 150;
+        g.r(ex + 4, 46, 2, 18, P.woodD);
+        g.r(ex - 2, 50, 14, 2, P.woodD);
+        g.r(ex + 1, 48, 8, 8, P.accent2);
+        g.r(ex + 2, 41, 6, 6, '#f0d8a8');
+        g.r(ex, 40, 10, 2, '#d8a83a');
+        g.r(ex + 2, 37, 6, 3, '#d8a83a');
+        g.p(ex + 3, 43, P.ink);
+        g.p(ex + 6, 43, P.ink);
+      } else if (L.extra === 'tractor') {
+        g.r(ex, 46, 22, 8, P.accent);
+        g.r(ex + 12, 38, 9, 8, P.accent);
+        g.r(ex + 13, 39, 7, 5, mix(env.skyLow, WHITE, 0.3));
+        g.r(ex + 4, 42, 2, 4, P.ink);
+        disc(g, ex + 16, 56, 5, P.ink);
+        disc(g, ex + 16, 56, 2, '#f6d04a');
+        disc(g, ex + 4, 57, 3, P.ink);
+        if (mod(t, 6) < 3) g.b(ex + 5, 39 - mod(t, 3), P.paperD, 0.6);
+      } else if (L.extra === 'well') {
+        g.r(ex, 48, 16, 8, '#a8a090');
+        g.r(ex, 48, 16, 1, '#c8c0ae');
+        g.r(ex + 1, 36, 2, 12, P.woodD);
+        g.r(ex + 13, 36, 2, 12, P.woodD);
+        g.r(ex - 1, 34, 18, 2, P.accent);
+        g.r(ex + 7, 40, 3, 4, P.woodL);
+      } else {
+        g.r(ex, 20, 14, 36, P.metalL);
+        for (y = 22; y < 56; y += 4) g.r(ex, y, 14, 1, P.metal);
+        g.ell(ex + 7, 20, 7, 4, P.metal);
+      }
+      var c0 = L.critters[0];
+      var c1 = L.critters[1];
+      if (c0 !== 'none') critter(g, env, c0, L.left ? 116 : 60, 78, t, false);
+      if (c1 !== 'none') critter(g, env, c1, L.left ? 96 : 80, 77, t, true);
+      mascot(g, env, L.left ? 110 : 66, 60, t, { sleep: false });
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+  // barn colour from the palette accent
+  function P0(env, R) {
+    return '#' + env.P.accent.map(function (v) {
+      return ('0' + v.toString(16)).slice(-2);
+    }).join('');
+  }
+
+  SC['space-station'] = {
+    still: 16,
+    setup: function (env, R) {
+      return {
+        layout: R.pick(['two', 'wide', 'three']),
+        planet: R.pick(['earth', 'ringed', 'moon', 'red']),
+        screen: R.pick(['code', 'radar', 'map']),
+        floats: [hp(R, env, 'cup', CUPS), hp(R, env, 'trinket', TRINKETS), R.pick(['book', 'wrench', 'apple', 'none'])],
+        panel: R.pick(['metal', 'paper', 'accent2L']),
+        pod: R.ch(0.55),
+        plant: hp(R, env, 'plant', PLANTS2),
+        left: R.ch(0.5)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var pc = P[L.panel];
+      g.r(0, 0, W, H, mix(pc, P.ink, 0.15));
+      for (x = 0; x < W; x += 24) {
+        g.r(x, 0, 1, H, mix(pc, P.ink, 0.35));
+        g.r(x + 1, 0, 1, H, mix(pc, WHITE, 0.2));
+      }
+      for (y = 0; y < H; y += 20) g.r(0, y, W, 1, mix(pc, P.ink, 0.3));
+      for (x = 4; x < W; x += 24) for (y = 4; y < H; y += 20) g.p(x, y, P.metalD);
+      // windows into space
+      var spaceIn = function (wx, wy, ww, wh) {
+        g.r(wx, wy, ww, wh, '#07061a');
+        for (var s = 0; s < (ww * wh) / 40; s++) {
+          var sx = wx + fl(hash(env.seed + s, wx) * ww);
+          var sy = wy + fl(hash(s, env.seed + wy) * wh);
+          g.p(sx, sy, mod(t + s * 3, 40) < 2 ? '#ffffff' : (s % 3 ? '#aeb9ea' : '#fff6dc'));
+        }
+        var px = wx + fl(ww * 0.65);
+        var py = wy + fl(wh * 0.62);
+        var r = Math.min(10, fl(wh * 0.35));
+        if (L.planet === 'earth') {
+          disc(g, px, py, r, '#3a7ad0');
+          for (var k = 0; k < 8; k++) g.ell(px - r + fl(hash(k, 3) * r * 2), py - r + fl(hash(k, 4) * r * 2), 2, 1, '#5ab86a');
+          for (k = 0; k < 4; k++) g.r(px - r + fl(hash(k, 5) * r * 1.5), py - r + 2 + k * 4, 5, 1, '#ffffff');
+          halo(g, px, py, r, 3, '#7fc0ff', 0.5);
+        } else if (L.planet === 'ringed') {
+          disc(g, px, py, r - 2, '#e8c890');
+          g.line(px - r - 4, py + 3, px + r + 4, py - 3, '#f0e0c0');
+        } else if (L.planet === 'moon') {
+          disc(g, px, py, r, '#c8c8d0');
+          g.ell(px - 3, py - 2, 2, 1, '#a8a8b4');
+          g.ell(px + 3, py + 3, 3, 2, '#a8a8b4');
+        } else {
+          disc(g, px, py, r, '#d0603a');
+          g.r(px - r + 2, py - 2, r * 2 - 4, 1, '#a8482a');
+        }
+      };
+      var wins = L.layout === 'wide' ? [[40, 10, 112, 34]] : (L.layout === 'two' ? [[24, 10, 40, 34], [128, 10, 40, 34]] : [[18, 12, 30, 30], [81, 12, 30, 30], [144, 12, 30, 30]]);
+      for (var i = 0; i < wins.length; i++) {
+        var wv = wins[i];
+        var round = L.layout === 'three';
+        win(g, env, wv[0], wv[1], wv[2], wv[3], t, {
+          shape: round ? 'round' : 'rect',
+          panes: 1,
+          sill: false,
+          frame: P.metalL,
+          open: false,
+          inner: env.bd ? null : spaceIn
+        });
+      }
+      // console along the floor
+      g.r(0, 56, W, 4, P.metalD);
+      g.r(0, 60, W, H - 60, mix(P.metal, P.ink, 0.35));
+      for (x = 0; x < W; x += 6) g.r(x, 62, 4, 1, mix(P.metal, P.ink, 0.2));
+      g.em = 1;
+      for (x = 6; x < W; x += 9) {
+        var on = hash(x, fl(t / 6) + env.seed) < 0.5;
+        g.p(x, 58, on ? ['#ff6a5a', '#7cff9a', '#ffd36e', '#6ac8ff'][(x / 9) % 4 | 0] : '#3a3f52');
+      }
+      var cx = L.left ? 12 : 140;
+      g.r(cx, 46, 40, 10, '#102030');
+      if (L.screen === 'code') codeScreen(g, env, cx + 1, 47, 38, 8, t);
+      else if (L.screen === 'radar') {
+        g.ell(cx + 20, 51, 8, 4, '#1a4030');
+        var a = t * 0.2;
+        g.line(cx + 20, 51, cx + 20 + rnd(Math.cos(a) * 8), 51 + rnd(Math.sin(a) * 4), '#7cff9a');
+        g.p(cx + 14, 49, mod(t, 8) < 4 ? '#7cff9a' : '#1a4030');
+      } else {
+        for (var q = 0; q < 38; q++) g.p(cx + 1 + q, 51 + rnd(Math.sin(q * 0.4 + t * 0.2) * 3), '#6ac8ff');
+      }
+      g.em = 0;
+      g.light(cx + 20, 51, 26, [0.6, 0.9, 1], 0.35, { n: 3 });
+      if (L.pod) {
+        var px2 = L.left ? 156 : 6;
+        g.r(px2, 30, 28, 26, P.metalD);
+        g.em = 1;
+        g.r(px2 + 2, 32, 24, 22, '#e8d8ff');
+        g.em = 0;
+        plant(g, env, px2 + 8, 54, L.plant, t, 3);
+        plant(g, env, px2 + 20, 54, 'tall', t, 5);
+        g.light(px2 + 14, 40, 24, [0.9, 0.6, 1], 0.35, { n: 3 });
+      }
+      // floating things
+      for (i = 0; i < 3; i++) {
+        var fk = L.floats[i];
+        if (fk === 'none') continue;
+        var fx = 60 + i * 34 + rnd(Math.sin(t * 0.07 + i * 2) * 4);
+        var fy = 34 + i * 4 + rnd(Math.sin(t * 0.09 + i) * 3);
+        if (i === 0) cupOf(g, env, fk, fx, fy, P.accent, 0);
+        else if (i === 1) trinket(g, env, fk, fx, fy, t);
+        else if (fk === 'book') {
+          g.r(fx, fy - 2, 8, 4, P.accent2);
+          g.r(fx + 1, fy - 2, 6, 1, P.paper);
+        } else if (fk === 'wrench') {
+          g.line(fx, fy, fx + 6, fy - 4, P.metalL);
+          g.r(fx + 6, fy - 6, 2, 3, P.metalL);
+        } else {
+          g.ell(fx + 2, fy, 2, 2, '#e8483a');
+          g.p(fx + 2, fy - 3, P.leafD);
+        }
+      }
+      var bob = rnd(Math.sin(t * 0.1) * 2);
+      mascot(g, env, 88, 52 + bob, t, { sleep: false });
+    }
+  };
+
+  SC.pojangmacha = {
+    still: 7,
+    setup: function (env, R) {
+      return {
+        tarp: R.pick(['#e8803a', '#d8503a', '#3a7ad0', '#e8a83a']),
+        stool: R.pick(['#e8483a', '#3a8ad0', '#5ab86a']),
+        pots: R.pick(['tteok', 'odeng', 'both']),
+        menu: R.i(3, 5),
+        bottles: R.i(1, 3),
+        bulbs: R.pick([2, 3]),
+        flap: R.ch(0.65),
+        critter: hp(R, env, 'critter', ['kitty', 'none', 'none', 'pup']),
+        left: R.ch(0.5)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var tarp = hx(L.tarp);
+      var tarpL = mix(tarp, '#fff0c8', 0.35);
+      var tarpD = mix(tarp, P.ink, 0.25);
+      // tent walls. 밤에는 안쪽 전구 빛이 비쳐 천막이 스스로 빛난다
+      var glow = env.time === 'day' ? 0 : 1;
+      if (glow) {
+        tarpL = mix(mix(tarp, '#ffd890', 0.45), P.ink, env.time === 'night' ? 0.18 : 0.08);
+        tarpD = mix(tarpL, P.ink, 0.25);
+      }
+      g.em = glow;
+      g.r(0, 0, W, 60, tarpL);
+      for (x = 0; x < W; x += 32) g.r(x, 0, 1, 60, tarpD);
+      for (y = 0; y < 60; y++) for (x = 0; x < W; x++) if (bay(x, y) < 0.05) g.p(x, y, mix(tarpL, tarpD, 0.6));
+      for (y = 0; y < 60; y++) for (x = 0; x < W; x++) if (bay(x, y) < 0.5 && y > 52) g.p(x, y, mix(tarpL, tarpD, 0.4));
+      g.em = 0;
+      // clear vinyl flaps showing outside
+      if (L.flap || env.bd) {
+        var fw = 60;
+        var fx = L.left ? 120 : 12;
+        win(g, env, fx, 8, fw, 28, t, { panes: 1, sill: false, frame: tarpD, view: 'street' });
+        g.br(fx + 2, 10, fw - 4, 24, '#fff6dc', 0.15);
+        for (x = fx + 4; x < fx + fw; x += 9) g.b(x, 12, WHITE, 0.3);
+      }
+      // menu boards
+      var mx = L.left ? 20 : 96;
+      for (var m = 0; m < L.menu; m++) {
+        var bx = mx + m * 16;
+        g.r(bx, 10, 13, 18, P.paper);
+        g.r(bx + 2, 12, 9, 3, P.ink);
+        g.r(bx + 2, 17, 7, 1, P.paperDD);
+        g.r(bx + 2, 20, 9, 2, '#e8483a');
+        g.r(bx + 3, 24, 6, 1, P.paperDD);
+      }
+      // bulbs
+      for (var b = 0; b < L.bulbs; b++) {
+        var lx = 40 + b * (112 / (L.bulbs - 1 || 1));
+        var sw = rnd(Math.sin(t * 0.12 + b) * 1);
+        g.line(lx, 0, lx + sw, 6, P.ink);
+        g.em = 1;
+        g.ell(lx + sw, 8, 2, 2, '#ffe08a');
+        g.em = 0;
+        halo(g, fl(lx + sw), 8, 2, 4, '#ffe9a8', 0.6);
+        g.light(lx + sw, 9, 64, [1, 0.78, 0.45], Math.max(0.4, env.lampK * 0.7), { top: 6 });
+      }
+      // counter
+      g.r(0, 44, W, 4, P.metalL);
+      g.r(0, 48, W, 12, P.metalD);
+      g.r(0, 60, W, H - 60, mix(P.floor, P.ink, 0.25));
+      // pots on the counter
+      var kx = L.left ? 120 : 20;
+      var drawPot = function (px, kind) {
+        g.r(px, 36, 30, 8, P.metal);
+        g.r(px, 36, 30, 1, P.metalL);
+        if (kind === 'tteok') {
+          g.r(px + 1, 37, 28, 3, '#d8382a');
+          for (var k = 0; k < 6; k++) g.r(px + 3 + k * 4, 37 + (k % 2), 3, 1, '#f6e0c8');
+        } else {
+          g.r(px + 1, 37, 28, 3, '#c8a060');
+          for (var k2 = 0; k2 < 5; k2++) {
+            g.r(px + 4 + k2 * 5, 28, 1, 10, P.woodL);
+            g.r(px + 3 + k2 * 5, 32, 3, 5, '#e0b878');
+          }
+        }
+        steam(g, px + 10, 35, t, 8, px);
+        steam(g, px + 20, 35, t + 3, 7, px + 1);
+      };
+      if (L.pots === 'both') {
+        drawPot(kx, 'tteok');
+        drawPot(kx + 34, 'odeng');
+      } else drawPot(kx, L.pots);
+      // bottles and glasses
+      var gx = L.left ? 30 : 140;
+      for (var q = 0; q < L.bottles; q++) {
+        g.r(gx + q * 8, 34, 4, 10, '#3a9a5a');
+        g.r(gx + q * 8 + 1, 32, 2, 2, '#3a9a5a');
+        g.r(gx + q * 8, 38, 4, 3, P.paper);
+      }
+      g.r(gx + 26, 40, 3, 4, mix('#e8f4fa', P.metalL, 0.3));
+      g.r(gx + 31, 40, 3, 4, mix('#e8f4fa', P.metalL, 0.3));
+      // plastic stools
+      var sc = hx(L.stool);
+      for (var s = 0; s < 3; s++) {
+        var sx = 28 + s * 56;
+        g.r(sx, 66, 16, 3, sc);
+        g.r(sx + 1, 69, 2, 9, mix(sc, P.ink, 0.25));
+        g.r(sx + 13, 69, 2, 9, mix(sc, P.ink, 0.25));
+        g.r(sx + 3, 72, 10, 1, mix(sc, P.ink, 0.25));
+      }
+      if (L.critter !== 'none') critter(g, env, L.critter, L.left ? 6 : 176, 78, t, !L.left);
+      mascot(g, env, 84 + 2, 66, t, { sleep: false });
+    }
+  };
+
+  // ------------------------------------------------ layers (T158, D-129)
+  //
+  // 저장값에 일곱째 칸(배경~계절)이 있으면 '섞기' 모드로 그린다. 장면(구도)은 그대로 두고
+  // 배경(창밖·뒤 풍경), 계절·행사 장식, 벽·바닥 재질, 가구 색, 마스코트 자세, 좌우 뒤집기를
+  // 따로 골라 겹친다. 일곱째 칸이 없는 예전 값은 이 함수들을 지나지 않아 그림이 그대로다.
+
+  function snowy(env) {
+    return env.weather === 'snow' || env.ev === 'frost' || env.ev === 'xmas';
+  }
+  function autumnal(env) {
+    return env.weather === 'leaves' || env.ev === 'fall';
+  }
+  function blossomy(env) {
+    return env.weather === 'petals' || env.ev === 'bloom';
+  }
+  // 배경 칸이 있으면 그 배경, 없으면 장면이 정한 풍경
+  function bk(env, def) {
+    return env.bd || def;
+  }
+
+  var SKY_OVERRIDE = {
+    space: { sky: ['#07061a', '#0d0b2a', '#16123d', '#211a52', '#2c2266'], stars: 1 },
+    aurora: { sky: ['#050f24', '#0a1a36', '#0f2a46', '#153a54', '#1c4a60'], stars: 0.9 },
+    under: { sky: ['#0a2a5a', '#0f3f78', '#16578f', '#1f70a6', '#2a8abd'], stars: 0 }
+  };
+
+  var WOODS = {
+    oak: ['#d8b07a', '#9a7448', '#ecd0a0'],
+    walnut: ['#8a5a3a', '#5a3622', '#a8744e'],
+    white: ['#ece6dc', '#b8b0a4', '#fbf8f2'],
+    mint: ['#a8d4c0', '#6a9a88', '#cce8dc'],
+    black: ['#4a4650', '#2a2830', '#6a6670'],
+    rose: ['#e0a8a8', '#a86a72', '#f2c8c4']
+  };
+
+  // 섞기 모드에서 배치 번호로 정하는 칸들. Env를 만든 뒤 부른다
+  function mixLayers(env) {
+    var X = xr(env, 101);
+    var P = env.P;
+    env.mirror = X.ch(0.5);
+    env.pose = X.pick(['', '', 'flip', 'hop', 'nap', 'awake']);
+    env.wallX = X.pick(['', '', 'brick', 'plank', 'tile', 'stripe', 'dots', 'check']);
+    env.floorX = X.pick(['', '', 'herring', 'carpet', 'check', 'concrete']);
+    var wood = X.pick(['', '', 'oak', 'walnut', 'white', 'mint', 'black', 'rose']);
+    if (wood) {
+      var wv = WOODS[wood];
+      P.wood = hx(wv[0]);
+      P.woodD = hx(wv[1]);
+      P.woodL = hx(wv[2]);
+      P.woodG = mix(P.wood, P.woodD, 0.3);
+      P.woodDD = mix(P.woodD, P.ink, 0.35);
+      P.frame = P.woodL;
+    }
+    var so = SKY_OVERRIDE[env.bd];
+    if (so) {
+      env.sky = so.sky.map(hx);
+      env.skyLow = env.sky[env.sky.length - 1];
+      env.skyMid = env.sky[2];
+      env.starK = so.stars;
+      if (env.bd !== 'under') {
+        env.cloudL = mix(env.cloudL, env.sky[1], 0.6);
+        env.cloudD = mix(env.cloudD, env.sky[0], 0.6);
+      }
+    }
+  }
+
+  function wallTex(g, env, floorY, kind) {
+    var P = env.P;
+    var x;
+    var y;
+    var line = mix(P.wall, P.ink, 0.14);
+    if (kind === 'brick') {
+      for (y = 2; y < floorY; y += 4) {
+        g.r(0, y, W, 1, line);
+        for (x = ((y >> 2) & 1) * 4; x < W; x += 8) g.r(x, y + 1, 1, 3, line);
+      }
+    } else if (kind === 'plank') {
+      for (x = 3; x < W; x += 7) g.r(x, 0, 1, floorY, line);
+      for (x = 0; x < W; x += 7) g.p(x + 3, mod(x * 13, floorY - 4) + 2, line);
+    } else if (kind === 'tile') {
+      var tc = mix(P.wall, WHITE, 0.25);
+      for (y = 0; y < floorY; y++) {
+        for (x = 0; x < W; x++) if ((x % 6 === 0) || (y % 6 === 0)) g.p(x, y, line);
+          else if ((x + y) % 6 === 1) g.p(x, y, tc);
+      }
+    } else if (kind === 'stripe') {
+      for (y = 4; y < floorY; y += 9) {
+        g.r(0, y, W, 2, P.wallS);
+        g.r(0, y + 3, W, 1, mix(P.wall, P.accent2, 0.25));
+      }
+    } else if (kind === 'dots') {
+      for (y = 4; y < floorY; y += 6) {
+        for (x = ((y / 6) & 1) * 3 + 2; x < W; x += 6) g.p(x, y, mix(P.wall, P.accent, 0.35));
+      }
+    } else {
+      for (y = 0; y < floorY; y++) {
+        for (x = 0; x < W; x++) if (((fl(x / 8) + fl(y / 8)) & 1) === 0 && bay(x, y) < 0.5) g.p(x, y, P.wallS);
+      }
+    }
+  }
+
+  function floorTex(g, env, floorY, kind) {
+    var P = env.P;
+    var x;
+    var y;
+    var d = P.floorD;
+    if (kind === 'herring') {
+      for (y = floorY + 1; y < H; y++) {
+        for (x = 0; x < W; x++) if (mod(x + (y - floorY) * (fl(x / 6) & 1 ? 1 : -1), 6) === 0) g.p(x, y, d);
+      }
+    } else if (kind === 'carpet') {
+      var c = mix(P.floor, P.rug, 0.55);
+      g.r(0, floorY + 1, W, H - floorY - 1, c);
+      for (y = floorY + 2; y < H; y++) {
+        for (x = 0; x < W; x++) if (bay(x, y) < 0.12) g.p(x, y, mix(c, P.ink, 0.15));
+      }
+    } else if (kind === 'check') {
+      for (y = floorY + 1; y < H; y++) {
+        var row = fl((y - floorY - 1) / 4);
+        for (x = 0; x < W; x++) if (((fl(x / 8) + row) & 1) === 0) g.p(x, y, mix(P.floor, P.paper, 0.55));
+      }
+    } else {
+      var cc = mix(P.metal, P.floor, 0.4);
+      g.r(0, floorY + 1, W, H - floorY - 1, cc);
+      for (x = 0; x < W; x += 32) g.r(x, floorY + 1, 1, H - floorY - 1, mix(cc, P.ink, 0.15));
+      for (y = floorY + 1; y < H; y++) for (x = 0; x < W; x++) if (bay(x, y) < 0.06) g.p(x, y, mix(cc, P.ink, 0.2));
+    }
+  }
+
+  // ---- backdrops (distant()가 모르는 풍경)
+
+  function scenery(g, env, x, y, w, h, kind, t) {
+    var P = env.P;
+    var low = env.skyLow;
+    var sd = env.seed;
+    var snow = snowy(env);
+    var xx;
+    var yy;
+    var i;
+    var k;
+    function band(fy, amp, freq, ph, c, cD) {
+      for (var bx = 0; bx < w; bx++) {
+        var gx = x + bx;
+        var top = y + h * fy + Math.sin((gx + ph) * freq) * h * amp + Math.sin(gx * 0.31 + ph) * 0.6;
+        for (var by = fl(top); by < y + h; by++) g.p(gx, by, cD && by - top > 2 && bay(gx, by) < 0.5 ? cD : c);
+      }
+    }
+    function waterFrom(fy, deep, shal) {
+      var hz = y + fl(h * fy);
+      for (var wy = hz; wy < y + h; wy++) {
+        var f = (wy - hz) / Math.max(1, y + h - hz);
+        var c = mix(deep, shal, f * 0.7);
+        g.r(x, wy, w, 1, c);
+        if (wy & 1) {
+          for (var q = 0; q < 3; q++) {
+            var dx = mod(hash(q, wy) * w + t * (0.15 + f * 0.4) * (q & 1 ? 1 : -1), w);
+            g.r(x + dx, wy, 2 + fl(hash(wy, q) * 3), 1, mix(c, WHITE, 0.3));
+          }
+        }
+      }
+      g.r(x, hz, w, 1, mix(low, WHITE, 0.3));
+      return hz;
+    }
+    function bushTree(tx, ty, r, c, cL) {
+      g.r(tx, ty - 1, 1, r + 2, tone(env, P.woodD));
+      g.ell(tx, ty - r, r, r, c);
+      g.ell(tx - 1, ty - r - 1, Math.max(1, r - 1), Math.max(1, r - 1), cL);
+    }
+    if (kind === 'sea') {
+      band(0.5, 0.05, 0.05, sd % 60, tone(env, mix(low, '#7a9a8a', 0.5)));
+      var hz = waterFrom(0.62, mix(env.skyMid, '#1a4a8a', 0.55), hx('#3aa8c0'));
+      var bxp = x + mod(t * 0.12 + sd * 7, w + 10) - 5;
+      g.r(bxp, hz + 1, 5, 1, P.paper);
+      g.r(bxp + 2, hz - 4, 1, 5, P.woodDD);
+      g.r(bxp + 3, hz - 3, 2, 3, P.paper);
+    } else if (kind === 'mount') {
+      var mc = tone(env, mix(low, '#8090b8', 0.45));
+      var mD = mix(mc, '#2e3656', 0.25);
+      for (xx = 0; xx < w; xx++) {
+        var gx = x + xx;
+        var pk1 = Math.abs(mod(gx + sd % 40, 70) - 35);
+        var top = y + h * 0.18 + pk1 * h * 0.017;
+        for (yy = fl(top); yy < y + h; yy++) {
+          var sn = yy < top + 3 + (gx % 3);
+          var shd = mod(gx + sd % 40, 70) > 35;
+          g.p(gx, yy, sn ? (shd ? hx('#c9d3ea') : hx('#f4f6fb')) : (shd ? mD : mc));
+        }
+      }
+      band(0.78, 0.04, 0.06, 20, tone(env, snow ? '#eef3fa' : P.leaf), tone(env, snow ? '#ccd8ea' : P.leafD));
+    } else if (kind === 'snow') {
+      band(0.55, 0.08, 0.05, sd % 50, tone(env, '#e8eef6'));
+      band(0.75, 0.06, 0.04, 9, tone(env, '#f6f9fc'), tone(env, '#d4dfec'));
+      for (i = 0; i < fl(w / 12); i++) {
+        var px = x + fl(hash(sd + 3, i) * w);
+        var pb = y + fl(h * 0.8);
+        for (k = 0; k < 7; k++) g.r(px - fl(k / 2.5), pb - 7 + k, fl(k / 2.5) * 2 + 1, 1, k % 3 === 0 ? hx('#f4f8ff') : tone(env, '#3f6a5e'));
+      }
+    } else if (kind === 'desert') {
+      band(0.5, 0.06, 0.03, sd % 80, tone(env, mix(low, '#e0a070', 0.55)));
+      band(0.66, 0.07, 0.045, 13, tone(env, '#e8b878'), tone(env, '#d09a5a'));
+      band(0.84, 0.04, 0.06, 41, tone(env, '#f0c88a'), tone(env, '#dcae70'));
+      if (w > 60) {
+        var pyx = x + fl(w * 0.7);
+        var pyb = y + fl(h * 0.68);
+        for (k = 0; k < 9; k++) {
+          g.r(pyx - k, pyb - 9 + k, k + 1, 1, tone(env, '#e8c080'));
+          g.r(pyx + 1, pyb - 9 + k, k, 1, tone(env, '#c8955a'));
+        }
+      }
+      for (i = 0; i < Math.max(1, fl(w / 50)); i++) {
+        var cx = x + fl(hash(sd + 5, i) * (w - 6)) + 3;
+        var cb = y + fl(h * 0.9);
+        var cc = tone(env, '#4a8a4a');
+        g.r(cx, cb - 8, 2, 8, cc);
+        g.r(cx - 2, cb - 6, 1, 3, cc);
+        g.r(cx - 2, cb - 4, 2, 1, cc);
+        g.r(cx + 3, cb - 7, 1, 3, cc);
+        g.r(cx + 2, cb - 5, 2, 1, cc);
+      }
+    } else if (kind === 'space') {
+      // ground of a small moon with craters
+      var gc = tone(env, '#8a8698');
+      band(0.74, 0.05, 0.05, sd % 30, gc, tone(env, '#6e6a80'));
+      for (i = 0; i < fl(w / 20); i++) {
+        var crx = x + fl(hash(sd + 9, i) * w);
+        var cry = y + fl(h * (0.84 + hash(sd, i) * 0.1));
+        g.ell(crx, cry, 3, 1, tone(env, '#5e5a70'));
+        g.r(crx - 2, cry - 1, 4, 1, tone(env, '#a8a4b8'));
+      }
+      if (w > 30) {
+        var fx = x + fl(w * 0.25);
+        var fy = y + fl(h * 0.74) - 6;
+        g.r(fx, fy, 1, 6, P.metalL);
+        g.r(fx + 1, fy, 4, 3, P.accent);
+      }
+      // drifting rocket now and then
+      var rp = mod(t + sd, 160);
+      if (rp < 60) {
+        var rx = x + fl((rp / 60) * (w + 10)) - 5;
+        var ry = y + fl(h * 0.35) - fl(rp / 8);
+        g.em = 1;
+        g.r(rx, ry, 4, 2, '#f4f4f8');
+        g.p(rx + 4, ry, P.accent);
+        g.p(rx - 1, ry + 1, mod(t, 2) ? '#ffb03a' : '#ffe08a');
+        g.em = 0;
+      }
+    } else if (kind === 'autumn' || kind === 'sakura' || kind === 'jungle') {
+      var cols =
+        kind === 'autumn'
+          ? [['#e08a3a', '#f6c05a'], ['#c8503a', '#f08a5a'], ['#d8a83a', '#f6dc6a']]
+          : kind === 'sakura'
+            ? [['#f6b8cc', '#fff0f4'], ['#f0a0bc', '#ffe0ea'], ['#ffc8d8', '#ffffff']]
+            : [['#2f8a4a', '#5ab86a'], ['#3a7a3a', '#6ac860'], ['#246a40', '#4aa85a']];
+      band(0.6, 0.05, 0.06, sd % 40, tone(env, kind === 'jungle' ? '#3a6a3a' : mix(low, '#8a9a7a', 0.4)));
+      var nT = fl(w / (kind === 'jungle' ? 5 : 8));
+      for (i = 0; i < nT; i++) {
+        var tx = x + fl(hash(sd + 21, i) * w);
+        var ty = y + fl(h * (0.72 + hash(sd + 22, i) * 0.12));
+        var r = 2 + fl(hash(sd + 23, i) * 3);
+        var cp = cols[i % 3];
+        if (kind === 'jungle' && i % 3 === 0) {
+          g.r(tx, ty - 9, 1, 9, tone(env, '#6a5030'));
+          for (k = -1; k <= 1; k += 2) {
+            g.line(tx, ty - 9, tx + k * 5, ty - 6, tone(env, cp[0]));
+            g.line(tx, ty - 9, tx + k * 4, ty - 11, tone(env, cp[1]));
+          }
+        } else {
+          bushTree(tx, ty, r, tone(env, cp[0]), tone(env, cp[1]));
+        }
+      }
+      band(0.9, 0.02, 0.07, 3, tone(env, kind === 'autumn' ? '#c8843a' : kind === 'sakura' ? mix(P.paper, P.woodL, 0.5) : '#2a5a30'));
+      if (kind === 'sakura' && w > 40) {
+        var lx = x + fl(w * 0.6);
+        g.r(lx, y + fl(h * 0.62), 1, fl(h * 0.28), tone(env, '#3a3f52'));
+        g.r(lx - 1, y + fl(h * 0.6), 3, 2, env.time === 'day' ? tone(env, '#d8dccc') : '#ffe08a');
+      }
+    } else if (kind === 'rice') {
+      band(0.42, 0.08, 0.05, sd % 60, tone(env, mix(low, '#6a8a9a', 0.5)));
+      var ripe = autumnal(env) ? 1 : 0;
+      for (yy = fl(y + h * 0.6); yy < y + h; yy++) {
+        var f2 = (yy - (y + h * 0.6)) / (h * 0.4);
+        var c1 = ripe ? '#e0c050' : '#7ac050';
+        var c2 = ripe ? '#c8a038' : '#5aa040';
+        for (xx = 0; xx < w; xx++) {
+          var gx2 = x + xx;
+          var dyke = mod(yy - fl(y + h * 0.6), 5 + fl(f2 * 4)) === 0;
+          g.p(gx2, yy, tone(env, dyke ? '#8a7048' : ((gx2 + yy) % 3 === 0 ? c2 : c1)));
+        }
+      }
+      if (w > 40) {
+        var hx1 = x + fl(w * 0.2);
+        var hy1 = y + fl(h * 0.6);
+        g.r(hx1, hy1 - 5, 10, 5, tone(env, P.paper));
+        for (k = 0; k < 4; k++) g.r(hx1 - 1 + k, hy1 - 6 - k, 12 - k * 2, 1, tone(env, '#5a6a8a'));
+        g.r(hx1 + 4, hy1 - 3, 2, 3, tone(env, P.woodD));
+      }
+    } else if (kind === 'harbor') {
+      var hz2 = waterFrom(0.66, mix(env.skyMid, '#1a3a6a', 0.6), hx('#2a6a9a'));
+      var wc = [tone(env, '#b85a4a'), tone(env, '#5a7a9a'), tone(env, '#c8a058'), tone(env, '#6a8a6a')];
+      xx = x;
+      i = 0;
+      while (xx < x + w) {
+        var bw = 8 + fl(hash(sd + 31, i) * 8);
+        var bh = 4 + fl(hash(sd + 32, i) * 5);
+        g.r(xx, hz2 - bh, bw, bh, wc[i % 4]);
+        g.r(xx, hz2 - bh, bw, 1, mix(wc[i % 4], WHITE, 0.3));
+        if (env.time !== 'day' && hash(sd, i) < 0.6) g.p(xx + 2, hz2 - 2, env.litC);
+        xx += bw;
+        i++;
+      }
+      if (w > 50) {
+        var crx2 = x + fl(w * 0.72);
+        var cdc = tone(env, P.accent);
+        g.r(crx2, hz2 - 16, 2, 16, cdc);
+        g.r(crx2 - 6, hz2 - 16, 16, 1, cdc);
+        g.line(crx2 + 1, hz2 - 16, crx2 - 5, hz2 - 15, cdc);
+        g.r(crx2 + 8, hz2 - 15, 1, 5, tone(env, P.ink));
+        g.r(crx2 + 7, hz2 - 10, 3, 2, tone(env, P.accent2));
+      }
+      var shx = x + mod(sd * 3 + t * 0.08, w + 20) - 10;
+      g.r(shx, hz2 + 2, 14, 2, tone(env, '#c84a3a'));
+      g.r(shx + 2, hz2 - 1, 8, 3, tone(env, P.paper));
+      for (k = 0; k < 3; k++) g.r(shx + 3 + k * 2, hz2 - 3, 2, 2, [tone(env, P.accent2), tone(env, '#f6c63a'), tone(env, P.accent)][k]);
+    } else if (kind === 'under') {
+      for (i = 0; i < 4; i++) {
+        var rx2 = x + fl(((i + 0.5) / 4) * w) + rnd(Math.sin(t * 0.05 + i) * 3);
+        for (yy = y; yy < y + h * 0.7; yy++) if (bay(rx2, yy) < 0.3) g.b(rx2 + fl((yy - y) * 0.2), yy, '#c8f0ff', 0.25);
+      }
+      band(0.84, 0.03, 0.08, sd % 20, tone(env, '#d8c08a'), tone(env, '#b8a070'));
+      for (i = 0; i < fl(w / 14) + 1; i++) {
+        var wx = x + fl(hash(sd + 41, i) * w);
+        var wh = 4 + fl(hash(sd + 42, i) * h * 0.25);
+        for (k = 0; k < wh; k++) g.p(wx + rnd(Math.sin(k * 0.5 + t * 0.15 + i) * 1.2), y + h * 0.88 - k, k % 3 ? '#3a9a5a' : '#5ab86a');
+      }
+      for (i = 0; i < 3; i++) {
+        var fsx = x + mod(hash(sd, i + 50) * w + t * (0.3 + i * 0.1) * (i % 2 ? 1 : -1), w + 8) - 4;
+        var fsy = y + fl(h * (0.3 + i * 0.15));
+        fishSpr(g, fsx, fsy, i % 2 ? 'tiny' : 'clown', hx(['#ffb03a', '#7fd8ff', '#ff9fbf'][i]), i % 2 === 0);
+      }
+      for (i = 0; i < 5; i++) g.p(x + fl(hash(sd, i) * w), y + h - mod(t * 0.8 + i * 9, h), '#d8f4ff');
+    } else if (kind === 'towers') {
+      var lit = env.time === 'day' ? 0.05 : 0.65;
+      xx = x - 2;
+      i = 0;
+      while (xx < x + w) {
+        var tw = 5 + fl(hash(sd + 61, i) * 7);
+        var th = fl(h * (0.35 + hash(sd + 62, i) * 0.55));
+        var tc = tone(env, mix(low, i % 2 ? '#3a4260' : '#4a5274', 0.6));
+        g.r(xx, y + h - th, tw, th, tc);
+        if (hash(sd, i + 3) < 0.4) {
+          g.r(xx + fl(tw / 2), y + h - th - 4, 1, 4, tc);
+          g.em = 1;
+          if (mod(t + i * 3, 10) < 5) g.p(xx + fl(tw / 2), y + h - th - 5, '#ff4a4a');
+          g.em = 0;
+        }
+        for (yy = y + h - th + 2; yy < y + h - 1; yy += 2) {
+          for (var wx2 = xx + 1; wx2 < xx + tw - 1; wx2 += 2) {
+            if (hash(wx2 * 7 + i, yy + fl((t + hash(wx2, yy) * 300) / 120)) < lit) {
+              g.em = 1;
+              g.p(wx2, yy, env.litC);
+              g.em = 0;
+            }
+          }
+        }
+        xx += tw + 1;
+        i++;
+      }
+    } else if (kind === 'aurora') {
+      for (i = 0; i < 3; i++) {
+        for (xx = 0; xx < w; xx++) {
+          var gx3 = x + xx;
+          var ay = y + h * (0.12 + i * 0.1) + Math.sin(gx3 * 0.05 + t * 0.03 + i * 2) * h * 0.08;
+          var len = fl(h * 0.18);
+          for (k = 0; k < len; k++) {
+            if (bay(gx3, fl(ay) + k) < (1 - k / len) * 0.7) g.b(gx3, fl(ay) + k, i === 1 ? '#8af0c0' : '#6ad8a8', env.time === 'day' ? 0.15 : 0.45);
+          }
+        }
+      }
+      band(0.7, 0.06, 0.05, sd % 50, tone(env, '#e8eef6'), tone(env, '#c8d4e6'));
+      for (i = 0; i < fl(w / 16); i++) {
+        var px2 = x + fl(hash(sd + 71, i) * w);
+        var pb2 = y + fl(h * 0.82);
+        for (k = 0; k < 8; k++) g.r(px2 - fl(k / 2.5), pb2 - 8 + k, fl(k / 2.5) * 2 + 1, 1, tone(env, '#1f3a36'));
+      }
+    } else if (kind === 'tulip') {
+      band(0.55, 0.04, 0.05, sd % 30, tone(env, mix(low, '#8ab07a', 0.5)));
+      var tcols = ['#e8483a', '#f6d04a', '#f6a0c0', '#ffffff', '#a88ad8'];
+      for (yy = fl(y + h * 0.66); yy < y + h; yy++) {
+        var f3 = (yy - (y + h * 0.66)) / (h * 0.34);
+        for (xx = 0; xx < w; xx++) {
+          var gx4 = x + xx;
+          var stripe = fl((gx4 - 96) / (6 + f3 * 10) + (yy - y) * 0.05);
+          var col = tcols[mod(stripe + sd, tcols.length)];
+          g.p(gx4, yy, tone(env, (gx4 + yy) % 4 === 0 ? P.leafD : col));
+        }
+      }
+      if (w > 40) farThing(g, env, 'windmill', x + fl(w * 0.8), y + fl(h * 0.62), t);
+    } else if (kind === 'canyon') {
+      var rc = [tone(env, '#c8704a'), tone(env, '#b85a3a'), tone(env, '#d88a5a'), tone(env, '#a84a32')];
+      for (xx = 0; xx < w; xx++) {
+        var gx5 = x + xx;
+        var m = mod(gx5 + sd % 90, 90);
+        var top2 = m < 30 ? y + h * 0.3 : (m < 40 ? y + h * (0.3 + (m - 30) * 0.035) : (m < 70 ? y + h * 0.65 : y + h * (0.65 - (m - 70) * 0.0175)));
+        for (yy = fl(top2); yy < y + h; yy++) g.p(gx5, yy, rc[fl((yy - y) / 3) % 4]);
+      }
+      band(0.88, 0.02, 0.1, 5, tone(env, '#d8a070'));
+    } else {
+      // lake with a little dock
+      band(0.5, 0.05, 0.06, sd % 40, tone(env, mix(low, '#6a9a6a', 0.45)));
+      for (i = 0; i < fl(w / 7); i++) bushTree(x + fl(hash(sd + 81, i) * w), y + fl(h * 0.6), 2 + (i % 2), tone(env, P.leafD), tone(env, P.leaf));
+      var hz3 = waterFrom(0.64, mix(env.skyMid, '#2a5a7a', 0.5), mix(low, '#5aa0b8', 0.5));
+      if (w > 40) {
+        var dx2 = x + fl(w * 0.3);
+        g.r(dx2, hz3 + 3, 14, 1, tone(env, P.woodL));
+        for (k = 0; k < 14; k += 4) g.r(dx2 + k, hz3 + 4, 1, 3, tone(env, P.woodD));
+      }
+    }
+  }
+
+  // ---- season / event overlays
+
+  var EVENT_KEYS = ['bloom', 'sun', 'fall', 'frost', 'xmas', 'boo', 'bday', 'wet', 'flies'];
+
+  function inWins(g, fn) {
+    for (var i = 0; i < g.wins.length; i++) {
+      var r = g.wins[i];
+      g.clip(r[0], r[1], r[2], r[3], r[4]);
+      fn(r[0], r[1], r[2], r[3]);
+    }
+    g.noclip();
+  }
+
+  function particles(g, env, x, y, w, h, t, kind, n) {
+    var cols = { bloom: ['#ffc4d6', '#ff9fbf', '#ffe3ec'], fall: ['#e9873b', '#d0533a', '#f2b648'], frost: ['#ffffff', '#e8f0ff'] }[kind];
+    for (var i = 0; i < n; i++) {
+      var sp = kind === 'frost' ? 0.5 : 0.7;
+      var px = x + mod(hash(env.seed + i, 91) * w + t * sp * 0.6 + Math.sin(t * 0.2 + i) * 2, w);
+      var py = y + mod(hash(env.seed + i, 92) * h + t * sp * 0.5, h);
+      g.p(px, py, cols[i % cols.length]);
+      if (kind !== 'frost' && mod(t + i, 3) === 0) g.p(px + 1, py, cols[i % cols.length]);
+    }
+  }
+
+  function xmasTree(g, env, x, yb, t) {
+    var P = env.P;
+    g.r(x + 5, yb - 4, 3, 4, P.woodDD);
+    g.r(x + 2, yb - 2, 9, 2, P.accent);
+    for (var r = 0; r < 16; r++) {
+      var hw = fl((r % 6) * 0.8 + r * 0.25);
+      g.r(x + 6 - hw, yb - 20 + r, hw * 2 + 1, 1, r % 6 === 0 ? '#3a8a4a' : '#2f7a42');
+    }
+    g.em = 1;
+    for (var b = 0; b < 7; b++) {
+      var bx = x + 6 + rnd(Math.sin(b * 2.3) * (1 + b * 0.7));
+      var by = yb - 17 + b * 2;
+      g.p(bx, by, mod(fl(t / 3) + b, 3) === 0 ? '#ffffff' : ['#ff6a5a', '#ffd34a', '#6ac8ff'][b % 3]);
+    }
+    g.p(x + 6, yb - 21, '#ffe04a');
+    g.p(x + 5, yb - 20, '#ffe04a');
+    g.p(x + 7, yb - 20, '#ffe04a');
+    g.em = 0;
+    if (env.time !== 'day') g.light(x + 6, yb - 12, 22, [1, 0.85, 0.6], 0.5, { n: 3 });
+  }
+
+  function pumpkin(g, env, x, yb, t) {
+    g.ell(x + 4, yb - 3, 4, 3, '#e8803a');
+    g.r(x + 3, yb - 7, 2, 2, '#5a8a3a');
+    g.r(x + 1, yb - 4, 1, 3, '#c8602a');
+    g.r(x + 6, yb - 4, 1, 3, '#c8602a');
+    g.em = 1;
+    var fl0 = mod(t + x, 4) === 0 ? '#ffb03a' : '#ffe08a';
+    g.p(x + 2, yb - 4, fl0);
+    g.p(x + 5, yb - 4, fl0);
+    g.r(x + 2, yb - 2, 4, 1, fl0);
+    g.em = 0;
+    if (env.time !== 'day') g.light(x + 4, yb - 3, 16, [1, 0.6, 0.25], 0.6, { n: 3 });
+  }
+
+  function balloons(g, env, x, yb, t) {
+    var P = env.P;
+    var cs = [P.accent, P.accent2, '#ffd25a', P.accentL];
+    for (var i = 0; i < 4; i++) {
+      var bx = x + i * 4 - 2 + rnd(Math.sin(t * 0.1 + i) * 1.2);
+      var by = yb - 24 - (i % 2) * 5 + rnd(Math.sin(t * 0.13 + i * 2) * 1);
+      g.line(bx, by + 3, x + 6, yb - 6, P.paperDD);
+      g.ell(bx, by, 2, 3, cs[i]);
+      g.p(bx - 1, by - 1, WHITE);
+    }
+    g.r(x + 2, yb - 6, 8, 6, P.accent2);
+    g.r(x + 5, yb - 6, 2, 6, P.paper);
+    g.r(x + 2, yb - 4, 8, 1, P.paper);
+    g.r(x + 4, yb - 8, 4, 2, P.paper);
+  }
+
+  function seasonal(g, env, scene, t) {
+    var P = env.P;
+    var ev = env.ev;
+    var out = !!scene.outdoor;
+    var x;
+    var i;
+    if (!ev) return;
+    var right = mod(env.seed, 2) === 0;
+    var cx = right ? 176 : 4;
+    if (ev === 'bloom' || ev === 'fall' || ev === 'frost') {
+      var n = ev === 'frost' ? 40 : 24;
+      if (out) particles(g, env, 0, 0, W, H, t, ev, n);
+      else inWins(g, function (wx, wy, ww, wh) {
+        particles(g, env, wx, wy, ww, wh, t, ev, fl((n * ww * wh) / 6000) + 3);
+      });
+      if (!out && ev === 'frost') {
+        inWins(g, function (wx, wy, ww, wh) {
+          for (var fy = 0; fy < 5; fy++) {
+            for (var fx = 0; fx < 6 - fy; fx++) {
+              if (bay(wx + fx, wy + wh - 1 - fy) < 0.6) g.b(wx + fx, wy + wh - 1 - fy, WHITE, 0.6);
+              if (bay(wx + ww - 1 - fx, wy + wh - 1 - fy) < 0.6) g.b(wx + ww - 1 - fx, wy + wh - 1 - fy, WHITE, 0.6);
+            }
+          }
+        });
+      }
+      if (!out && ev === 'bloom') {
+        g.r(cx + 4, 72, 6, 7, P.accent2);
+        g.r(cx + 4, 72, 6, 1, P.accent2L);
+        g.line(cx + 6, 72, cx + 3, 60, P.woodD);
+        g.line(cx + 7, 72, cx + 11, 62, P.woodD);
+        for (i = 0; i < 9; i++) g.p(cx + 3 + fl(hash(i, 3) * 9), 59 + fl(hash(i, 4) * 12), i % 2 ? '#ffc4d6' : '#fff0f4');
+      }
+      if (ev === 'fall') {
+        for (i = 0; i < 8; i++) g.p(cx + (i * 5) % 14, 78 - (i % 3), ['#e9873b', '#d0533a', '#f2b648'][i % 3]);
+      }
+    } else if (ev === 'sun') {
+      if (env.time === 'day' || env.time === 'sunset') {
+        g.em = 1;
+        for (i = 0; i < 4; i++) g.b(150 + i * 9, 6 + i * 6, '#fff6c8', 0.35);
+        g.em = 0;
+      }
+      for (i = 0; i < 2; i++) {
+        var dx = mod(t * 0.9 + i * 90, W + 20) - 10;
+        var dy = 30 + i * 12 + rnd(Math.sin(t * 0.3 + i) * 3);
+        g.r(dx, dy, 5, 1, '#3a8ad0');
+        g.p(dx + 1, dy - 1, mod(t, 2) ? '#c8e8ff' : '#e8f4ff');
+        g.p(dx + 3, dy - 1, mod(t, 2) ? '#c8e8ff' : '#e8f4ff');
+      }
+      if (!out) {
+        // electric fan
+        g.r(cx + 6, 66, 1, 12, P.metalD);
+        g.r(cx + 3, 77, 7, 2, P.metalD);
+        disc(g, cx + 6, 62, 4, P.metalL);
+        var a = t * 0.9;
+        for (i = 0; i < 3; i++) g.line(cx + 6, 62, cx + 6 + rnd(Math.cos(a + i * 2.1) * 3), 62 + rnd(Math.sin(a + i * 2.1) * 3), P.accent2);
+      } else {
+        g.ell(cx + 6, 77, 5, 2, '#e8483a');
+        g.r(cx + 1, 77, 11, 1, '#5ab86a');
+        g.p(cx + 4, 76, P.ink);
+        g.p(cx + 8, 76, P.ink);
+      }
+    } else if (ev === 'xmas') {
+      stringLights(g, env, 1, t, 3, 6, ['#ff6a5a', '#6ad870', '#ffd34a', '#6ac8ff']);
+      xmasTree(g, env, cx, 79, t);
+      if (out) particles(g, env, 0, 0, W, H, t, 'frost', 24);
+      else inWins(g, function (wx, wy, ww, wh) {
+        particles(g, env, wx, wy, ww, wh, t, 'frost', 6);
+      });
+    } else if (ev === 'boo') {
+      for (x = 0; x < W; x++) {
+        var sag = rnd(Math.abs(Math.sin((x / 48) * PI)) * 3);
+        g.p(x, 2 + sag, P.ink);
+        if (x % 10 === 5) for (var r = 0; r < 3; r++) g.r(x - 2 + r, 3 + sag + r, 5 - r * 2, 1, fl(x / 10) % 2 ? '#e8803a' : '#7a4ab8');
+      }
+      pumpkin(g, env, cx, 79, t);
+      pumpkin(g, env, right ? cx - 10 : cx + 10, 79, t + 2);
+      for (i = 0; i < 3; i++) {
+        var bx = mod(t * 0.8 + i * 70, W + 20) - 10;
+        var by = 14 + i * 7 + rnd(Math.sin(t * 0.4 + i) * 3);
+        var up = mod(t + i, 4) < 2;
+        g.r(bx - 1, by, 3, 2, '#2a2030');
+        g.p(bx - 2, by + (up ? -1 : 1), '#2a2030');
+        g.p(bx - 3, by + (up ? -1 : 0), '#2a2030');
+        g.p(bx + 2, by + (up ? -1 : 1), '#2a2030');
+        g.p(bx + 3, by + (up ? -1 : 0), '#2a2030');
+      }
+    } else if (ev === 'bday') {
+      for (x = 0; x < W; x++) {
+        var sag2 = rnd(Math.abs(Math.sin((x / 64) * PI)) * 4);
+        g.p(x, 2 + sag2, P.ink);
+        if (x % 9 === 4) for (var r2 = 0; r2 < 4; r2++) g.r(x - 3 + r2, 3 + sag2 + r2, 7 - r2 * 2, 1, [P.accent, P.accent2, '#ffd25a', P.paper][fl(x / 9) % 4]);
+      }
+      balloons(g, env, cx, 79, t);
+      for (i = 0; i < 10; i++) g.p(mod(hash(env.seed, i) * W + t * 0.3, W), mod(hash(i, env.seed) * H + t * 0.6, H), [P.accent, P.accent2, '#ffd25a'][i % 3]);
+    } else if (ev === 'wet') {
+      if (out) {
+        for (i = 0; i < 3; i++) {
+          var px = 20 + i * 64 + (env.seed % 20);
+          g.ell(px, 76, 9, 1, mix(env.skyLow, WHITE, 0.25));
+          g.ell(px, 76, 7, 1, mix(env.skyMid, WHITE, 0.1));
+          var rr = mod(t + i * 5, 12);
+          if (rr < 8) {
+            g.b(px - rr, 76, WHITE, 0.6);
+            g.b(px + rr, 76, WHITE, 0.6);
+          }
+        }
+        weather(g, env, 0, 0, W, H, t, env.weather === 'rain' ? 0 : 0.5);
+      } else {
+        inWins(g, function (wx, wy, ww, wh) {
+          for (var d = 0; d < fl(ww / 4); d++) {
+            var ddx = wx + fl(hash(env.seed + d, 41) * ww);
+            var ddy = wy + mod(hash(env.seed + d, 43) * wh + t * 0.4, wh + 6) - 3;
+            g.b(ddx, ddy - 1, WHITE, 0.25);
+            g.b(ddx, ddy, WHITE, 0.5);
+          }
+        });
+        floorThing(g, env, 'umbrella', cx, 79, t);
+        g.ell(cx + 7, 79, 7, 1, mix(env.skyLow, P.floor, 0.5));
+      }
+    } else if (ev === 'flies') {
+      var night = env.time === 'night' || env.time === 'dawn';
+      g.em = 1;
+      var draw = function (fx0, fy0, fw, fh, nn) {
+        for (var q = 0; q < nn; q++) {
+          var on = mod(t + q * 7, 14) < 9;
+          if (!on) continue;
+          var ffx = fx0 + mod(hash(env.seed, q + 70) * fw + Math.sin(t * 0.08 + q) * 6, fw);
+          var ffy = fy0 + mod(hash(q + 70, env.seed) * fh + Math.sin(t * 0.11 + q * 2) * 4, fh);
+          g.p(ffx, ffy, night ? '#e8ff8a' : '#c8e870');
+          if (night) halo(g, fl(ffx), fl(ffy), 0, 2, '#e8ff8a', 0.5);
+        }
+      };
+      if (out) draw(0, 30, W, 48, 14);
+      else {
+        inWins(g, function (wx, wy, ww, wh) {
+          draw(wx, wy + wh * 0.4, ww, wh * 0.6, 3);
+        });
+        // a glowing jar in the corner
+        g.r(cx + 3, 70, 8, 9, mix('#e8f4fa', P.wall, 0.3));
+        g.r(cx + 3, 69, 8, 1, P.metalD);
+        draw(cx + 4, 71, 6, 7, 3);
+      }
+      g.em = 0;
+    }
+  }
+
+  // 그림 전체 좌우 뒤집기. 빛의 자리도 같이 옮긴다
+  function mirror(g) {
+    var d = g.d;
+    var e = g.e;
+    for (var y = 0; y < H; y++) {
+      for (var x = 0; x < W >> 1; x++) {
+        var a = y * W + x;
+        var b = y * W + (W - 1 - x);
+        var t0 = e[a];
+        e[a] = e[b];
+        e[b] = t0;
+        var ja = a << 2;
+        var jb = b << 2;
+        for (var k = 0; k < 3; k++) {
+          var tt = d[ja + k];
+          d[ja + k] = d[jb + k];
+          d[jb + k] = tt;
+        }
+      }
+    }
+    for (var i = 0; i < g.lights.length; i++) g.lights[i].x = W - 1 - g.lights[i].x;
+  }
+
+  function postLayers(g, env, scene, t) {
+    seasonal(g, env, scene, t);
+    if (env.mirror) mirror(g);
+  }
+
+  // 장면과 맞지 않는 배경은 바꾼다. 바깥 장면에 바닷속은 바다로, 바다 장면의 수평선에는 물 배경을 겹치지 않는다
+  function fitBd(key, bd) {
+    if (!bd || BACKDROPS.indexOf(bd) < 0) return null;
+    if (key === 'sea' && (bd === 'sea' || bd === 'lake' || bd === 'under')) return null;
+    if (SC[key] && SC[key].outdoor && bd === 'under') return 'sea';
+    return bd;
+  }
+
+  // 우주 배경의 해·달 자리에 뜨는 행성
+  function planet(g, env, x, y, w, h) {
+    var X = xr(env, 103);
+    var cs = X.pick([['#e8a85a', '#b8703a'], ['#7ab0e8', '#3a6ab0'], ['#d87a9a', '#a04a6a'], ['#9ad87a', '#5a9a4a'], ['#e8d8a8', '#b8a070']]);
+    var ring = X.ch(0.5);
+    var cx = x + fl(env.sunX * w);
+    var cy = y + fl(h * 0.3);
+    var r = clamp(rnd(h * 0.13), 3, 8);
+    halo(g, cx, cy, r, 3, cs[0], 0.35);
+    for (var dy = -r; dy <= r; dy++) {
+      for (var dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r + r * 0.8) continue;
+        var sh = dx + dy > r * 0.6;
+        var band = mod(dy + r, 4) === 0;
+        g.p(cx + dx, cy + dy, sh ? cs[1] : (band ? mix(hx(cs[0]), WHITE, 0.25) : cs[0]));
+      }
+    }
+    if (ring) {
+      for (var k = -r - 4; k <= r + 4; k++) {
+        var ry = cy + rnd(k * 0.3);
+        if (Math.abs(k) > r - 1 || k > 0) g.p(cx + k, ry, '#f0e6c8');
+      }
+    }
+    if (h > 30) disc(g, cx + r + 8, cy - r, 1, '#d8d4e8');
+  }
+
   // ---------------------------------------------------------------- API
 
   function pick(arr, v, def) {
@@ -6809,6 +9104,11 @@
     };
     if (MASCOT_KEYS.indexOf(spec.mascot) >= 0) out.mascot = spec.mascot;
     if (PROPS.indexOf(spec.prop) >= 0) out.prop = spec.prop;
+    if (spec.mix) {
+      out.mix = true;
+      if (BACKDROPS.indexOf(spec.backdrop) >= 0) out.backdrop = spec.backdrop;
+      if (EVENTS.indexOf(spec.event) >= 0) out.event = spec.event;
+    }
     return out;
   }
 
@@ -6856,6 +9156,7 @@
     function draw() {
       g.clear();
       scene.draw(g, env, L, frame);
+      if (env.mix) postLayers(g, env, scene, frame);
       shade(g, env.amb, img.data);
       octx.putImageData(img, 0, 0);
       ctx.imageSmoothingEnabled = false;
@@ -6925,13 +9226,18 @@
     return handle;
   }
 
-  // 서버가 저장한 값(study.night.rain.mint.4821, 소품 주제가 있으면 끝에 .cat처럼 한 칸 더)을 spec으로 바꾼다. 값이 없으면 fallbackSeed(블로그 주소)로 정한다.
+  // 서버가 저장한 값(study.night.rain.mint.4821, 소품 주제가 있으면 끝에 .cat처럼 한 칸 더, 섞기 모드면 .sea~xmas처럼 또 한 칸)을 spec으로 바꾼다. 값이 없으면 fallbackSeed(블로그 주소)로 정한다.
   // mascot은 블로그 마스코트 값(cat.mint.beret.heart)이고 바탕이 동물이면 장면 안에 그린다
   function fromValue(value, fallbackSeed, mascot) {
     var spec;
     var p = typeof value === 'string' ? value.split('.') : [];
     if (SCENES.indexOf(p[0]) >= 0) {
-      spec = normalize({ scene: p[0], time: p[1], weather: p[2], palette: p[3], seed: Number(p[4]) || 0, prop: p[5] });
+      // 일곱째 칸(배경~계절)이 있으면 섞기 모드. 소품 주제가 없을 때 여섯째 칸은 '-'다
+      var lay = p.length > 6 ? String(p[6]).split('~') : null;
+      spec = normalize({
+        scene: p[0], time: p[1], weather: p[2], palette: p[3], seed: Number(p[4]) || 0, prop: p[5],
+        mix: !!lay, backdrop: lay && lay[0], event: lay && lay[1]
+      });
     } else {
       spec = normalize({ seed: String(fallbackSeed || '') });
       delete spec.mascot;
@@ -6950,6 +9256,8 @@
     PALETTES: PALETTES.slice(),
     MASCOTS: MASCOT_KEYS.slice(),
     PROPS: PROPS.slice(),
+    BACKDROPS: BACKDROPS.slice(),
+    EVENTS: EVENTS.slice(),
     label: function (kind, key) {
       var m = LABELS[kind];
       return (m && m[key]) || '';

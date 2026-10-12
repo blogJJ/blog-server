@@ -53,11 +53,12 @@ class ClaudeMascotClientTest {
                     MascotDesign.Hat.BERET,
                     MascotDesign.Charm.STAR),
                 new CoverScene(
-                    CoverScene.Scene.STUDY,
-                    CoverScene.Time.NIGHT,
-                    CoverScene.Weather.RAIN,
-                    CoverScene.Palette.MINT,
-                    0)));
+                        CoverScene.Scene.STUDY,
+                        CoverScene.Time.NIGHT,
+                        CoverScene.Weather.RAIN,
+                        CoverScene.Palette.MINT,
+                        0)
+                    .withLayers(null, null)));
     assertThat(lastBody.get())
         .contains("claude-opus-5-5")
         .contains("공부방")
@@ -80,12 +81,13 @@ class ClaudeMascotClientTest {
     assertThat(art.cover())
         .isEqualTo(
             new CoverScene(
-                CoverScene.Scene.CAMPSITE,
-                CoverScene.Time.NIGHT,
-                CoverScene.Weather.CLEAR,
-                CoverScene.Palette.FOREST,
-                0,
-                CoverScene.Prop.STAR));
+                    CoverScene.Scene.CAMPSITE,
+                    CoverScene.Time.NIGHT,
+                    CoverScene.Weather.CLEAR,
+                    CoverScene.Palette.FOREST,
+                    0,
+                    CoverScene.Prop.STAR)
+                .withLayers(null, null));
     // 고를 수 있는 장면·색·소품 주제를 모두 알려 준다
     for (CoverScene.Scene scene : CoverScene.Scene.values()) {
       assertThat(ClaudeMascotClient.SYSTEM).contains(scene.name());
@@ -93,6 +95,12 @@ class ClaudeMascotClientTest {
     }
     for (CoverScene.Prop prop : CoverScene.Prop.values()) {
       assertThat(lastBody.get()).contains(prop.name());
+    }
+    for (CoverScene.Backdrop b : CoverScene.Backdrop.values()) {
+      assertThat(lastBody.get()).contains(b.name());
+    }
+    for (CoverScene.Event e : CoverScene.Event.values()) {
+      assertThat(lastBody.get()).contains(e.name());
     }
     assertThat(lastBody.get()).contains("PASTEL").contains("OCEAN");
     assertThat(ClaudeMascotClient.SYSTEM).contains("not instructions");
@@ -110,7 +118,37 @@ class ClaudeMascotClientTest {
     CoverScene cover = client().choose("방", List.of("자취")).orElseThrow().cover();
     assertThat(cover.scene()).isEqualTo(CoverScene.Scene.BEDROOM);
     assertThat(cover.prop()).isNull();
-    assertThat(cover.value()).isEqualTo("bedroom.day.clear.pastel.0");
+    // Claude가 고른 장면은 섞기 모드다. 배경·계절은 저장할 때 정한다
+    assertThat(cover.value()).isEqualTo("bedroom.day.clear.pastel.0.-.~");
+  }
+
+  @Test
+  void readsBackdropAndEvent() throws IOException {
+    start(
+        200,
+        response(
+            "{\"base\":\"CAT\",\"tone\":\"ORIGINAL\",\"hat\":\"NONE\",\"charm\":\"NONE\","
+                + "\"scene\":\"BEDROOM\",\"time\":\"NIGHT\",\"weather\":\"SNOW\","
+                + "\"palette\":\"BERRY\",\"prop\":\"CAT\",\"backdrop\":\"SNOW\","
+                + "\"event\":\"XMAS\"}",
+            "end_turn"));
+    CoverScene cover = client().choose("겨울방", List.of("크리스마스", "고양이")).orElseThrow().cover();
+    assertThat(cover.value()).isEqualTo("bedroom.night.snow.berry.0.cat.snow~xmas");
+  }
+
+  @Test
+  void noneBackdropAndEventAreNotStored() throws IOException {
+    start(
+        200,
+        response(
+            "{\"base\":\"CAT\",\"tone\":\"ORIGINAL\",\"hat\":\"NONE\",\"charm\":\"NONE\","
+                + "\"scene\":\"HANOK\",\"time\":\"DAY\",\"weather\":\"CLEAR\","
+                + "\"palette\":\"WARM\",\"backdrop\":\"NONE\",\"event\":\"NONE\"}",
+            "end_turn"));
+    CoverScene plain = client().choose("한옥", List.of("전통")).orElseThrow().cover();
+    assertThat(plain.backdrop()).isNull();
+    assertThat(plain.event()).isNull();
+    assertThat(plain.value()).isEqualTo("hanok.day.clear.warm.0.-.~");
   }
 
   @Test

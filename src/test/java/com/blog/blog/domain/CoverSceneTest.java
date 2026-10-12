@@ -91,4 +91,81 @@ class CoverSceneTest {
     assertThat(CoverScene.parse("study.night.rain.mint.4821.robot").orElseThrow().prop()).isNull();
     assertThat(withProp.withSeed(5).prop()).isEqualTo(CoverScene.Prop.CAT);
   }
+
+  @Test
+  void layersAreAnOptionalSeventhPart() {
+    CoverScene base =
+        new CoverScene(
+            CoverScene.Scene.BEDROOM,
+            CoverScene.Time.NIGHT,
+            CoverScene.Weather.CLEAR,
+            CoverScene.Palette.DUSK,
+            4821);
+    CoverScene c = base.withLayers(CoverScene.Backdrop.SEA, CoverScene.Event.XMAS);
+    assertThat(c.value()).isEqualTo("bedroom.night.clear.dusk.4821.-.sea~xmas");
+    assertThat(CoverScene.parse(c.value())).contains(c);
+    assertThat(c.withSeed(7).value()).isEqualTo("bedroom.night.clear.dusk.7.-.sea~xmas");
+    // 한쪽만 있거나 둘 다 없어도 섞기 모드다
+    assertThat(base.withLayers(null, CoverScene.Event.BLOOM).value())
+        .isEqualTo("bedroom.night.clear.dusk.4821.-.~bloom");
+    assertThat(base.withLayers(CoverScene.Backdrop.DESERT, null).value())
+        .isEqualTo("bedroom.night.clear.dusk.4821.-.desert~");
+    CoverScene empty = CoverScene.parse("bedroom.night.clear.dusk.4821.-.~").orElseThrow();
+    assertThat(empty.mixed()).isTrue();
+    assertThat(empty.backdrop()).isNull();
+    assertThat(empty.prop()).isNull();
+    assertThat(empty.value()).isEqualTo("bedroom.night.clear.dusk.4821.-.~");
+    // 소품 주제와 같이 쓴다
+    CoverScene full =
+        CoverScene.parse("space-station.sunset.cloudy.forest.99999.travel.harbor~flies")
+            .orElseThrow();
+    assertThat(full.prop()).isEqualTo(CoverScene.Prop.TRAVEL);
+    assertThat(full.backdrop()).isEqualTo(CoverScene.Backdrop.HARBOR);
+    assertThat(full.event()).isEqualTo(CoverScene.Event.FLIES);
+    // 모르는 배경·계절은 없는 것으로, NONE은 저장하지 않는다
+    assertThat(CoverScene.parse("study.day.clear.warm.1.-.moon~party").orElseThrow().value())
+        .isEqualTo("study.day.clear.warm.1.-.~");
+    assertThat(base.withLayers(CoverScene.Backdrop.NONE, CoverScene.Event.NONE).value())
+        .isEqualTo("bedroom.night.clear.dusk.4821.-.~");
+    // 섞기 모드가 아니면 배경·계절을 넣어도 버린다(예전 값은 그대로)
+    assertThat(
+            new CoverScene(
+                    CoverScene.Scene.STUDY,
+                    CoverScene.Time.DAY,
+                    CoverScene.Weather.CLEAR,
+                    CoverScene.Palette.WARM,
+                    1,
+                    null,
+                    CoverScene.Backdrop.SEA,
+                    CoverScene.Event.XMAS,
+                    false)
+                .value())
+        .isEqualTo("study.day.clear.warm.1");
+  }
+
+  @Test
+  void longestMixedValueFitsTheColumn() {
+    // blogs.cover_scene VARCHAR(60). 모든 장면·배경·계절에 가장 긴 시간·날씨·색·번호·주제를 붙여도 60자 이하
+    int longest = 0;
+    for (CoverScene.Scene scene : CoverScene.Scene.values()) {
+      for (CoverScene.Backdrop b : CoverScene.Backdrop.values()) {
+        for (CoverScene.Event e : CoverScene.Event.values()) {
+          for (CoverScene.Prop prop : CoverScene.Prop.values()) {
+            CoverScene c =
+                new CoverScene(
+                        scene,
+                        CoverScene.Time.SUNSET,
+                        CoverScene.Weather.CLOUDY,
+                        CoverScene.Palette.FOREST,
+                        99_999,
+                        prop)
+                    .withLayers(b, e);
+            assertThat(CoverScene.parse(c.value())).contains(c);
+            longest = Math.max(longest, c.value().length());
+          }
+        }
+      }
+    }
+    assertThat(longest).isLessThanOrEqualTo(60);
+  }
 }

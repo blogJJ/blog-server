@@ -3,17 +3,22 @@ package com.blog.blog.service;
 import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogTag;
 import com.blog.blog.domain.CoverScene;
+import com.blog.blog.domain.CoverScene.Backdrop;
+import com.blog.blog.domain.CoverScene.Event;
+import com.blog.blog.domain.CoverScene.Scene;
 import com.blog.blog.domain.Mascot;
 import com.blog.blog.domain.MascotDesign;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogTagRepository;
 import jakarta.annotation.PreDestroy;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.random.RandomGenerator;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,7 +129,12 @@ public class MascotService {
     ClaudeMascotClient.Art art =
         claude.choose(info.name(), info.tags()).orElseGet(() -> fallback(info.name(), info.tags()));
     MascotDesign wanted = art.mascot();
-    CoverScene cover = withNewSeed(art.cover(), info.cover());
+    CoverScene cover =
+        withLayers(
+            withNewSeed(art.cover(), info.cover()),
+            info.name(),
+            info.tags(),
+            ThreadLocalRandom.current());
     // 한 번에 하나씩 만들기 때문에(worker, ShedLock) 읽고 저장하는 사이에 같은 조합이 끼어들지 않는다
     MascotDesign mascot =
         tx.execute(
@@ -181,48 +191,26 @@ public class MascotService {
   /** 바탕 그림과 어울리는 장면들. 첫째가 원래(D-119) 장면이고, 나머지는 D-129에서 더한 장면이다. */
   static List<CoverScene.Scene> scenesFor(Mascot base) {
     return switch (base) {
-      case COMPUTER -> List.of(CoverScene.Scene.DESK, CoverScene.Scene.WORKSHOP);
-      case CAMERA ->
-          List.of(CoverScene.Scene.PHOTO, CoverScene.Scene.MOUNTAIN, CoverScene.Scene.RIVERSIDE);
-      case BOOK -> List.of(CoverScene.Scene.STUDY, CoverScene.Scene.LIBRARY);
-      case OWL ->
-          List.of(CoverScene.Scene.STUDY, CoverScene.Scene.LIBRARY, CoverScene.Scene.OBSERVATORY);
-      case PLANE -> List.of(CoverScene.Scene.SEA, CoverScene.Scene.SKY, CoverScene.Scene.TRAIN);
-      case HEADPHONES -> List.of(CoverScene.Scene.STAGE, CoverScene.Scene.BEDROOM);
-      case FROG ->
-          List.of(CoverScene.Scene.STAGE, CoverScene.Scene.GREENHOUSE, CoverScene.Scene.RIVERSIDE);
-      case GAMEPAD -> List.of(CoverScene.Scene.GAME, CoverScene.Scene.BEDROOM);
-      case COFFEE -> List.of(CoverScene.Scene.CAFE, CoverScene.Scene.STREET_MARKET);
-      case CAKE -> List.of(CoverScene.Scene.BAKERY, CoverScene.Scene.KITCHEN);
-      case BEAR ->
-          List.of(
-              CoverScene.Scene.KITCHEN, CoverScene.Scene.CAMPSITE, CoverScene.Scene.STREET_MARKET);
-      case PENGUIN ->
-          List.of(CoverScene.Scene.SNOWFIELD, CoverScene.Scene.AQUARIUM, CoverScene.Scene.MOUNTAIN);
-      case BIRD ->
-          List.of(
-              CoverScene.Scene.SKY,
-              CoverScene.Scene.MOUNTAIN,
-              CoverScene.Scene.CAMPSITE,
-              CoverScene.Scene.TRAIN);
-      case DOG ->
-          List.of(CoverScene.Scene.PARK, CoverScene.Scene.RIVERSIDE, CoverScene.Scene.ROOFTOP);
-      case FOX ->
-          List.of(CoverScene.Scene.PARK, CoverScene.Scene.ATELIER, CoverScene.Scene.CAMPSITE);
+      case COMPUTER -> List.of(Scene.DESK, Scene.WORKSHOP, Scene.OFFICE);
+      case CAMERA -> List.of(Scene.PHOTO, Scene.MOUNTAIN, Scene.RIVERSIDE, Scene.HANOK);
+      case BOOK -> List.of(Scene.STUDY, Scene.LIBRARY, Scene.CLASSROOM);
+      case OWL -> List.of(Scene.STUDY, Scene.LIBRARY, Scene.OBSERVATORY, Scene.CLASSROOM);
+      case PLANE -> List.of(Scene.SEA, Scene.SKY, Scene.TRAIN, Scene.SPACE_STATION);
+      case HEADPHONES -> List.of(Scene.STAGE, Scene.BEDROOM, Scene.RECORD_SHOP, Scene.SUBWAY);
+      case FROG -> List.of(Scene.STAGE, Scene.GREENHOUSE, Scene.RIVERSIDE, Scene.FARM);
+      case GAMEPAD -> List.of(Scene.GAME, Scene.BEDROOM, Scene.CONVENIENCE);
+      case COFFEE -> List.of(Scene.CAFE, Scene.STREET_MARKET, Scene.OFFICE);
+      case CAKE -> List.of(Scene.BAKERY, Scene.KITCHEN);
+      case BEAR -> List.of(Scene.KITCHEN, Scene.CAMPSITE, Scene.STREET_MARKET, Scene.POJANGMACHA);
+      case PENGUIN -> List.of(Scene.SNOWFIELD, Scene.AQUARIUM, Scene.MOUNTAIN, Scene.SPACE_STATION);
+      case BIRD -> List.of(Scene.SKY, Scene.MOUNTAIN, Scene.CAMPSITE, Scene.TRAIN, Scene.BUS_STOP);
+      case DOG -> List.of(Scene.PARK, Scene.RIVERSIDE, Scene.ROOFTOP, Scene.GYM);
+      case FOX -> List.of(Scene.PARK, Scene.ATELIER, Scene.CAMPSITE, Scene.HANOK);
       case CAT ->
-          List.of(
-              CoverScene.Scene.GARDEN,
-              CoverScene.Scene.BEDROOM,
-              CoverScene.Scene.FLOWER_SHOP,
-              CoverScene.Scene.ROOFTOP);
-      case RABBIT ->
-          List.of(
-              CoverScene.Scene.GARDEN, CoverScene.Scene.FLOWER_SHOP, CoverScene.Scene.GREENHOUSE);
+          List.of(Scene.GARDEN, Scene.BEDROOM, Scene.FLOWER_SHOP, Scene.ROOFTOP, Scene.LAUNDROMAT);
+      case RABBIT -> List.of(Scene.GARDEN, Scene.FLOWER_SHOP, Scene.GREENHOUSE, Scene.FARM);
       case HAMSTER ->
-          List.of(
-              CoverScene.Scene.NIGHT_CITY,
-              CoverScene.Scene.STREET_MARKET,
-              CoverScene.Scene.WORKSHOP);
+          List.of(Scene.NIGHT_CITY, Scene.STREET_MARKET, Scene.WORKSHOP, Scene.CONVENIENCE);
     };
   }
 
@@ -239,6 +227,40 @@ public class MascotService {
       seed = ThreadLocalRandom.current().nextInt(CoverScene.SEEDS);
     } while (current != null && current.seed() == seed);
     return chosen.withSeed(seed);
+  }
+
+  // 태그에 없을 때 무작위로 고르는 계절. 크리스마스·핼러윈·생일은 1년 내내 남으므로 태그에 있을 때만 붙인다
+  private static final List<CoverScene.Event> SEASONS =
+      List.of(Event.BLOOM, Event.SUN, Event.FALL, Event.FROST, Event.WET, Event.FLIES);
+  private static final List<CoverScene.Backdrop> BACKDROPS =
+      Arrays.stream(Backdrop.values()).filter(b -> b != Backdrop.NONE).toList();
+
+  /**
+   * 섞기 모드로 바꾸고 배경과 계절·행사를 정한다 (D-129). Claude가 고른 값이 있으면 그대로, 없으면 태그 단어 사전, 그래도 없으면 배경은 10번 중 7번,
+   * 계절은 20번 중 9번쯤 무작위로 고른다. 나머지는 장면이 정한 풍경과 장식 없음이다. 벽·바닥 재질, 가구 색, 마스코트 자세, 좌우 뒤집기는 화면이 배치 번호로
+   * 정한다.
+   */
+  static CoverScene withLayers(
+      CoverScene chosen, String name, List<String> tags, RandomGenerator random) {
+    Backdrop backdrop =
+        chosen.backdrop() != null
+            ? chosen.backdrop()
+            : KeywordScenePicker.backdrop(name, tags)
+                .orElseGet(
+                    () ->
+                        random.nextInt(10) < 7
+                            ? BACKDROPS.get(random.nextInt(BACKDROPS.size()))
+                            : null);
+    Event event =
+        chosen.event() != null
+            ? chosen.event()
+            : KeywordScenePicker.event(name, tags)
+                .orElseGet(
+                    () ->
+                        random.nextInt(20) < 9
+                            ? SEASONS.get(random.nextInt(SEASONS.size()))
+                            : null);
+    return chosen.withLayers(backdrop, event);
   }
 
   /** 쓰고 있는 조합이면 같은 바탕 안에서 비어 있는 조합으로 바꾼다. 모두 차 있으면 원래 조합을 그대로 쓴다. */
