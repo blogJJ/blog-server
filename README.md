@@ -59,6 +59,12 @@ IntelliJ에서 `BlogServerApplication`을 바로 실행할 때는 Run Configurat
 - 구글·깃허브 소셜 로그인(T157)은 키를 넣어야 켜진다. 만드는 법과 넣을 secrets는 [docs/social-login.md](docs/social-login.md).
 - nginx 설정(설명서 5단계)은 이 저장소 밖에서 한다. nginx는 `X-Forwarded-Proto`를 넘겨야 한다(안 넘기면 https로 돌려보낸다).
 
+## 릴리즈 노트
+
+- 사이트의 `/release-notes.html`(API `GET /api/release-notes`, `/api/release-notes/{버전}`)은 `src/main/resources/release-notes.json`을 보여 준다. 저장소가 비공개라 서버가 GitHub Releases를 읽지 못해서 파일로 둔다.
+- 사용자에게 보일 변경이 있는 PR은 파일 맨 위에 새 버전을 더한다. MAJOR는 아주 큰 업데이트, MINOR는 기능 추가, PATCH는 버그 수정·작은 변경. 제목은 짧게, 바뀐 점은 사용자가 읽을 쉬운 말로 쓴다.
+- 배포가 성공하면 `.github/workflows/release.yml`이 맨 위 버전으로 태그와 GitHub 릴리즈를 만든다. 새 항목이 없으면(이미 태그가 있으면) 아무것도 하지 않는다.
+
 ## 자주 쓰는 명령
 
 | 명령 | 하는 일 |
@@ -76,7 +82,7 @@ src/main/java/com/blog/
 ├── auth/      회원·인증 (USR, SEC-01~05, 13)
 ├── blog/      블로그·멤버·폐쇄·블랙리스트 (BLG)
 ├── board/     공통 게시판: 글, 댓글, 태그, 이미지 (BRD-01~07, 11)
-├── main/      통합 검색, 메인 피드, 공지 (BRD-08~10)
+├── main/      통합 검색, 메인 피드, 공지 (BRD-08~10), 릴리즈 노트
 ├── social/    팔로우, 구독, 알림, 차단, 신고 (SOC)
 ├── admin/     메인 관리자 (ADM)
 ├── batch/     매일 04:00 배치

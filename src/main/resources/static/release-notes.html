@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>릴리즈 노트 - 블로그</title>
+    <link rel="stylesheet" href="/css/common.css" />
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js" defer></script>
+    <script src="/js/layout.js" defer></script>
+    <script src="/js/release-notes.js" defer></script>
+  </head>
+  <body>
+    <!-- 릴리즈 노트 목록 (T159, D-130). 한 줄에 버전 하나, 새 버전부터. 누르면 release-note.html?v=버전 -->
+    <main>
+      <div class="page-head">
+        <h1>릴리즈 노트</h1>
+      </div>
+      <p class="release-intro">버전마다 무엇이 바뀌었는지 적어 둬요.</p>
+      <ul class="release-list" id="releases"></ul>
+      <p class="empty" id="releases-empty" hidden>아직 릴리즈 노트가 없어요.</p>
+    </main>
+  </body>
+</html>

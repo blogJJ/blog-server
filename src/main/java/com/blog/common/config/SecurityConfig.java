@@ -154,6 +154,9 @@ public class SecurityConfig {
                     // 내 정보·알림은 읽기도 로그인 필요 (USR-07, SOC-04)
                     .requestMatchers("/api/me/**", "/api/notifications/**")
                     .authenticated()
+                    // 릴리즈 노트는 누구나 (T159, D-130). 아래 GET 규칙에도 들지만 공개 주소임을 따로 적어 둔다
+                    .requestMatchers(HttpMethod.GET, "/api/release-notes", "/api/release-notes/*")
+                    .permitAll()
                     // 그 밖의 읽기는 비회원도. 비공개·일부 공개 블로그는 서비스가 막는다 (BLG-01, T047)
                     .requestMatchers(HttpMethod.GET, "/api/**")
                     .permitAll()
