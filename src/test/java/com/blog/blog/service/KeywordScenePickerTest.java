@@ -81,7 +81,7 @@ class KeywordScenePickerTest {
     CoverScene chosen = base.withLayers(Backdrop.DESERT, Event.BOO);
     assertThat(MascotService.withLayers(chosen, "우리집", List.of("크리스마스"), random).value())
         .isEqualTo("bedroom.night.clear.mint.1.-.desert~boo");
-    // 태그에 없으면 무작위. 배경은 10번 중 7번쯤, 계절은 20번 중 9번쯤이고 행사 장식은 나오지 않는다
+    // 태그에 없으면 무작위. 배경은 늘 붙고(T158), 계절은 20번 중 9번쯤이고 행사 장식은 나오지 않는다
     Set<Backdrop> backdrops = EnumSet.noneOf(Backdrop.class);
     int withBackdrop = 0;
     int withEvent = 0;
@@ -97,9 +97,29 @@ class KeywordScenePickerTest {
         assertThat(c.event()).isNotIn(Event.XMAS, Event.BOO, Event.BDAY);
       }
     }
-    assertThat(withBackdrop).isBetween(1250, 1550);
+    assertThat(withBackdrop).isEqualTo(2000);
     assertThat(withEvent).isBetween(750, 1050);
     assertThat(backdrops).hasSize(Backdrop.values().length - 1);
+  }
+
+  @Test
+  void tagsPickNewBackdrops() {
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("화산"))).contains(Backdrop.LAVA);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("폭포"))).contains(Backdrop.FALLS);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("산토리니"))).contains(Backdrop.SANTO);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("풍차"))).contains(Backdrop.MILLS);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("라벤더"))).contains(Backdrop.LILAC);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("야자수"))).contains(Backdrop.PALMS);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("등대"))).contains(Backdrop.STORM);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("한옥마을"))).contains(Backdrop.ROOFS);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("한강 야경"))).contains(Backdrop.BRIDGE);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("밀밭"))).contains(Backdrop.WHEAT);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("빙하"))).contains(Backdrop.BERG);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("대나무"))).contains(Backdrop.BAMBOO);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("고성"))).contains(Backdrop.CASTLE);
+    // '서울 야경'은 예전처럼 야경 빌딩, '감성'의 '성'은 성이 아니다
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("서울 야경"))).contains(Backdrop.TOWERS);
+    assertThat(KeywordScenePicker.backdrop("기록", List.of("감성"))).isEmpty();
   }
 
   @Test

@@ -250,7 +250,20 @@
       jungle: '정글',
       tulip: '튤립 꽃밭',
       canyon: '협곡',
-      lake: '호수'
+      lake: '호수',
+      lava: '화산',
+      falls: '폭포',
+      santo: '하얀 마을',
+      mills: '풍력 언덕',
+      lilac: '라벤더 밭',
+      palms: '야자수 노을',
+      storm: '폭풍 등대',
+      roofs: '한옥 지붕',
+      bridge: '한강 야경',
+      wheat: '밀밭',
+      berg: '빙하',
+      bamboo: '대나무 숲',
+      castle: '언덕 위 성'
     },
     event: {
       bloom: '봄꽃',
@@ -416,6 +429,7 @@
     this.d[j + 2] = c[2];
     this.d[j + 3] = 255;
     this.e[i] = this.em;
+    if (this.cnt) this.cnt[i]++;
   };
   Gfx.prototype.get = function (x, y) {
     x = clamp(fl(x), 0, W - 1);
@@ -703,9 +717,10 @@
 
   function celestial(g, env, x, y, w, h) {
     if (env.bd === 'space') return planet(g, env, x, y, w, h);
-    if (env.bd === 'under') return;
+    if (env.bd === 'under' || env.bd === 'storm') return;
     if (env.weather === 'rain' || env.weather === 'snow') return;
-    var tm = env.time;
+    // 하늘을 바꾸는 배경은 그 하늘에 맞는 해·달을 띄운다
+    var tm = env.bd === 'bridge' ? 'night' : env.bd === 'palms' ? 'sunset' : env.time;
     var sx = x + fl(env.sunX * w);
     var r = clamp(rnd(h * 0.09), 2, 6);
     var sy;
@@ -809,6 +824,12 @@
     var xx;
     var yy;
     var i;
+    // 섞기 모드 배치에 따라 바깥 장면의 먼 풍경(가로 전체)을 더 높게·낮게 그린다. 아랫선은 그대로다
+    if (env.hz && x <= 1 && w >= W - 2) {
+      var nh = clamp(rnd(h * env.hz), 8, y + h - 2);
+      y = y + h - nh;
+      h = nh;
+    }
     if (kind === 'hills' || kind === 'trees') {
       var far = tone(env, mix(low, snow ? '#e8eef6' : '#9cc79a', 0.55));
       var near = tone(env, snow ? '#f4f7fb' : '#6aa862');
@@ -1024,6 +1045,8 @@
     var P = env.P;
     o = o || {};
     var shape = o.shape || 'rect';
+    // 섞기 모드 배치에 따라 네모 창은 아치로, 아치 창은 네모로 바꾼다
+    if (env.winAlt && shape !== 'round') shape = shape === 'arch' ? 'rect' : (h >= w / 2 + 8 ? 'arch' : shape);
     var fr = o.frame || P.frame;
     var frD = mix(fr, P.ink, 0.35);
     var cx = x + (w - 1) / 2;
@@ -1044,6 +1067,7 @@
       }
       return qy >= y + ins;
     }
+    if (g.keep) g.keep.push([x - 3, x + w + 3, 30]);
     // recess shadow on wall
     for (py = y + 1; py < y + h + 1; py++) {
       for (px = x + 1; px < x + w + 1; px++) {
@@ -1632,6 +1656,8 @@
   function mascot(g, env, x, yb, t, o) {
     var m = MASCOTS[env.spec.mascot];
     if (!m) return null;
+    // 배치를 정하려고 미리 그릴 때는 마스코트 자리를 적어 둔다. 이 자리는 자르지 않는다
+    if (g.keep) g.keep.push([x - 2, x + 20, 400]);
     o = o || {};
     var sleep = o.sleep != null ? o.sleep : env.time === 'night';
     var pose = env.pose;
@@ -1884,6 +1910,226 @@
     g.em = 0;
   }
 
+  // ---- screen contents (섞기 모드에서 모니터·TV 화면을 배치 번호로 고른다)
+
+  var SCREENS = ['code', 'platform', 'race', 'shooter', 'weather', 'movie', 'music', 'call', 'chart', 'nature', 'news', 'paint'];
+  var TV_SCREENS = ['platform', 'race', 'shooter', 'weather', 'movie', 'music', 'call', 'nature', 'news', 'paint'];
+
+  // 화면 하나를 kind 그림으로 채운다. 크기에 맞춰 그리므로 작은 사무실 모니터(20x12)에서 TV(38x26)까지 쓴다
+  function screenArt(g, env, kind, x, y, w, h, t) {
+    var P = env.P;
+    var em0 = g.em;
+    var i;
+    var k;
+    var xx;
+    var yy;
+    var u = Math.max(1, rnd(h / 13));
+    var sd = env.seed;
+    g.em = 1;
+    g.clip(x, y, w, h);
+    if (kind === 'code') {
+      g.noclip();
+      codeScreen(g, env, x, y, w, h, t);
+      g.em = 1;
+      g.clip(x, y, w, h);
+    } else if (kind === 'platform') {
+      g.r(x, y, w, h, '#7ec8f6');
+      var gy = y + h - Math.max(2, fl(h * 0.2));
+      g.r(x, gy, w, y + h - gy, '#b86a3a');
+      g.r(x, gy, w, 1, '#5fc05a');
+      var sc = fl(t);
+      for (xx = 0; xx < w; xx++) if (mod(xx + sc, 6) === 0) g.p(x + xx, gy + 2, '#8a4a2a');
+      g.r(x + mod(-t * 0.5, w + 10) - 5, y + 2, 3 * u, u, '#ffffff');
+      var pp = mod(30 - sc, w + 8) - 4;
+      g.r(x + pp, gy - 3 * u, 2 * u, 3 * u, '#4ab84a');
+      g.r(x + mod(18 - sc, w + 8) - 4, y + fl(h * 0.3), 2 * u, 2 * u, '#f6c03a');
+      var jp = mod(t, 14);
+      var jy = jp < 10 ? rnd(Math.sin((jp / 10) * PI) * h * 0.3) : 0;
+      g.r(x + fl(w * 0.3), gy - 3 * u - jy, 2 * u, u, '#e8483a');
+      g.r(x + fl(w * 0.3), gy - 2 * u - jy, 2 * u, u, '#ffd0a0');
+      g.r(x + fl(w * 0.3), gy - u - jy, 2 * u, u, '#3a5ad0');
+    } else if (kind === 'race') {
+      var hzr = y + fl(h * 0.38);
+      g.r(x, y, w, hzr - y, '#8ad0ff');
+      for (xx = 0; xx < w; xx++) g.r(x + xx, hzr - 1 - fl(Math.abs(Math.sin((xx + sd) * 0.15)) * h * 0.12), 1, 2, '#6a8ab8');
+      for (yy = hzr; yy < y + h; yy++) {
+        var f = (yy - hzr + 1) / (y + h - hzr);
+        var half = fl(w * (0.06 + f * 0.46));
+        var cxr = x + fl(w / 2) + rnd(Math.sin(t * 0.08) * f * w * 0.12);
+        var stripe = mod(fl(f * 12 - t * 0.8), 2) === 0;
+        g.r(x, yy, w, 1, stripe ? '#5ab84a' : '#4aa83a');
+        g.r(cxr - half, yy, half * 2, 1, '#5a5e6a');
+        g.p(cxr - half, yy, stripe ? '#e8483a' : '#ffffff');
+        g.p(cxr + half - 1, yy, stripe ? '#e8483a' : '#ffffff');
+        if (stripe && f > 0.1) g.p(cxr, yy, '#f4f4f4');
+      }
+      var cw = Math.max(4, fl(w * 0.22));
+      var ch = Math.max(2, fl(h * 0.18));
+      var cx0 = x + fl((w - cw) / 2);
+      g.r(cx0, y + h - ch - 1, cw, ch, '#e8483a');
+      g.r(cx0 + 1, y + h - ch - 2, cw - 2, 1, '#ff8a6a');
+      g.r(cx0, y + h - 1, 2, 1, '#202020');
+      g.r(cx0 + cw - 2, y + h - 1, 2, 1, '#202020');
+    } else if (kind === 'shooter') {
+      g.r(x, y, w, h, '#0a0a1e');
+      for (i = 0; i < fl((w * h) / 30); i++) g.p(x + fl(hash(sd + 5, i) * w), y + mod(hash(i, sd) * h + t * (1 + (i % 3)), h), i % 4 ? '#5a5a8a' : '#ffffff');
+      var aw = Math.max(2, fl(w / 10));
+      var sway = rnd(Math.sin(t * 0.15) * aw);
+      var acol = ['#ff5ac8', '#5ae8ff', '#ffe85a'];
+      for (var ar = 0; ar < 3; ar++) {
+        for (k = 0; k < 5; k++) {
+          var axp = x + fl(w * 0.15) + k * (aw + 1) + sway;
+          var ayp = y + 2 + ar * (u + 2);
+          if (hash(k + ar * 5, fl(t / 60)) < 0.15) continue;
+          g.r(axp, ayp, aw, u, acol[ar]);
+          if (mod(t, 4) < 2) g.p(axp, ayp + u, acol[ar]);
+          else g.p(axp + aw - 1, ayp + u, acol[ar]);
+        }
+      }
+      var shx = x + fl(w / 2) + rnd(Math.sin(t * 0.21) * w * 0.3);
+      g.r(shx - u, y + h - 2 * u - 1, 3 * u, u + 1, '#5aff7a');
+      g.p(shx, y + h - 2 * u - 2, '#5aff7a');
+      var ly = y + h - 4 - mod(t * 2, h);
+      g.r(shx, ly, 1, 2, '#ffffff');
+    } else if (kind === 'weather') {
+      g.r(x, y, w, h, '#3a78c8');
+      var lx0 = x + fl(w * 0.38);
+      for (yy = 0; yy < h; yy++) {
+        var lw = fl(w * (0.18 + Math.sin((yy / h) * PI) * 0.12));
+        var lxs = lx0 + fl(Math.sin(yy * 0.4) * 1.5) + fl(yy * 0.15);
+        g.r(lxs, y + yy, lw, 1, yy % 5 === 0 ? '#7ac86a' : '#6ab85a');
+      }
+      g.r(x + fl(w * 0.75), y + fl(h * 0.6), Math.max(2, fl(w * 0.06)), Math.max(2, fl(h * 0.1)), '#6ab85a');
+      disc(g, x + fl(w * 0.2), y + fl(h * 0.3), Math.max(1, fl(h * 0.1)), '#ffd84a');
+      var cl = x + fl(w * 0.62) + rnd(Math.sin(t * 0.05) * 2);
+      g.r(cl, y + fl(h * 0.25), Math.max(4, fl(w * 0.16)), Math.max(2, fl(h * 0.1)), '#ffffff');
+      g.r(cl + 1, y + fl(h * 0.25) - 1, Math.max(2, fl(w * 0.08)), 1, '#ffffff');
+      if (mod(t, 10) < 6) for (k = 0; k < 3; k++) g.p(cl + 1 + k * 2, y + fl(h * 0.25) + Math.max(2, fl(h * 0.1)) + 1 + (k % 2), '#9ad0ff');
+      for (k = 0; k < w; k += 3) g.p(x + k, y + fl(h * 0.55) + rnd(Math.sin(k * 0.3) * 2), '#e8483a');
+      g.r(x, y + h - Math.max(2, u + 1), w, Math.max(2, u + 1), '#1a3a6a');
+      for (k = 0; k < 4; k++) g.r(x + 2 + k * fl(w / 4), y + h - u, Math.max(1, fl(w / 8)), 1, k % 2 ? '#ffb03a' : '#ffffff');
+    } else if (kind === 'movie') {
+      for (yy = 0; yy < h; yy++) g.r(x, y + yy, w, 1, mix(hx('#ff9a5a'), hx('#5a3a8a'), 1 - yy / h));
+      disc(g, x + fl(w * 0.66), y + fl(h * 0.5), Math.max(2, fl(h * 0.2)), '#ffe8a8');
+      for (xx = 0; xx < w; xx++) {
+        var ht = y + h - fl(h * (0.22 + Math.sin(xx * 0.09 + 1) * 0.08));
+        g.r(x + xx, ht, 1, y + h - ht, '#2a1a3a');
+      }
+      var fx = x + fl(w * 0.3);
+      var fy = y + h - fl(h * 0.3);
+      g.r(fx, fy - 3 * u, u + 1, 3 * u, '#2a1a3a');
+      g.r(fx, fy - 4 * u, u + 1, u, '#2a1a3a');
+      g.r(fx + u + 2, fy - 3 * u + 1, u + 1, 3 * u - 1, '#2a1a3a');
+      g.r(fx + u + 2, fy - 4 * u + 1, u + 1, u, '#2a1a3a');
+      var bar = Math.max(1, fl(h * 0.12));
+      g.r(x, y, w, bar, '#000000');
+      g.r(x, y + h - bar, w, bar, '#000000');
+      if (mod(t, 40) < 28) g.r(x + fl(w * 0.25), y + h - bar - u - 1, fl(w * 0.5), u, '#ffffff');
+    } else if (kind === 'music') {
+      g.r(x, y, w, h, '#2a1a3e');
+      var as = Math.max(4, h - 2 * u - 4);
+      for (yy = 0; yy < as; yy++) g.r(x + 2, y + 2 + yy, as, 1, mix(hx('#ff6ab0'), hx('#ffb03a'), yy / as));
+      disc(g, x + 2 + fl(as / 2), y + 2 + fl(as / 2), Math.max(1, fl(as / 5)), '#2a1a3e');
+      var bx0 = x + as + 4;
+      for (xx = bx0; xx < x + w - 1; xx += 2) {
+        var bh = Math.max(1, fl((0.3 + 0.7 * Math.abs(Math.sin(xx * 0.7 + t * 0.6) * Math.sin(xx * 0.23 - t * 0.31))) * as));
+        g.r(xx, y + 2 + as - bh, 1, bh, xx % 4 ? '#5ae8c8' : '#a87aff');
+      }
+      g.r(x + 2, y + h - u - 1, w - 4, 1, '#5a4a6e');
+      g.r(x + 2, y + h - u - 1, fl((w - 4) * mod(t, 120) / 120), 1, '#ffffff');
+    } else if (kind === 'call') {
+      var tw = fl(w / 2);
+      var th = fl((h - u - 1) / 2);
+      var bgs = ['#d8c0a8', '#a8c8e0', '#c8e0b0', '#e8c0d0'];
+      var skins = ['#f8d0a8', '#e0a878', '#c88858', '#f8e0c8'];
+      var shirts = [P.accent, '#3a5ad0', '#5ab84a', P.accent2];
+      for (k = 0; k < 4; k++) {
+        var tx = x + (k % 2) * tw;
+        var ty = y + fl(k / 2) * th;
+        g.r(tx, ty, tw, th, bgs[(k + sd) % 4]);
+        var hr = Math.max(1, fl(th * 0.22));
+        var talk = k === fl(t / 20) % 4;
+        disc(g, tx + fl(tw / 2), ty + fl(th * 0.42), hr, skins[(k + sd) % 4]);
+        g.r(tx + fl(tw / 2) - hr - 1, ty + th - Math.max(1, fl(th * 0.25)), hr * 2 + 3, Math.max(1, fl(th * 0.25)), shirts[k]);
+        if (talk) {
+          g.r(tx, ty, tw, 1, '#5aff7a');
+          g.r(tx, ty + th - 1, tw, 1, '#5aff7a');
+        }
+      }
+      g.r(x, y + h - u - 1, w, u + 1, '#20242e');
+      g.r(x + fl(w / 2) - u, y + h - u - 1, 2 * u + 1, u, '#e8483a');
+    } else if (kind === 'chart') {
+      g.r(x, y, w, h, '#f8faf8');
+      g.r(x, y, w, Math.max(1, u), '#2a8a4a');
+      for (xx = x + 5; xx < x + w; xx += 6) g.r(xx, y + u, 1, h - u, '#dce4dc');
+      for (yy = y + u + 2; yy < y + h; yy += 3) g.r(x, yy, w, 1, '#e4ece4');
+      var nb = Math.max(3, fl((w - 4) / 4));
+      var py0 = 0;
+      for (k = 0; k < nb; k++) {
+        var bv = fl((0.25 + hash(k, sd) * 0.6) * (h - u - 3));
+        g.r(x + 2 + k * 4, y + h - 1 - bv, 2, bv, k % 2 ? '#5aa8e8' : '#2a8a4a');
+        var py = y + h - 3 - fl((0.3 + 0.5 * (k / nb) + Math.sin(k + t * 0.05) * 0.1) * (h - u - 4));
+        if (k) g.line(x + 3 + (k - 1) * 4, py0, x + 3 + k * 4, py, '#e8483a');
+        py0 = py;
+      }
+    } else if (kind === 'nature') {
+      for (yy = 0; yy < h; yy++) g.r(x, y + yy, w, 1, yy < h * 0.55 ? mix(hx('#ffe0a0'), hx('#f8b860'), yy / h) : (yy % 3 ? '#d8a84a' : '#c8983a'));
+      disc(g, x + fl(w * 0.75), y + fl(h * 0.3), Math.max(1, fl(h * 0.12)), '#fff4d0');
+      var ax = x + fl(w * 0.22);
+      var ay = y + fl(h * 0.55);
+      g.r(ax, ay - fl(h * 0.25), 1, fl(h * 0.25), '#4a3020');
+      g.r(ax - fl(w * 0.12), ay - fl(h * 0.3), fl(w * 0.24) + 1, Math.max(1, u), '#3a5a20');
+      g.r(ax - fl(w * 0.08), ay - fl(h * 0.3) - 1, fl(w * 0.16) + 1, 1, '#3a5a20');
+      var ex = x + mod(w * 0.7 - t * 0.2, w + 12) - 6;
+      var es = Math.max(3, fl(h * 0.22));
+      g.r(ex, ay - es + 2, es + 2, es - 1, '#8a8a92');
+      g.r(ex - 2, ay - es + 2, 3, 3, '#8a8a92');
+      g.r(ex - 2, ay - es + 5, 1, es - 3, '#8a8a92');
+      g.r(ex + 1, ay, 1, 2, '#6a6a72');
+      g.r(ex + es, ay, 1, 2, '#6a6a72');
+      g.r(x + w - 5, y + 1, 4, 2, '#ffffff');
+    } else if (kind === 'news') {
+      g.r(x, y, w, h, '#1a3a7a');
+      for (k = 0; k < w; k += 4) g.r(x + k, y, 2, h, '#20448a');
+      var nx = x + fl(w * 0.3);
+      var hr2 = Math.max(1, fl(h * 0.13));
+      disc(g, nx, y + fl(h * 0.38), hr2, '#f0c8a0');
+      g.r(nx - hr2, y + fl(h * 0.38) - hr2, hr2 * 2 + 1, Math.max(1, fl(hr2 / 2)), '#3a2a20');
+      g.r(nx - hr2 - 2, y + fl(h * 0.38) + hr2 + 1, hr2 * 2 + 5, fl(h * 0.2), '#2a2a3a');
+      g.r(x + fl(w * 0.58), y + 2, fl(w * 0.36), fl(h * 0.4), '#8ab0d8');
+      g.r(x + fl(w * 0.58) + 1, y + 2 + fl(h * 0.25), fl(w * 0.36) - 2, Math.max(1, fl(h * 0.15)) - 1, '#5a8a5a');
+      var lb = y + h - 2 * u - 2;
+      g.r(x, lb, w, u + 1, '#e8483a');
+      g.r(x, lb + u + 1, w, u + 1, '#f8f8f8');
+      for (k = 0; k < 6; k++) g.r(x + mod(k * 9 - t, w + 9) - 4, lb + u + 1 + fl(u / 2), 5, 1, '#3a3a4a');
+      g.r(x + 1, lb, Math.max(3, fl(w * 0.18)), u + 1, '#ffffff');
+    } else {
+      g.r(x, y, w, h, '#d8dce4');
+      var tb = Math.max(3, fl(w * 0.14));
+      g.r(x, y, tb, h, '#4a4e5a');
+      var pc = ['#e8483a', '#ffb03a', '#ffe85a', '#5ab84a', '#3a8ae8', '#a87aff'];
+      for (k = 0; k < 6; k++) g.r(x + 1, y + 1 + k * Math.max(2, fl((h - 2) / 6)), tb - 2, Math.max(1, fl((h - 2) / 6) - 1), pc[k]);
+      var cvx = x + tb + 2;
+      var cvw = w - tb - 4;
+      g.r(cvx, y + 2, cvw, h - 4, '#ffffff');
+      var ccx = cvx + fl(cvw / 2);
+      var ccy = y + fl(h / 2);
+      var rr = Math.max(2, fl(Math.min(cvw, h) * 0.22));
+      var done = mod(t, 80);
+      for (k = 0; k < Math.min(done, 40); k++) {
+        var a = (k / 40) * 2 * PI;
+        g.p(ccx + rnd(Math.cos(a) * rr), ccy + rnd(Math.sin(a) * rr * 0.9), pc[fl(k / 7) % 6]);
+      }
+      for (k = 0; k < 5; k++) disc(g, ccx + rnd(Math.cos(k * 1.26) * (rr + 2)), ccy + rnd(Math.sin(k * 1.26) * (rr + 1)), 1, '#ff8ac0');
+      g.p(ccx - 1, ccy - 1, '#2a2a3a');
+      g.p(ccx + 1, ccy - 1, '#2a2a3a');
+      g.r(ccx - 1, ccy + 1, 3, 1, '#2a2a3a');
+      g.r(cvx + mod(t, cvw), y + h - 4 - (mod(t, 20) < 10 ? 1 : 0), 1, 2, '#2a2a3a');
+    }
+    g.noclip();
+    g.em = em0;
+  }
+
   SC.desk = {
     still: 40,
     setup: function (env, R) {
@@ -1928,7 +2174,8 @@
       g.r(mx, my, 1, 37, '#45485c');
       g.r(mx + 61, my, 1, 37, '#1c1d28');
       g.r(mx + 28, my + 34, 6, 1, '#45485c');
-      codeScreen(g, env, mx + 3, my + 3, 56, 30, t);
+      if (env.scr) screenArt(g, env, env.scr[0], mx + 3, my + 3, 56, 30, t);
+      else codeScreen(g, env, mx + 3, my + 3, 56, 30, t);
       g.r(mx + 27, my + 37, 8, 4, '#3a3c4c');
       g.r(mx + 21, my + 41, 20, 2, '#4a4c5e');
       g.r(mx + 21, my + 41, 20, 1, '#5e6174');
@@ -2744,7 +2991,9 @@
       var sy = 19;
       var sw = 38;
       var sh = 26;
+      if (env.tv) screenArt(g, env, env.tv, sx, sy, sw, sh, t);
       g.em = 1;
+      if (!env.tv) {
       g.r(sx, sy, sw, sh, '#7ec8f6');
       g.r(sx, sy + sh - 5, sw, 5, '#b86a3a');
       g.r(sx, sy + sh - 5, sw, 1, '#5fc05a');
@@ -2770,6 +3019,7 @@
       g.r(hx0, hy0 + 4, 4, 2, '#3a5ad0');
       if (jp > 2 && jp < 8) {
         g.p(sx + 14, sy + 8 - (jp - 3), '#ffe27a');
+      }
       }
       for (var yy = sy; yy < sy + sh; yy += 2) g.br(sx, yy, sw, 1, '#000000', 0.12);
       g.em = 0;
@@ -5303,6 +5553,7 @@
   }
 
   SC.aquarium = {
+    rollOnly: true,
     still: 6,
     setup: function (env, R) {
       var fish = [];
@@ -7603,7 +7854,8 @@
         g.r(dx + 12, 40, 22, 14, P.ink);
         g.em = 1;
         var sk = L.screens[s];
-        if (sk === 'code') codeScreen(g, env, dx + 13, 41, 20, 12, t);
+        if (env.scr) screenArt(g, env, env.scr[s], dx + 13, 41, 20, 12, t);
+        else if (sk === 'code') codeScreen(g, env, dx + 13, 41, 20, 12, t);
         else {
           g.r(dx + 13, 41, 20, 12, sk === 'video' ? '#203050' : '#eef4fa');
           if (sk === 'chart') {
@@ -7851,6 +8103,7 @@
   };
 
   SC.hanok = {
+    rollOnly: true,
     still: 5,
     outdoor: true,
     setup: function (env, R) {
@@ -8388,7 +8641,10 @@
   var SKY_OVERRIDE = {
     space: { sky: ['#07061a', '#0d0b2a', '#16123d', '#211a52', '#2c2266'], stars: 1 },
     aurora: { sky: ['#050f24', '#0a1a36', '#0f2a46', '#153a54', '#1c4a60'], stars: 0.9 },
-    under: { sky: ['#0a2a5a', '#0f3f78', '#16578f', '#1f70a6', '#2a8abd'], stars: 0 }
+    under: { sky: ['#0a2a5a', '#0f3f78', '#16578f', '#1f70a6', '#2a8abd'], stars: 0 },
+    palms: { sky: ['#3a2a6a', '#7a3a7a', '#d0607a', '#f89a6a', '#ffcf8a'], stars: 0.15 },
+    storm: { sky: ['#1a1e28', '#262c38', '#343c4a', '#424c5c', '#52606e'], stars: 0 },
+    bridge: { sky: ['#080c26', '#10163a', '#1a224c', '#26305e', '#343e70'], stars: 0.6 }
   };
 
   var WOODS = {
@@ -8418,13 +8674,22 @@
       P.woodDD = mix(P.woodD, P.ink, 0.35);
       P.frame = P.woodL;
     }
+    // 큰 배치(D-129 확장): 0은 장면 그대로, 1은 한 번 잘라 앞뒤 바꾸기, 2·3은 세 띠로 잘라 순서 바꾸기.
+    // 1·3은 창 모양도 바꾸고, 1은 바깥 먼 풍경을 높게, 2는 낮게 그린다
+    var Y = xr(env, 109);
+    env.layout = Y.pick([0, 1, 2, 3]);
+    env.winAlt = env.layout === 1 || env.layout === 3;
+    env.hz = [0, 1.7, 0.6, 0][env.layout];
+    var S = xr(env, 111);
+    env.scr = [S.pick(SCREENS), S.pick(SCREENS)];
+    env.tv = S.pick(TV_SCREENS);
     var so = SKY_OVERRIDE[env.bd];
     if (so) {
       env.sky = so.sky.map(hx);
       env.skyLow = env.sky[env.sky.length - 1];
       env.skyMid = env.sky[2];
       env.starK = so.stars;
-      if (env.bd !== 'under') {
+      if (env.bd !== 'under' && env.bd !== 'palms') {
         env.cloudL = mix(env.cloudL, env.sky[1], 0.6);
         env.cloudD = mix(env.cloudD, env.sky[0], 0.6);
       }
@@ -8771,6 +9036,414 @@
         for (yy = fl(top2); yy < y + h; yy++) g.p(gx5, yy, rc[fl((yy - y) / 3) % 4]);
       }
       band(0.88, 0.02, 0.1, 5, tone(env, '#d8a070'));
+    } else if (kind === 'lava') {
+      // 화산: 가운데 원뿔 산, 분화구에서 흘러내리는 용암과 피어오르는 연기
+      band(0.6, 0.05, 0.05, sd % 50, tone(env, mix(low, '#8a7a8a', 0.5)));
+      var vx = x + fl(w * (0.4 + (sd % 25) / 100));
+      var vt = y + fl(h * 0.24);
+      var vb = y + h;
+      var cr = Math.max(2, fl(w * 0.04));
+      var slope = clamp(w / h, 1.2, 2.2);
+      for (yy = vt; yy < vb; yy++) {
+        var hw = cr + fl((yy - vt) * slope);
+        for (xx = -hw; xx <= hw; xx++) {
+          var rs = xx > hw * 0.3;
+          g.p(vx + xx, yy, tone(env, rs ? '#4a3a42' : (bay(vx + xx, yy) < 0.12 ? '#7a6066' : '#5e4a52')));
+        }
+      }
+      var em0 = g.em;
+      g.em = 1;
+      for (k = 0; k < 3; k++) {
+        var lx0 = vx + (k - 1) * cr;
+        var len2 = fl((vb - vt) * (0.45 + hash(sd, k) * 0.4));
+        for (i = 0; i < len2; i++) {
+          var lxx = lx0 + rnd((k - 1) * i * slope * 0.55 + Math.sin(i * 0.5 + k * 2) * 1.2);
+          var hot = mod(i - t * 0.5 + k * 5, 9) < 3;
+          g.p(lxx, vt + i, hot ? '#ffd04a' : '#ff6a2a');
+          if (i > len2 * 0.3) g.p(lxx + 1, vt + i, '#e8481a');
+        }
+      }
+      g.r(vx - cr, vt, cr * 2 + 1, 1, mod(t, 6) < 3 ? '#ffe08a' : '#ff9a3a');
+      g.em = em0;
+      halo(g, vx, vt, cr, 4, '#ff8a3a', 0.6);
+      for (i = 0; i < 5; i++) {
+        var sp2 = mod(t * 0.25 + i * 9, 45);
+        var smx = vx + rnd(Math.sin(sp2 * 0.15 + i) * 2 + sp2 * 0.35);
+        var smy = vt - 2 - fl(sp2 * h / 90);
+        var smr = 1 + fl(sp2 / 12);
+        if (smy - smr > y) g.ell(smx, smy, smr + 1, smr, mix(tone(env, '#8a8088'), low, sp2 / 60));
+      }
+      band(0.92, 0.03, 0.09, 7, tone(env, '#3a3034'));
+    } else if (kind === 'falls') {
+      // 폭포: 양쪽 절벽 사이로 떨어지는 물줄기와 물안개
+      var fw = Math.max(5, fl(w * 0.14));
+      var fx0 = x + fl(w * (0.36 + (sd % 20) / 100));
+      var ftop = y + fl(h * 0.24);
+      var fbot = y + fl(h * 0.76);
+      for (xx = 0; xx < w; xx++) {
+        var gx6 = x + xx;
+        if (gx6 >= fx0 && gx6 < fx0 + fw) continue;
+        var dist = gx6 < fx0 ? fx0 - gx6 : gx6 - fx0 - fw + 1;
+        var ctop = ftop - fl(Math.min(dist, h) * 0.22) + fl(Math.sin(gx6 * 0.4) * 1.2);
+        for (yy = Math.max(y, ctop); yy < y + h; yy++) {
+          var strata = mod(yy + fl(gx6 / 9), 5) === 0;
+          var rc2 = yy - ctop < 2 ? (yy - ctop < 1 ? '#6ab84a' : '#4a8a3a') : (strata ? '#5e5048' : (gx6 < fx0 ? '#857262' : '#76665a'));
+          g.p(gx6, yy, tone(env, rc2));
+        }
+        if (mod(gx6 * 7 + sd, 11) === 0 && dist > 3) bushTree(gx6, ctop + 1, 2, tone(env, '#3a7a3a'), tone(env, '#5aa04a'));
+      }
+      for (yy = ftop; yy < fbot; yy++) {
+        for (xx = 0; xx < fw; xx++) {
+          var wv = mod(xx * 3 + yy - fl(t * 2), 7);
+          g.p(fx0 + xx, yy, tone(env, wv < 2 ? '#f4fbff' : (xx === 0 || xx === fw - 1 ? '#5aa8d8' : '#8ad0f0')));
+        }
+      }
+      var pw = fw + 10;
+      for (yy = fbot; yy < y + h; yy++) {
+        var pw2 = pw + (yy - fbot) * 2;
+        for (xx = 0; xx < pw2; xx++) {
+          var px3 = fx0 + fl(fw / 2) - fl(pw2 / 2) + xx;
+          g.p(px3, yy, tone(env, mod(px3 + yy * 3 + fl(t * 0.5), 9) === 0 ? '#d8f0fc' : '#4a98c8'));
+        }
+      }
+      for (i = 0; i < 6; i++) {
+        var mx2 = fx0 + fl(fw / 2) + rnd(Math.sin(t * 0.2 + i * 1.3) * (fw * 0.8 + 3));
+        g.ell(mx2, fbot + rnd(Math.cos(t * 0.15 + i) * 1.5), 2, 1, mix(tone(env, '#ffffff'), low, 0.15));
+      }
+    } else if (kind === 'santo') {
+      // 그리스 하얀 마을: 비탈에 층층이 하얀 집과 파란 지붕, 앞은 짙푸른 바다
+      waterFrom(0.72, mix(env.skyMid, '#123a8a', 0.6), hx('#2a6ac8'));
+      var slopeTop = function (gx) {
+        var f = clamp(((gx - x) / w - 0.18) / 0.82, 0, 1);
+        return y + h * (0.8 - 0.55 * Math.sqrt(f));
+      };
+      for (xx = 0; xx < w; xx++) {
+        var st2 = fl(slopeTop(x + xx));
+        if (st2 >= y + h * 0.78) continue;
+        for (yy = st2; yy < y + h; yy++) g.p(x + xx, yy, tone(env, bay(x + xx, yy) < 0.2 ? '#a8846a' : '#c09a7a'));
+      }
+      var hw2 = Math.max(4, fl(h * 0.13));
+      for (var row = 0; row < 6; row++) {
+        for (xx = fl(w * 0.2) + (row % 2) * 3; xx < w; xx += hw2 + 1) {
+          var hxp = x + xx + fl(hash(sd + row, xx) * 2);
+          var hy2 = fl(slopeTop(hxp + hw2 / 2)) + row * hw2 + 1;
+          if (hy2 + hw2 > y + h * 0.98 || hash(sd + 3, xx * 5 + row) < 0.1) continue;
+          var hh2 = hw2 - 1 + fl(hash(row, xx + sd) * 2);
+          g.r(hxp, hy2, hw2, hh2, tone(env, '#f8f6f0'));
+          g.r(hxp + hw2 - 1, hy2, 1, hh2, tone(env, '#d4d8e6'));
+          g.p(hxp + 1 + (xx % 2), hy2 + hh2 - 2, tone(env, '#2a4aa0'));
+          if (hh2 > 3) g.p(hxp + hw2 - 2, hy2 + 1, tone(env, '#2a4aa0'));
+          if (hash(sd + 7, xx + row * 31) < 0.3) {
+            var dr = Math.max(1, fl(hw2 / 2) - 1);
+            for (k = 0; k <= dr; k++) {
+              var dw = fl(Math.sqrt(dr * dr - k * k) + 0.5);
+              g.r(hxp + fl(hw2 / 2) - dw, hy2 - 1 - k, dw * 2 + (hw2 % 2), 1, tone(env, '#2a5ad0'));
+            }
+            g.p(hxp + fl(hw2 / 2), hy2 - 2 - dr, tone(env, '#f8f6f0'));
+          }
+        }
+      }
+    } else if (kind === 'mills') {
+      // 풍력 발전기 언덕: 초록 언덕 위로 하얀 날개가 돈다
+      band(0.55, 0.06, 0.04, sd % 40, tone(env, mix(low, '#8ab87a', 0.5)));
+      band(0.7, 0.05, 0.05, 17, tone(env, snow ? '#eef3fa' : '#7ac060'), tone(env, snow ? '#d8e2ee' : '#68aa52'));
+      band(0.86, 0.03, 0.07, 31, tone(env, snow ? '#f6f9fc' : '#c8c060'), tone(env, snow ? '#e0e8f2' : '#b0aa50'));
+      var nm = Math.max(2, fl(w / 40));
+      for (i = 0; i < nm; i++) {
+        var mxp = x + fl(((i + 0.5) / nm) * w + (hash(sd + 11, i) - 0.5) * (w / nm) * 0.5);
+        var mbase = y + fl(h * (0.62 + hash(sd + 12, i) * 0.16));
+        var mh = fl(h * (0.32 + hash(sd + 13, i) * 0.18));
+        var mtop = mbase - mh;
+        var white = tone(env, '#f4f6f8');
+        var grey = tone(env, '#c8ccd4');
+        g.r(mxp, mtop, 1, mh, white);
+        if (mh > 14) g.r(mxp + 1, mtop + 3, 1, mh - 3, grey);
+        var bl = Math.max(4, fl(mh * 0.5));
+        var ang = t * 0.12 + i * 2.1 + sd;
+        for (k = 0; k < 3; k++) {
+          var a2 = ang + (k * 2 * PI) / 3;
+          g.line(mxp, mtop, mxp + Math.cos(a2) * bl, mtop + Math.sin(a2) * bl, white);
+        }
+        g.r(mxp - 1, mtop - 1, 2, 2, grey);
+      }
+    } else if (kind === 'lilac') {
+      // 라벤더 밭: 지평선으로 모이는 보랏빛 줄과 돌집 한 채
+      band(0.5, 0.05, 0.05, sd % 40, tone(env, mix(low, '#9a90b8', 0.5)));
+      var ftop2 = y + fl(h * 0.6);
+      var vpx = x + w * 0.5 + ((sd % 40) - 20) * (w / 192);
+      for (yy = ftop2; yy < y + h; yy++) {
+        var f4 = (yy - ftop2 + 1) / (y + h - ftop2);
+        for (xx = 0; xx < w; xx++) {
+          var rel = (x + xx - vpx) / (0.4 + f4 * 2.6);
+          var on2 = mod(rel, 5) < 3;
+          var lc2 = (x + xx + yy) % 3 === 0 ? '#b89ae8' : '#8a6ac8';
+          g.p(x + xx, yy, tone(env, on2 ? lc2 : (f4 < 0.3 ? '#7a6aa0' : '#6a8a4a')));
+        }
+      }
+      if (w > 40) {
+        var fhx = x + fl(w * 0.72);
+        var fhs = Math.max(6, fl(h * 0.2));
+        g.r(fhx, ftop2 - fhs + 2, fhs + 2, fhs - 2, tone(env, '#e8d8b8'));
+        for (k = 0; k < 3; k++) g.r(fhx - 1 + k, ftop2 - fhs + 1 - k, fhs + 4 - k * 2, 1, tone(env, '#c8683a'));
+        g.r(fhx + 2, ftop2 - 3, 2, 3, tone(env, '#7a5a3a'));
+        bushTree(x + fl(w * 0.22), ftop2 + 1, 3, tone(env, '#4a7a3a'), tone(env, '#6a9a4a'));
+      }
+    } else if (kind === 'palms') {
+      // 야자수 해변 노을: 수평선에 걸린 큰 해, 물에 비친 빛, 야자수 그림자
+      var hz5 = waterFrom(0.64, hx('#7a3a7a'), hx('#f08a6a'));
+      var em1 = g.em;
+      g.em = 1;
+      var scx = x + fl(w * (0.45 + (sd % 20) / 100));
+      var sr = Math.max(4, fl(h * 0.2));
+      for (yy = -sr; yy < 0; yy++) {
+        var sw2 = fl(Math.sqrt(sr * sr - yy * yy));
+        if (yy % 3 === -1 && yy > -sr / 2) continue;
+        g.r(scx - sw2, hz5 + yy, sw2 * 2 + 1, 1, yy < -sr / 2 ? '#ffe89a' : '#ffc860');
+      }
+      for (yy = hz5 + 1; yy < y + h; yy += 2) {
+        var rw2 = Math.max(1, fl(sr * (1 - (yy - hz5) / (y + h - hz5)) * 1.2));
+        g.r(scx - rw2 + rnd(Math.sin(yy + t * 0.3) * 1.5), yy, rw2 * 2, 1, '#ffd070');
+      }
+      g.em = em1;
+      band(0.9, 0.02, 0.05, 3, tone(env, '#5a3a4a'));
+      var pals = w > 60 ? [0.1, 0.86] : [0.12];
+      for (i = 0; i < pals.length; i++) {
+        var pbx = x + fl(w * pals[i]);
+        var plen = fl(h * 0.72);
+        var lean = i ? -1 : 1;
+        var ptx = pbx;
+        var pty = y + h;
+        for (k = 0; k < plen; k++) {
+          ptx = pbx + rnd(lean * Math.pow(k / plen, 2) * h * 0.18);
+          pty = y + h - k;
+          g.r(ptx, pty, 2, 1, '#2a1a2e');
+        }
+        for (k = 0; k < 6; k++) {
+          var fa = PI + (k / 5) * PI;
+          var fl2 = Math.max(4, fl(h * 0.18));
+          var ex2 = ptx + Math.cos(fa) * fl2;
+          var ey2 = pty + Math.sin(fa) * fl2 * 0.5 + fl2 * 0.35;
+          g.line(ptx, pty, (ptx + ex2) / 2, pty - fl2 * 0.2 + Math.sin(fa) * fl2 * 0.2, '#2a1a2e');
+          g.line((ptx + ex2) / 2, pty - fl2 * 0.2 + Math.sin(fa) * fl2 * 0.2, ex2, ey2, '#2a1a2e');
+        }
+      }
+    } else if (kind === 'storm') {
+      // 폭풍 바다와 등대: 흰 물마루, 바위 위 등대, 도는 불빛, 가끔 번개
+      var hz6 = waterFrom(0.58, hx('#1a2836'), hx('#38566a'));
+      for (i = 0; i < fl(w / 6); i++) {
+        var wcx = x + mod(hash(sd + 51, i) * w + t * 0.6 * (i % 2 ? 1 : -1), w);
+        var wcy = hz6 + 2 + fl(hash(sd + 52, i) * (y + h - hz6 - 3));
+        if (mod(t + i * 5, 14) < 9) g.r(wcx, wcy, 2 + (i % 3), 1, '#e8f0f4');
+      }
+      var lhx = x + fl(w * (0.7 + (sd % 15) / 100));
+      var lhh = Math.max(10, fl(h * 0.5));
+      g.ell(lhx + 1, hz6 + 1, Math.max(5, fl(lhh * 0.45)), 3, '#22242c');
+      g.ell(lhx - 1, hz6, Math.max(3, fl(lhh * 0.3)), 2, '#34363e');
+      for (k = 0; k < lhh; k++) {
+        var lw2 = 2 + fl((k / lhh) * 2);
+        var lc3 = fl(k / 3) % 2 ? '#d8403a' : '#f4f2ee';
+        g.r(lhx - fl(lw2 / 2), hz6 - 1 - k, lw2, 1, lc3);
+      }
+      var ltop = hz6 - lhh - 1;
+      var em2 = g.em;
+      g.em = 1;
+      g.r(lhx - 1, ltop - 2, 3, 2, '#ffe88a');
+      g.r(lhx - 2, ltop - 3, 5, 1, '#2a2a30');
+      var bp = mod(t, 20);
+      var bdir = bp < 10 ? -1 : 1;
+      var blen = fl(w * 0.45);
+      for (k = 2; k < blen; k++) {
+        var spread = fl(k * 0.18);
+        for (var bs = -spread; bs <= spread; bs++) {
+          g.b(lhx + bdir * k, ltop - 1 + bs, '#fff4c0', 0.55 * (1 - k / blen) * (1 - Math.abs(bs) / (spread + 1)));
+        }
+      }
+      if (mod(t + sd, 70) < 3) {
+        var bx3 = x + fl(w * 0.25) + fl(hash(sd, fl(t / 70)) * w * 0.4);
+        var by3 = y;
+        while (by3 < hz6 - 2) {
+          var nx3 = bx3 + fl(hash(by3, sd) * 5) - 2;
+          g.line(bx3, by3, nx3, by3 + 3, '#ffffff');
+          bx3 = nx3;
+          by3 += 3;
+        }
+        g.br(x, y, w, h, '#ffffff', 0.12);
+      }
+      g.em = em2;
+      if (mod(t, 16) < 5) g.ell(lhx - 3, hz6 - 2, 3, 2, '#f4f8fa');
+    } else if (kind === 'roofs') {
+      // 한옥 마을 지붕: 뒷산 아래로 겹겹이 이어지는 검은 기와지붕
+      band(0.3, 0.1, 0.03, sd % 60, tone(env, mix(low, '#6a8a7a', 0.45)), tone(env, mix(low, '#5a7a6a', 0.5)));
+      band(0.42, 0.05, 0.05, 23, tone(env, snow ? '#e8eef6' : '#4a7a5a'));
+      var sc2 = clamp(h / 40, 0.6, 1.2);
+      for (var r2 = 0; r2 < 3; r2++) {
+        var ry2 = y + fl(h * (0.46 + r2 * 0.17));
+        var rw3 = fl((16 + r2 * 6) * sc2);
+        var rh3 = Math.max(2, fl((3 + r2) * sc2));
+        var off2 = mod(sd * 7 + r2 * 11, rw3 + 3);
+        for (var rx3 = x - off2; rx3 < x + w; rx3 += rw3 + 3) {
+          g.r(rx3 + 2, ry2, rw3 - 4, rh3 + 3, tone(env, '#f0e8d8'));
+          for (k = 2; k < rw3 - 2; k += 5) g.r(rx3 + k, ry2, 1, rh3 + 3, tone(env, '#8a5a3a'));
+          var roofC = snow ? '#eef2f8' : '#4a4e5a';
+          for (k = 0; k < rh3; k++) {
+            var inset = rh3 - 1 - k;
+            g.r(rx3 + inset, ry2 - 1 - k, rw3 - inset * 2, 1, tone(env, roofC));
+          }
+          for (k = rx3 + 1; k < rx3 + rw3 - 1; k += 2) g.p(k, ry2 - 1, tone(env, snow ? '#c8d4e6' : '#34383f'));
+          g.r(rx3 + rh3 - 1, ry2 - rh3 - 1, rw3 - rh3 * 2 + 2, 1, tone(env, '#2a2c34'));
+          g.p(rx3 - 1, ry2 - 2, tone(env, roofC));
+          g.p(rx3 + rw3, ry2 - 2, tone(env, roofC));
+        }
+      }
+    } else if (kind === 'bridge') {
+      // 한강 다리 야경: 강 건너 불 켜진 건물, 조명이 켜진 다리와 무지개 분수
+      var em3 = g.em;
+      g.em = 1;
+      var skyB = y + fl(h * 0.48);
+      xx = x;
+      i = 0;
+      while (xx < x + w) {
+        var bw3 = 4 + fl(hash(sd + 71, i) * 7);
+        var bh3 = fl(h * (0.08 + hash(sd + 72, i) * 0.22));
+        g.r(xx, skyB - bh3, bw3, bh3, '#1a1e36');
+        for (yy = skyB - bh3 + 1; yy < skyB - 1; yy += 2) for (var wx3 = xx + 1; wx3 < xx + bw3 - 1; wx3 += 2) if (hash(wx3 + sd, yy) < 0.4) g.p(wx3, yy, '#ffd36e');
+        xx += bw3 + 1;
+        i++;
+      }
+      var hz7 = waterFrom(0.48, hx('#0e1838'), hx('#1e3060'));
+      var dk2 = hz7 + Math.max(4, fl((y + h - hz7) * 0.3));
+      var span = 24;
+      var ah = Math.max(3, fl(h * 0.14));
+      var p0 = x + mod(sd, span) - span;
+      for (xx = p0; xx < x + w; xx += span) {
+        g.r(xx, dk2 + 2, 2, y + h - dk2 - 2, '#2a2e48');
+        for (k = 0; k <= span; k++) {
+          var ayy = dk2 - fl(Math.sin((k / span) * PI) * ah);
+          g.p(xx + k, ayy, mod(k + fl(t / 3), 8) < 4 ? '#ffffff' : '#9ad8ff');
+          if (k % 4 === 0) g.r(xx + k, ayy + 1, 1, dk2 - ayy - 1, '#4a5070');
+        }
+      }
+      g.r(x, dk2, w, 2, '#3a3e5c');
+      for (xx = x; xx < x + w; xx += 3) g.p(xx, dk2 - 1, mod(xx + fl(t / 2), 12) < 6 ? '#ffe08a' : '#ffc860');
+      var cols2 = ['#ff5a7a', '#ffb03a', '#ffe85a', '#5ae87a', '#5ac8ff', '#a87aff'];
+      for (xx = 0; xx < w; xx += 2) {
+        var fall = mod(t * 0.6 + xx * 0.7, 6);
+        g.p(x + xx, dk2 + 2 + fl(fall), cols2[mod(fl(xx / 6) + fl(t / 8), 6)]);
+      }
+      for (i = 0; i < fl(w / 5); i++) {
+        var rfx = x + fl(hash(sd + 73, i) * w);
+        var rfy = dk2 + 4 + mod(i * 3 + fl(t / 3), Math.max(2, y + h - dk2 - 4));
+        g.b(rfx, rfy, cols2[i % 6], 0.5);
+        g.b(rfx + 1, rfy, cols2[i % 6], 0.3);
+      }
+      g.em = em3;
+    } else if (kind === 'wheat') {
+      // 밀밭: 바람에 물결치는 황금빛 밀과 둥근 건초더미
+      band(0.52, 0.05, 0.05, sd % 40, tone(env, mix(low, '#9ab0a0', 0.5)));
+      var wtop = y + fl(h * 0.6);
+      for (yy = wtop; yy < y + h; yy++) {
+        for (xx = 0; xx < w; xx++) {
+          var gx7 = x + xx;
+          var wave = Math.sin(gx7 * 0.12 + yy * 0.35 - t * 0.22);
+          var wc2 = wave > 0.55 ? '#f8e08a' : (bay(gx7, yy) < 0.25 ? '#c8962a' : '#e6bc50');
+          g.p(gx7, yy, tone(env, snow ? (wave > 0.55 ? '#ffffff' : '#e8eef6') : wc2));
+        }
+      }
+      for (xx = 0; xx < w; xx += 2) if (hash(x + xx, sd) < 0.5) g.p(x + xx, wtop - 1, tone(env, '#e6bc50'));
+      for (i = 0; i < Math.max(1, fl(w / 50)); i++) {
+        var hbx = x + fl(hash(sd + 81, i) * (w - 10)) + 5;
+        var hby = wtop + fl(hash(sd + 82, i) * (y + h - wtop) * 0.6) + 3;
+        var hbr = 2 + fl((hby - wtop) / 5);
+        g.ell(hbx, hby, hbr + 1, hbr, tone(env, '#c8923a'));
+        g.ell(hbx - 1, hby - 1, Math.max(1, hbr - 1), Math.max(1, hbr - 1), tone(env, '#e0b05a'));
+        g.p(hbx - 1, hby - 1, tone(env, '#a8762a'));
+      }
+      if (w > 50) bushTree(x + fl(w * 0.8), wtop, 3, tone(env, '#4a7a3a'), tone(env, '#6a9a4a'));
+    } else if (kind === 'berg') {
+      // 빙하: 들쭉날쭉한 얼음 절벽과 떠다니는 빙산
+      for (xx = 0; xx < w; xx++) {
+        var gx8 = x + xx;
+        var jag = hash(fl(gx8 / 3), sd) * h * 0.1;
+        var itop = y + fl(h * 0.3 + Math.sin(gx8 * 0.07 + sd) * h * 0.1 + jag);
+        var crev = hash(fl(gx8 / 2), sd + 1) < 0.18;
+        for (yy = itop; yy < y + h; yy++) {
+          var ic = yy - itop < 2 ? '#ffffff' : (crev ? '#7ab0d8' : (mod(gx8, 7) < 2 ? '#bcdcf0' : '#e2f2fc'));
+          g.p(gx8, yy, tone(env, ic));
+        }
+      }
+      var hz8 = waterFrom(0.7, hx('#1a4a6a'), hx('#3a7a9a'));
+      for (i = 0; i < Math.max(1, fl(w / 45)); i++) {
+        var ibx = x + mod(hash(sd + 91, i) * w + t * 0.05, w);
+        var ibw = 4 + fl(hash(sd + 92, i) * 6);
+        var iby = hz8 + 3 + fl(hash(sd + 93, i) * (y + h - hz8 - 5)) + rnd(Math.sin(t * 0.2 + i));
+        for (k = 0; k < ibw; k++) {
+          var colh = fl((ibw - Math.abs(k - ibw / 2) * 1.6) * 0.6) + 1;
+          g.r(ibx + k, iby - colh, 1, colh, tone(env, k > ibw * 0.6 ? '#a8d0ec' : '#f4fbff'));
+        }
+        g.r(ibx - 1, iby, ibw + 2, 1, tone(env, '#5a9ac0'));
+      }
+    } else if (kind === 'bamboo') {
+      // 대나무 숲: 세 겹의 곧은 대와 마디, 위쪽 잎
+      g.br(x, y, w, h, tone(env, '#c8e0b0'), 0.35);
+      var bcols = [['#b8d4a0', '#a0c088'], ['#7ab05a', '#5a9040'], ['#3a7a38', '#2a5a2a']];
+      for (var lay = 0; lay < 3; lay++) {
+        var gap2 = [6, 8, 13][lay];
+        var bsw = lay + 1;
+        for (i = 0; i * gap2 < w + gap2; i++) {
+          var bsx = x + i * gap2 + fl(hash(sd + lay * 13, i) * gap2 * 0.8) - 2;
+          var sway = Math.sin(t * 0.05 + i + lay) * (lay + 1) * 0.6;
+          var nodeP = 6 + lay * 2;
+          for (yy = y; yy < y + h; yy++) {
+            var bpx = bsx + rnd(sway * (1 - (yy - y) / h));
+            var node = mod(yy + i * 3, nodeP) === 0;
+            g.r(bpx, yy, bsw, 1, tone(env, node ? bcols[lay][1] : bcols[lay][0]));
+            if (node && lay > 0 && hash(i + lay, yy) < 0.35) g.line(bpx + bsw, yy, bpx + bsw + 3, yy - 2, tone(env, lay === 2 ? '#4a9a40' : '#8ac86a'));
+          }
+        }
+      }
+      band(0.94, 0.01, 0.1, 3, tone(env, '#6a7a3a'));
+    } else if (kind === 'castle') {
+      // 언덕 위 성: 성벽과 뾰족 지붕 탑, 펄럭이는 깃발
+      band(0.62, 0.06, 0.05, sd % 40, tone(env, mix(low, snow ? '#e8eef6' : '#8ab07a', 0.5)));
+      band(0.8, 0.04, 0.05, 9, tone(env, snow ? '#f4f7fb' : '#6aa862'), tone(env, snow ? '#d4dfec' : '#5a9852'));
+      var cxm = x + fl(w * (0.5 + ((sd % 30) - 15) / 100));
+      var cbase = y + fl(h * 0.68);
+      var cs2 = clamp(h / 36, 0.55, 1.5);
+      var stone = tone(env, '#ddd4c8');
+      var stoneD = tone(env, '#b0a698');
+      var roofK = tone(env, P.accent2);
+      var cww = fl(34 * cs2);
+      var cwh = fl(9 * cs2);
+      g.r(cxm - fl(cww / 2), cbase - cwh, cww, cwh, stone);
+      for (k = 0; k < cww; k += 2) g.p(cxm - fl(cww / 2) + k, cbase - cwh - 1, stone);
+      g.r(cxm - 2, cbase - fl(cwh * 0.7), 4, fl(cwh * 0.7), tone(env, '#4a3a32'));
+      var towers = [[-fl(cww / 2) - 2, 5, 18], [fl(cww / 2) - 3, 5, 18], [-fl(cww * 0.2), 7, 26], [fl(cww * 0.12), 5, 21]];
+      for (i = 0; i < towers.length; i++) {
+        var tw2 = Math.max(3, fl(towers[i][1] * cs2));
+        var th2 = fl(towers[i][2] * cs2);
+        var tx2 = cxm + towers[i][0];
+        g.r(tx2, cbase - th2, tw2, th2, stone);
+        g.r(tx2 + tw2 - 1, cbase - th2, 1, th2, stoneD);
+        var wy2 = cbase - th2 + 3;
+        if (env.time !== 'day') {
+          var em4 = g.em;
+          g.em = 1;
+          g.p(tx2 + fl(tw2 / 2), wy2, env.litC);
+          g.em = em4;
+        } else g.p(tx2 + fl(tw2 / 2), wy2, tone(env, '#4a3a32'));
+        var rh4 = fl(tw2 * 1.2) + 1;
+        for (k = 0; k < rh4; k++) {
+          var rw4 = Math.max(1, fl(((k + 1) / rh4) * (tw2 + 2)));
+          g.r(tx2 + fl((tw2 - rw4) / 2), cbase - th2 - rh4 + k, rw4, 1, roofK);
+        }
+        if (i === 2) {
+          var fy3 = cbase - th2 - rh4 - 4;
+          g.r(tx2 + fl(tw2 / 2), fy3, 1, 4, tone(env, P.ink));
+          for (k = 0; k < 4; k++) g.p(tx2 + fl(tw2 / 2) + 1 + k, fy3 + (mod(t + k, 4) < 2 ? 0 : 1), tone(env, P.accent));
+          g.r(tx2 + fl(tw2 / 2) + 1, fy3 + 1, 3, 1, tone(env, P.accent));
+        }
+      }
+      for (k = 0; k < fl(h * 0.3); k++) g.p(cxm + rnd(Math.sin(k * 0.4) * 4), cbase + k, tone(env, '#d8c8a0'));
     } else {
       // lake with a little dock
       band(0.5, 0.05, 0.06, sd % 40, tone(env, mix(low, '#6a9a6a', 0.45)));
@@ -9028,8 +9701,147 @@
     for (var i = 0; i < g.lights.length; i++) g.lights[i].x = W - 1 - g.lights[i].x;
   }
 
+  // ---- 큰 배치 바꾸기 (D-129 확장). 섞기 모드에서 배치 번호로 고른 배치(env.layout)에 따라
+  // 그림을 세로 띠 두세 개로 잘라 순서를 바꾼다. 창, 가구, 마스코트, 바깥의 탑·집·배가 다른 자리로 간다.
+  // 자르는 자리는 처음 한 번 그림을 그려 보고 물건이 없는 줄(벽·하늘·바닥만 있는 줄)과 이어 붙여도 티가 덜 나는 줄을 찾아 정한다.
+
+  function colAt(d, x, y) {
+    var j = (y * W + x) << 2;
+    return (d[j] << 16) | (d[j + 1] << 8) | d[j + 2];
+  }
+  function cdiff(a, b) {
+    return Math.abs((a >> 16) - (b >> 16)) + Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) + Math.abs((a & 255) - (b & 255));
+  }
+
+  function planLayout(g, env, scene, L) {
+    var kind = env.layout;
+    if (!kind) return null;
+    g.clear();
+    g.cnt = new Uint16Array(W * H);
+    g.keep = [];
+    scene.draw(g, env, L, scene.still || 0);
+    seasonal(g, env, scene, scene.still || 0);
+    var d = g.d;
+    var cnt = g.cnt;
+    var keep = g.keep;
+    g.cnt = null;
+    g.keep = null;
+    var x;
+    var y;
+    // 칸마다 몇 번 덧칠했는지 센다. 줄마다 덜 칠한 쪽(하위 15%)을 배경으로 보고, 그보다 더 칠한 칸이 많은 세로줄은 물건이 있는 줄로 친다
+    var base = [];
+    for (y = 0; y < H; y++) {
+      var row = Array.prototype.slice.call(cnt, y * W, y * W + W).sort(function (p, q) {
+        return p - q;
+      });
+      base.push(row[fl(W * 0.15)]);
+    }
+    var fg = [];
+    for (x = 0; x < W; x++) {
+      var s = 0;
+      for (y = 0; y < H; y++) if (cnt[y * W + x] > base[y]) s++;
+      fg.push(s);
+    }
+    // 세로줄 단위로 색을 모아 둔다(px[x * H + y])
+    var px = new Int32Array(W * H);
+    for (x = 0; x < W; x++) for (y = 0; y < H; y++) px[x * H + y] = colAt(d, x, y);
+    var memo = new Int16Array(W * W).fill(-1);
+    // a 줄 오른쪽에 b 줄을 붙였을 때 어긋나는 칸 수
+    function seam(a, b) {
+      var key = a * W + b;
+      if (memo[key] >= 0) return memo[key];
+      var s2 = 0;
+      var pa = a * H;
+      var pb = b * H;
+      // 두 줄에 하나씩만 봐도 충분하다
+      for (var yy = 0; yy < H; yy += 2) if (cdiff(px[pa + yy], px[pb + yy]) > 36) s2 += 2;
+      return (memo[key] = s2);
+    }
+    function cut(a) {
+      var c = fg[a - 1] + fg[a];
+      for (var k = 0; k < keep.length; k++) if (keep[k][0] < a && a < keep[k][1]) c += keep[k][2];
+      return c;
+    }
+    var src = [];
+    var a;
+    var b;
+    // 한 번 잘라 앞뒤를 바꾼다(가로로 굴리기). 최소 56칸은 옮긴다
+    var rolls = [];
+    for (a = 56; a <= W - 56; a += 2) rolls.push([cut(a) * 1.5, a]);
+    rolls.sort(function (p, q) {
+      return p[0] - q[0] || p[1] - q[1];
+    });
+    var roll = rolls[0];
+    var bestCost = roll[0];
+    var plan = [[roll[1], W], [0, roll[1]]];
+    if (kind > 1) {
+      // 두 번 잘라 세 띠 A|B|C를 B|A|C, A|C|B(배치 2) 또는 C|B|A(배치 3)로 다시 놓는다
+      bestCost = 1e9;
+      plan = null;
+      for (a = 28; a <= W - 56; a += 3) {
+        for (b = a + 28; b <= W - 28; b += 3) {
+          var base = (cut(a) + cut(b)) * 1.5;
+          var opts = kind === 2
+            ? [[seam(b - 1, 0) + seam(a - 1, b), [[a, b], [0, a], [b, W]]], [seam(a - 1, b) + seam(W - 1, a), [[0, a], [b, W], [a, b]]]]
+            : [[seam(W - 1, a) + seam(b - 1, 0), [[b, W], [a, b], [0, a]]]];
+          for (var o = 0; o < opts.length; o++) {
+            var cost = base + opts[o][0];
+            if (cost < bestCost) {
+              bestCost = cost;
+              plan = opts[o][1];
+            }
+          }
+        }
+      }
+      // 세 띠로 자르면 물건이 잘리는 장면(가운데 큰 건물·수조가 있는 장면 포함)은 굴리기로 하되 배치마다 다른 자리에서 자른다
+      if (scene.rollOnly || bestCost > roll[0] + 30) {
+        var used = [roll[1]];
+        for (var q = 1; q < rolls.length && used.length < kind; q++) {
+          var far = true;
+          for (var u = 0; u < used.length; u++) if (Math.abs(rolls[q][1] - used[u]) < 32) far = false;
+          if (far) used.push(rolls[q][1]);
+        }
+        var ca = used[used.length - 1];
+        plan = [[ca, W], [0, ca]];
+      }
+    }
+    if (!plan) return null;
+    for (var p = 0; p < plan.length; p++) for (x = plan[p][0]; x < plan[p][1]; x++) src.push(x);
+    return src;
+  }
+
+  // 띠 순서 바꾸기를 그림과 빛에 적용한다
+  function applyLayout(g, src) {
+    var d = g.d;
+    var e = g.e;
+    var d0 = d.slice();
+    var e0 = e.slice();
+    var inv = [];
+    for (var x = 0; x < W; x++) {
+      var sx = src[x];
+      inv[sx] = x;
+      for (var y = 0; y < H; y++) {
+        var i = y * W + x;
+        var si = y * W + sx;
+        e[i] = e0[si];
+        var j = i << 2;
+        var sj = si << 2;
+        d[j] = d0[sj];
+        d[j + 1] = d0[sj + 1];
+        d[j + 2] = d0[sj + 2];
+        d[j + 3] = d0[sj + 3];
+      }
+    }
+    for (var k = 0; k < g.lights.length; k++) {
+      var lt = g.lights[k];
+      var lx = clamp(fl(lt.x), 0, W - 1);
+      lt.x = inv[lx] + (lt.x - lx);
+    }
+  }
+
   function postLayers(g, env, scene, t) {
     seasonal(g, env, scene, t);
+    if (env.perm) applyLayout(g, env.perm);
     if (env.mirror) mirror(g);
   }
 
@@ -9123,6 +9935,7 @@
     // 원래 장면에 덧붙인 소품 칸. setup과 다른 난수라 예전 배치는 그대로다 (D-129)
     if (scene.extra) L.x = scene.extra(env, xr(env, 7));
     var g = new Gfx();
+    if (env.mix) env.perm = planLayout(g, env, scene, L);
     var off = document.createElement('canvas');
     off.width = W;
     off.height = H;

@@ -142,6 +142,7 @@ app:
     secret-key: ${TURNSTILE_SECRET_KEY:}
   # 소셜 로그인 (T157, D-128). 아이디·비밀값이 모두 있는 제공자만 켜진다. 비어 있으면 그 버튼이 숨고 서버는 그대로 뜬다.
   # 만드는 법은 docs/social-login.md. 돌아오는 주소는 {사이트 주소}/login/oauth2/code/google, /login/oauth2/code/github
+  # 운영은 X-Forwarded-Proto https라 https로 만든다: 콘솔에 https://jj-blog.java21.net/login/oauth2/code/github(google)을 등록한다
   social:
     google:
       client-id: ${GOOGLE_CLIENT_ID:}

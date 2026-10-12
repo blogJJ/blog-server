@@ -48,6 +48,8 @@ public class MascotService {
 
   private static final Logger log = LoggerFactory.getLogger(MascotService.class);
   private static final int BACKFILL_BATCH = 20;
+  // 예전 장면을 새로 고르는 수(한 번 돌 때). Claude를 부르지 않아 빠르다
+  private static final int REFRESH_BATCH = 100;
   // 겹칠 때 다음 조합으로 건너뛰는 폭. 조합 수(288)와 서로소라 모든 조합을 한 번씩 돈다
   private static final int STEP = 115;
 
@@ -95,7 +97,9 @@ public class MascotService {
     }
   }
 
-  /** 마스코트나 장면이 없는 블로그를 채운다. 기존 블로그와, 고르다 서버가 꺼진 블로그용. */
+  /**
+   * 마스코트나 장면이 없는 블로그를 채운다. 기존 블로그와, 고르다 서버가 꺼진 블로그용. 섞기 모드가 아닌 예전 장면도 한 번 새로 고른다(T158, D-129 확장).
+   */
   @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT10M")
   @SchedulerLock(name = "mascotBackfill", lockAtMostFor = "PT9M")
   public void backfill() {
@@ -104,6 +108,85 @@ public class MascotService {
     }
     List<Long> ids = blogRepository.findIdsWithoutMascot(PageRequest.of(0, BACKFILL_BATCH));
     ids.forEach(this::assignSafely);
+    refreshLegacyCovers();
+  }
+
+  /**
+   * 섞기 모드가 아닌 예전 픽셀 장면(일곱째 칸 없음)을 가진 블로그에 새 장면을 한 번 고른다 (T158, D-129 확장). 장면은 태그 단어 사전, 맞는 단어가 없으면
+   * 지금과 다른 장면을 무작위로 고르고 배경은 늘 붙인다. Claude는 부르지 않고 마스코트와 대표 이미지(cover_image)는 그대로 둔다. 새 값에는 {@code
+   * ~}가 붙어 다음에는 고르지 않는다.
+   *
+   * @return 바꾼 블로그 수
+   */
+  public int refreshLegacyCovers() {
+    int changed = 0;
+    for (Long id : blogRepository.findIdsWithLegacyCover(REFRESH_BATCH)) {
+      try {
+        if (refreshCover(id)) {
+          changed++;
+        }
+      } catch (RuntimeException e) {
+        log.warn("블로그 {} 대표 장면을 새로 고르지 못함: {}", id, e.toString());
+      }
+    }
+    return changed;
+  }
+
+  private boolean refreshCover(Long blogId) {
+    Boolean done =
+        tx.execute(
+            s ->
+                blogRepository
+                    .findById(blogId)
+                    .filter(Blog::isOpen)
+                    .map(
+                        b -> {
+                          b.changeCoverScene(
+                              freshCover(
+                                  b.getName(),
+                                  tagNames(b.getId()),
+                                  b.getCoverScene(),
+                                  ThreadLocalRandom.current()));
+                          return true;
+                        })
+                    .orElse(false));
+    return Boolean.TRUE.equals(done);
+  }
+
+  /**
+   * 예전 장면을 대신할 새 섞기 모드 장면. 장면은 태그 단어 사전, 없으면 지금과 다른 장면을 무작위로 고르고 시간·날씨·색·배치 번호도 새로 뽑는다. 소품 주제는 태그,
+   * 없으면 지금 주제를 그대로 둔다. 배경은 태그, 없으면 무작위로 늘 붙이고 계절·행사는 {@link #withLayers}와 같다.
+   */
+  static CoverScene freshCover(
+      String name, List<String> tags, CoverScene current, RandomGenerator random) {
+    Scene[] scenes = Scene.values();
+    Scene scene =
+        KeywordScenePicker.scene(name, tags)
+            .orElseGet(
+                () -> {
+                  Scene s;
+                  do {
+                    s = scenes[random.nextInt(scenes.length)];
+                  } while (current != null && s == current.scene());
+                  return s;
+                });
+    CoverScene.Weather[] weathers = CoverScene.Weather.values();
+    int seed;
+    do {
+      seed = random.nextInt(CoverScene.SEEDS);
+    } while (current != null && current.seed() == seed);
+    CoverScene base =
+        new CoverScene(
+            scene,
+            CoverScene.Time.values()[random.nextInt(CoverScene.Time.values().length)],
+            // 날씨는 절반쯤 맑게
+            random.nextBoolean()
+                ? CoverScene.Weather.CLEAR
+                : weathers[random.nextInt(weathers.length)],
+            CoverScene.Palette.values()[random.nextInt(CoverScene.Palette.values().length)],
+            seed,
+            KeywordScenePicker.prop(name, tags).orElse(current == null ? null : current.prop()));
+    return withLayers(base, name, tags, random);
   }
 
   /**
@@ -236,9 +319,9 @@ public class MascotService {
       Arrays.stream(Backdrop.values()).filter(b -> b != Backdrop.NONE).toList();
 
   /**
-   * 섞기 모드로 바꾸고 배경과 계절·행사를 정한다 (D-129). Claude가 고른 값이 있으면 그대로, 없으면 태그 단어 사전, 그래도 없으면 배경은 10번 중 7번,
-   * 계절은 20번 중 9번쯤 무작위로 고른다. 나머지는 장면이 정한 풍경과 장식 없음이다. 벽·바닥 재질, 가구 색, 마스코트 자세, 좌우 뒤집기는 화면이 배치 번호로
-   * 정한다.
+   * 섞기 모드로 바꾸고 배경과 계절·행사를 정한다 (D-129). Claude가 고른 값이 있으면 그대로, 없으면 태그 단어 사전, 그래도 없으면 배경은 늘(T158),
+   * 계절은 20번 중 9번쯤 무작위로 고른다. 계절이 안 붙으면 장식 없음이다. 벽·바닥 재질, 가구 색, 마스코트 자세, 좌우 뒤집기, 큰 배치, 화면 그림은 화면이 배치
+   * 번호로 정한다.
    */
   static CoverScene withLayers(
       CoverScene chosen, String name, List<String> tags, RandomGenerator random) {
@@ -246,11 +329,8 @@ public class MascotService {
         chosen.backdrop() != null
             ? chosen.backdrop()
             : KeywordScenePicker.backdrop(name, tags)
-                .orElseGet(
-                    () ->
-                        random.nextInt(10) < 7
-                            ? BACKDROPS.get(random.nextInt(BACKDROPS.size()))
-                            : null);
+                // 배경이 늘 바뀌게 비워 두지 않는다 (T158)
+                .orElseGet(() -> BACKDROPS.get(random.nextInt(BACKDROPS.size())));
     Event event =
         chosen.event() != null
             ? chosen.event()
