@@ -110,10 +110,13 @@ probe() {
     wget -qO- -T 3 "http://${NEXT_HOST}:8080/actuator/health" 2>/dev/null | grep -q '"UP"'
 }
 
-# 확인 한 번에 컨테이너를 하나 띄우느라 몇 초씩 걸리므로 횟수가 아니라 시간(2분)으로 끊는다.
+# DB 변경(Flyway)이 잠금을 오래 기다리면 앱이 스스로 멈추므로(spring.flyway.init-sqls), 이 한도는 앱이 뜨는 시간만 넉넉히 덮으면 된다
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-240}"
+
+# 확인 한 번에 컨테이너를 하나 띄우느라 몇 초씩 걸리므로 횟수가 아니라 시간(기본 4분, HEALTH_TIMEOUT 초)으로 끊는다.
 # 기다리는 동안 출력이 없으면 ssh 연결이 끊기므로 20초마다 진행 상황을 찍는다
 healthy() {
-  local deadline=$((SECONDS + 120)) next_note=$((SECONDS + 20))
+  local deadline=$((SECONDS + HEALTH_TIMEOUT)) next_note=$((SECONDS + 20))
   while [ "$SECONDS" -lt "$deadline" ]; do
     if [ "$(docker inspect -f '{{.State.Running}}' "$NEXT_NAME" 2>/dev/null)" != "true" ]; then
       return 1
@@ -174,7 +177,7 @@ through_proxy() {
 echo "== 새 컨테이너 띄우기 ($NEXT_NAME). 지금 응답 중: ${ACTIVE:-이전 방식 컨테이너}"
 start
 if ! healthy; then
-  echo "== 새 컨테이너가 2분 안에 뜨지 않았어요. 마지막 로그:" >&2
+  echo "== 새 컨테이너가 ${HEALTH_TIMEOUT}초 안에 뜨지 않았어요. 마지막 로그:" >&2
   docker logs --tail 80 "$NEXT_NAME" >&2 || true
   docker rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
   echo "== 새 컨테이너를 지웠어요. 지금까지 돌던 서버가 계속 응답해요. 원인을 고친 뒤 다시 배포해 주세요" >&2
