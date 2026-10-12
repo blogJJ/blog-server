@@ -1,0 +1,85 @@
+# DB 백업 (T139, OPS-01, D-101, D-121).
+# 매일 03:00(Asia/Seoul)에 서버에서 ops/backup/db-backup.sh로 전체 백업을 만들고,
+# 받아서 BACKUP_PASSPHRASE로 암호화한 뒤 이 저장소의 Actions 아티팩트로 7일 보관한다(서버 밖 저장소).
+# 아티팩트는 이 저장소에 권한이 있는 사람만 받을 수 있고, 받아도 암호를 알아야 열 수 있다.
+# 복구는 ops/backup/RESTORE.md. Actions 탭 > Backup > Run workflow로 바로 돌릴 수도 있다.
+#
+# 필요한 Repository secrets: 배포와 같은 SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD
+#   + BACKUP_PASSPHRASE  openssl rand -base64 32 로 만든 값. 잃어버리면 백업을 열 수 없으니 따로 적어 둔다
+name: Backup
+
+on:
+  schedule:
+    # GitHub 시간은 UTC. 18:00 UTC = 03:00 Asia/Seoul. 몰리는 시각엔 몇 분 늦게 돌 수 있다
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 배포와 겹치지 않게 같은 그룹에서 하나씩
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SSH_ADDRESS: ${{ secrets.SSH_ADDRESS }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_ID: ${{ secrets.SSH_ID }}
+      SSHPASS: ${{ secrets.SSH_PASSWORD }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        run: |
+          missing=""
+          for name in SSH_ADDRESS SSH_PORT SSH_ID SSHPASS BACKUP_PASSPHRASE; do
+            if [ -z "${!name}" ]; then
+              missing="$missing ${name/SSHPASS/SSH_PASSWORD}"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Repository secrets가 비어 있어요:$missing"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - name: Dump on server
+        id: dump
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass > /dev/null
+          opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+          sshpass -e scp -p "${opts[@]}" -P "$SSH_PORT" ops/backup/db-backup.sh "$SSH_ID@$SSH_ADDRESS:blog-server/"
+          remote="$(sshpass -e ssh "${opts[@]}" -p "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS" 'bash ~/blog-server/db-backup.sh' | tail -n 1)"
+          case "$remote" in
+            */blog-server/backups/blog-*.sql.gz) ;;
+            *) echo "::error::백업 파일 경로를 받지 못했어요: $remote"; exit 1;;
+          esac
+          name="$(basename "$remote" .sql.gz)"
+          umask 077
+          sshpass -e scp "${opts[@]}" -P "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS:$remote" "$RUNNER_TEMP/$name.sql.gz"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Encrypt
+        run: |
+          f="$RUNNER_TEMP/${{ steps.dump.outputs.name }}.sql.gz"
+          gzip -t "$f"
+          umask 077
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_PASSPHRASE \
+            -in "$f" -out "$f.enc"
+          rm -f "$f"
+          # 같은 암호로 되돌려 보고 원본과 같은지 확인한다
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in "$f.enc" | gzip -t
+          ls -lh "$f.enc"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-${{ steps.dump.outputs.name }}
+          path: ${{ runner.temp }}/${{ steps.dump.outputs.name }}.sql.gz.enc
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
