@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.PortMapper;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
@@ -57,6 +58,20 @@ public class SecurityConfig {
 
   static final String HEALTH_PATH = "/actuator/health";
 
+  /** https는 항상 443, http로 돌아갈 때는 80 */
+  static final PortMapper ALWAYS_443 =
+      new PortMapper() {
+        @Override
+        public Integer lookupHttpPort(Integer httpsPort) {
+          return 80;
+        }
+
+        @Override
+        public Integer lookupHttpsPort(Integer httpPort) {
+          return 443;
+        }
+      };
+
   @Bean
   public SecurityFilterChain securityFilterChain(
       HttpSecurity http,
@@ -69,8 +84,9 @@ public class SecurityConfig {
     JsonSecurityErrorHandler errorHandler = new JsonSecurityErrorHandler(jsonMapper);
 
     if (requireHttps) {
-      // 서버는 8080으로 받고 사용자에게는 443(https 기본 포트)으로 보낸다. 기본 매핑은 8080 → 8443이라 바꾼다
-      http.portMapper(ports -> ports.http(8080).mapsTo(443));
+      // 어느 포트로 들어왔든 사용자에게는 443(https 기본 포트)으로 보낸다. 서버는 docker가 연 포트(APP_PORT)로도 받는데,
+      // 기본 매핑(80 → 443, 8080 → 8443)에 없는 포트면 리다이렉트 대신 500이 났다
+      http.portMapper(ports -> ports.portMapper(ALWAYS_443));
       http.redirectToHttps(
           https ->
               https.requestMatchers(
