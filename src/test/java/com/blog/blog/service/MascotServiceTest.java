@@ -46,7 +46,8 @@ class MascotServiceTest {
     assertThat(
             jdbc.queryForObject(
                 "select cover_scene from blogs where id = ?", String.class, blog.getId()))
-        .matches("kitchen\\.[a-z]+\\.[a-z]+\\.[a-z]+\\.\\d+");
+        // 장면은 '집밥', 소품 주제는 '레시피'에서 고르고, 일곱째 칸(배경~계절)이 붙는 섞기 모드다 (D-129)
+        .matches("kitchen\\.[a-z]+\\.[a-z]+\\.[a-z]+\\.\\d+\\.food\\.[a-z]*~[a-z]*");
     assertThat(blogRepository.findIdsWithoutMascot(PageRequest.of(0, 10_000)))
         .doesNotContain(blog.getId());
   }
