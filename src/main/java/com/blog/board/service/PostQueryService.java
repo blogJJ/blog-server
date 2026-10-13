@@ -198,29 +198,6 @@ public class PostQueryService {
         viewerId != null && likeRepository.existsByPostIdAndUserId(post.getId(), viewerId));
   }
 
-  /** 공유 미리보기(og 태그)용 값. 비회원이 볼 수 없는 글이면 null. */
-  @Transactional(readOnly = true)
-  public OgInfo ogInfo(Long postId, String shareKey) {
-    Post post = postRepository.findDetail(postId).filter(Post::isPublished).orElse(null);
-    if (post == null) {
-      return null;
-    }
-    try {
-      accessService.check(post.getBlog(), null, shareKey);
-    } catch (BusinessException e) {
-      return null;
-    }
-    String image =
-        imageRepository.findFirstImages(List.of(post.getId())).stream()
-            .findFirst()
-            .map(i -> ImageService.url(i.getStoredName()))
-            .orElse(ImageService.url(post.getBlog().getCoverImage()));
-    return new OgInfo(
-        post.getTitle(), renderer.excerpt(post.getContent(), 100), image, post.getBlog().getName());
-  }
-
-  public record OgInfo(String title, String description, String image, String blogName) {}
-
   /** 블로그의 카테고리 목록. 블로그를 볼 수 있는 사람만. */
   @Transactional(readOnly = true)
   public List<CategoryRow> categories(Long blogId, Long viewerId, String shareKey) {
