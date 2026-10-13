@@ -56,6 +56,7 @@ public class ShareMetaService {
    * @param imageSized 그림이 1200x630으로 정해져 있는지(크기 태그를 붙인다)
    * @param type og:type (website, article)
    * @param url og:url 경로(필요하면 ?share= 포함)
+   * @param blogId 비회원도 볼 수 있는 블로그·글이면 그 블로그 번호, 아니면 null. 화면이 부를 API를 미리 받게 하는 데 쓴다 (T164)
    */
   public record ShareMeta(
       String title,
@@ -64,7 +65,20 @@ public class ShareMetaService {
       String image,
       boolean imageSized,
       String type,
-      String url) {}
+      String url,
+      Long blogId) {
+
+    public ShareMeta(
+        String title,
+        String pageTitle,
+        String description,
+        String image,
+        boolean imageSized,
+        String type,
+        String url) {
+      this(title, pageTitle, description, image, imageSized, type, url, null);
+    }
+  }
 
   private record Image(String path, boolean sized) {}
 
@@ -120,7 +134,8 @@ public class ShareMetaService {
         image.path(),
         image.sized(),
         "website",
-        path + shareQuery(blog, shareKey));
+        path + shareQuery(blog, shareKey),
+        blog.getId());
   }
 
   /** 글 화면 {@code /blog/{주소}/posts/{번호}}. 주소와 글의 블로그가 다르면 기본값. */
@@ -155,7 +170,8 @@ public class ShareMetaService {
         image.path(),
         image.sized(),
         "article",
-        path + shareQuery(blog, shareKey));
+        path + shareQuery(blog, shareKey),
+        blog.getId());
   }
 
   /** 대표 그림 PNG로 바꿀 SVG 저장 이름. 주소가 맞지 않으면 빈 값. */

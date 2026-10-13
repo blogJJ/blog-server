@@ -85,6 +85,12 @@ springdoc:
     enabled: false
 
 server:
+  # 글자 응답(HTML·JS·CSS·JSON·SVG)을 gzip으로 줄여 보낸다 (T164). pixel-cover.js가 약 390KB → 약 107KB.
+  # 바깥 nginx가 gzip을 하지 않아도 앱이 줄인 응답을 그대로 넘긴다
+  compression:
+    enabled: true
+    min-response-size: 1KB
+    mime-types: text/html,text/css,text/javascript,application/javascript,application/json,image/svg+xml,text/plain
   # 기본 오류 응답에 내부 정보를 싣지 않는다 (OPS-02, D-102). API 오류는 GlobalExceptionHandler가 만든다
   error:
     include-stacktrace: never

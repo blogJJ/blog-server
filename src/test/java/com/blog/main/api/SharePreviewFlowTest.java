@@ -146,6 +146,57 @@ class SharePreviewFlowTest {
         .contains(prop("og:title", "블로그"));
   }
 
+  /**
+   * 화면 JS가 곧 부를 API를 HTML과 함께 받기 시작한다 (T164). 주소는
+   * blog.js·post-list.js·post-view.js·comments.js·feed.js가 만드는 주소와 같아야 브라우저가 미리 받은 응답을 쓴다. 비회원이 볼 수
+   * 없는 블로그는 번호를 알리지 않는다.
+   */
+  @Test
+  void pagesPreloadTheApisTheirScriptsCall() throws Exception {
+    User owner = newUser();
+    long blogId = createBlog(owner, "PUBLIC", "미리 받기", "소개");
+    String slug = slugOf(blogId);
+    long postId = writePost(owner, blogId, "제목", "본문");
+
+    assertThat(page("/blog/" + slug))
+        .contains(preload("/api/blogs/by-slug/" + slug))
+        .contains(preload("/api/blogs/" + blogId + "/posts?page=1&amp;size=10"))
+        .contains(preload("/api/blogs/" + blogId + "/categories"))
+        .contains(preload("/api/me"))
+        // JS·CSS 주소에는 내용 해시를 붙인다
+        .containsPattern("<script src=\"/js/blog\\.js\\?v=[0-9a-f]{12}\" defer>")
+        .containsPattern("href=\"/css/common\\.css\\?v=[0-9a-f]{12}\"");
+    assertThat(page("/blog/" + slug + "/posts/" + postId))
+        .contains(preload("/api/posts/" + postId))
+        .contains(preload("/api/posts/" + postId + "/comments?page=1"));
+    // 0으로 시작하는 번호는 post-view.js가 주소 글자를 그대로 써서 주소가 달라지므로 미리 받지 않는다
+    assertThat(page("/blog/" + slug + "/posts/0" + postId)).doesNotContain(preload("/api/posts/"));
+
+    // 공유 링크 값은 JS(encodeURIComponent)와 같은 주소를 만들 수 있을 때만
+    long linkOnly = createBlog(owner, "LINK_ONLY", "링크 미리 받기", "소개");
+    String key =
+        jdbc.queryForObject("select share_key from blogs where id = ?", String.class, linkOnly);
+    assertThat(page("/blog/" + slugOf(linkOnly) + "?share=" + key))
+        .contains(preload("/api/blogs/by-slug/" + slugOf(linkOnly) + "?share=" + key))
+        .contains(preload("/api/blogs/" + linkOnly + "/posts?page=1&amp;size=10&amp;share=" + key))
+        .contains(preload("/api/blogs/" + linkOnly + "/categories?share=" + key));
+    assertThat(page("/blog/" + slugOf(linkOnly) + "?share=a%20b"))
+        .doesNotContain(preload("/api/blogs/by-slug/"))
+        .contains(preload("/api/me"));
+
+    // 비회원이 볼 수 없는 블로그는 블로그 정보만(블로그 번호를 알리지 않는다)
+    long privateBlog = createBlog(owner, "PRIVATE", "비밀 미리 받기", "소개");
+    assertThat(page("/blog/" + slugOf(privateBlog)))
+        .contains(preload("/api/blogs/by-slug/" + slugOf(privateBlog)))
+        .doesNotContain(preload("/api/blogs/" + privateBlog + "/"));
+
+    // 메인: feed.js의 첫 요청. 로그인해야 보이는 탭은 미리 받지 않는다
+    assertThat(page("/")).contains(preload("/api/feed?tab=latest&amp;page=1"));
+    assertThat(page("/?tab=blogs&sort=popular&page=2"))
+        .contains(preload("/api/blogs?sort=popular&amp;page=2"));
+    assertThat(page("/?tab=following")).doesNotContain(preload("/api/feed"));
+  }
+
   @Test
   void everyValueIsEscaped() throws Exception {
     User owner = newUser();
@@ -262,6 +313,10 @@ class SharePreviewFlowTest {
   }
 
   // ---------- 도우미 ----------
+
+  private static String preload(String href) {
+    return "<link rel=\"preload\" as=\"fetch\" crossorigin=\"anonymous\" href=\"" + href;
+  }
 
   private static String prop(String property, String content) {
     return "<meta property=\"" + property + "\" content=\"" + content + "\" />";

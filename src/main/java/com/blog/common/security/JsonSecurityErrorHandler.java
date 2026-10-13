@@ -19,6 +19,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>관리자 화면({@code /admin/**})은 사람이 주소창으로 여는 화면이라 JSON 대신 401은 로그인 화면으로 보내고, 403은 오류 화면을 보여 준다
  * (T126).
+ *
+ * <p>401인데 요청에 로그인 쿠키(access_token)가 아예 없으면 {@link #NO_SESSION_HEADER} 헤더를 붙인다 (T164). 두 로그인 쿠키는 늘
+ * 같이 쓰고 같이 지우므로 그때는 Refresh Token도 없다. 화면(api.js)은 이 헤더를 보면 토큰 재발급을 시도하지 않는다. 예전에는 비회원이 화면을 열 때마다
+ * /api/me 401 뒤에 실패할 재발급 요청을 한 번 더 기다렸다.
  */
 public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
@@ -38,8 +42,14 @@ public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, Acces
       response.sendRedirect("/login.html?next=" + ADMIN_HOME);
       return;
     }
+    if (AuthCookies.read(request, AuthCookies.ACCESS_TOKEN) == null) {
+      response.setHeader(NO_SESSION_HEADER, "none");
+    }
     write(response, ErrorCode.UNAUTHORIZED);
   }
+
+  /** 로그인 쿠키가 없어서 난 401에 붙는 헤더. 값은 {@code none}. */
+  public static final String NO_SESSION_HEADER = "X-Auth-Session";
 
   @Override
   public void handle(
