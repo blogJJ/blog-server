@@ -42,7 +42,9 @@ public class MailService {
   /** 글자만 있는 메일을 보낸다. 실패하면 {@link BusinessException}(MAIL_SEND_FAILED). */
   public void send(String to, String subject, String text) {
     if (logOnly) {
-      log.info("[log-only mail] to={} subject={}\n{}", Masking.email(to), subject, text);
+      if (log.isInfoEnabled()) {
+        log.info("[log-only mail] to={} subject={}\n{}", Masking.email(to), subject, text);
+      }
       return;
     }
     SimpleMailMessage message = new SimpleMailMessage();

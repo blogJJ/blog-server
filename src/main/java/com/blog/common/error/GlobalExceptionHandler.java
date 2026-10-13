@@ -138,11 +138,13 @@ public class GlobalExceptionHandler {
     AsyncRequestTimeoutException.class
   })
   public ResponseEntity<ErrorResponse> handleTimeout(Exception e, HttpServletRequest request) {
-    log.warn(
-        "request timed out {} {}: {}",
-        request.getMethod(),
-        SecurityEventLogger.sanitize(request.getRequestURI()),
-        e.getClass().getSimpleName());
+    if (log.isWarnEnabled()) {
+      log.warn(
+          "request timed out {} {}: {}",
+          request.getMethod(),
+          SecurityEventLogger.sanitize(request.getRequestURI()),
+          e.getClass().getSimpleName());
+    }
     return respond(ErrorCode.REQUEST_TIMEOUT);
   }
 

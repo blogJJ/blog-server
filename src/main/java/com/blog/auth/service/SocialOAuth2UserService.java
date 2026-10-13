@@ -3,6 +3,7 @@ package com.blog.auth.service;
 import com.blog.auth.domain.SocialProvider;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -38,8 +39,8 @@ public class SocialOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
   public OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException {
     OAuth2User user = delegate.loadUser(request);
     String registrationId = request.getClientRegistration().getRegistrationId();
-    if (!SocialProvider.GITHUB.getId().equals(registrationId)) {
-      return user;
+    if (user == null || !SocialProvider.GITHUB.getId().equals(registrationId)) {
+      return user; // null이면 이 제공자를 다루지 않는다는 뜻(OAuth2UserService 약속)이라 그대로 넘긴다
     }
     Map<String, Object> attrs = new HashMap<>(user.getAttributes());
     String email = githubEmailClient.primaryVerifiedEmail(request.getAccessToken().getTokenValue());
@@ -54,6 +55,8 @@ public class SocialOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             .getProviderDetails()
             .getUserInfoEndpoint()
             .getUserNameAttributeName();
+    // delegate(DefaultOAuth2UserService)가 이 이름이 없으면 이미 실패하므로 여기서는 늘 있다
+    Objects.requireNonNull(nameKey, "user-name-attribute");
     return new DefaultOAuth2User(user.getAuthorities(), attrs, nameKey);
   }
 }

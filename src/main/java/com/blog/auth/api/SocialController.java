@@ -100,7 +100,9 @@ public class SocialController {
       HttpServletRequest request,
       HttpServletResponse response) {
     rateLimitGuard.check("signup", request, 10, Duration.ofMinutes(10));
-    PendingSocialSignup pending = SocialSession.findPending(request, clock.instant()).orElse(null);
+    PendingSocialSignup pending =
+        SocialSession.findPending(request, clock.instant())
+            .orElseThrow(() -> new BusinessException(ErrorCode.SOCIAL_SIGNUP_EXPIRED));
     User user = socialLoginService.completeSignup(pending, form);
     SocialSession.clearPending(request);
     handlers.startSession(request, response, user, pending.rememberMe());

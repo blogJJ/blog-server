@@ -123,10 +123,11 @@ public final class SvgSanitizer {
   private static final Pattern LOCAL_HREF = Pattern.compile("#([A-Za-z_][A-Za-z0-9_.:-]{0,63})");
   private static final Pattern URL_FUNC = Pattern.compile("(?i)url\\s*\\(");
   private static final Pattern LOCAL_URL =
-      Pattern.compile("(?i)url\\(\\s*(['\"]?)#[A-Za-z_][A-Za-z0-9_.:-]{0,63}\\1\\s*\\)");
+      Pattern.compile("(?i)url\\(\\s*(['\"]?)#[a-z_][a-z0-9_.:-]{0,63}\\1\\s*\\)");
   // 속성 값에 이런 글자가 있으면 그 속성만 뺀다. 표현 속성에는 필요 없는 것들이다
   private static final Pattern FORBIDDEN_VALUE =
       Pattern.compile("(?i)javascript:|data:|expression|@import|[<>\\\\]|&#");
+  private static final String INVALID_VIEW_BOX = "Invalid viewBox";
   private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
 
   private SvgSanitizer() {}
@@ -209,15 +210,15 @@ public final class SvgSanitizer {
     }
     String[] parts = value.split("[\\s,]+");
     if (parts.length != 4) {
-      throw new IllegalArgumentException("Invalid viewBox");
+      throw new IllegalArgumentException(INVALID_VIEW_BOX);
     }
     for (String p : parts) {
       if (!NUMBER.matcher(p).matches()) {
-        throw new IllegalArgumentException("Invalid viewBox");
+        throw new IllegalArgumentException(INVALID_VIEW_BOX);
       }
     }
     if (Double.parseDouble(parts[2]) <= 0 || Double.parseDouble(parts[3]) <= 0) {
-      throw new IllegalArgumentException("Invalid viewBox");
+      throw new IllegalArgumentException(INVALID_VIEW_BOX);
     }
     return parts;
   }
@@ -246,6 +247,15 @@ public final class SvgSanitizer {
     if (depth > MAX_DEPTH || ++counter.elements > MAX_ELEMENTS) {
       throw new IllegalArgumentException("SVG too complex");
     }
+    Map<String, String> attrs = cleanAttributes(e, name);
+    if ("use".equals(name) && !attrs.containsKey("href")) {
+      return null; // 바깥을 가리키던 use
+    }
+    return new Item(name, attrs, cleanChildren(e, depth + 1, counter));
+  }
+
+  /** 남길 속성. on*, 다른 네임스페이스, 모르는 속성은 뺀다. href는 같은 문서 안(#id)을 가리킬 때만 */
+  private static Map<String, String> cleanAttributes(Element e, String name) {
     Map<String, String> attrs = new LinkedHashMap<>();
     NamedNodeMap list = e.getAttributes();
     for (int i = 0; i < list.getLength(); i++) {
@@ -254,21 +264,14 @@ public final class SvgSanitizer {
       String local = a.getLocalName() == null ? a.getName() : a.getLocalName();
       String value = a.getValue().strip();
       if (XLINK_NS.equals(ns) && "href".equals(local) || ns == null && "href".equals(local)) {
-        Matcher m = LOCAL_HREF.matcher(value);
-        if (HREF_ELEMENTS.contains(name) && m.matches()) {
+        if (HREF_ELEMENTS.contains(name) && LOCAL_HREF.matcher(value).matches()) {
           attrs.put("href", value); // xlink:href도 SVG2 href로 바꿔 쓴다
         }
-        continue;
+      } else if (ns == null && ATTRIBUTES.contains(local) && safeValue(local, value)) {
+        attrs.put(local, value);
       }
-      if (ns != null || !ATTRIBUTES.contains(local) || !safeValue(local, value)) {
-        continue; // on*, 다른 네임스페이스, 모르는 속성
-      }
-      attrs.put(local, value);
     }
-    if ("use".equals(name) && !attrs.containsKey("href")) {
-      return null; // 바깥을 가리키던 use
-    }
-    return new Item(name, attrs, cleanChildren(e, depth + 1, counter));
+    return attrs;
   }
 
   private static boolean safeValue(String attr, String value) {

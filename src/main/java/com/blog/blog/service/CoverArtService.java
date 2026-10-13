@@ -4,6 +4,7 @@ import com.blog.blog.domain.Blog;
 import com.blog.blog.domain.BlogTag;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogTagRepository;
+import com.blog.board.domain.Tag;
 import com.blog.board.service.ImageService;
 import com.blog.board.service.SvgSanitizer;
 import com.blog.common.storage.FileStorage;
@@ -127,7 +128,7 @@ public class CoverArtService {
   private List<String> tagNames(Long blogId) {
     return blogTagRepository.findWithTagByBlogIdIn(List.of(blogId)).stream()
         .map(BlogTag::getTag)
-        .map(t -> t.getName())
+        .map(Tag::getName)
         .toList();
   }
 

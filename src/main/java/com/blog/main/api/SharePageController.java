@@ -55,7 +55,10 @@ public class SharePageController {
   /** encodeURIComponent가 바꾸지 않는 글자만. 이런 share 값이면 화면 JS와 같은 주소를 만들 수 있다. */
   private static final Pattern URL_SAFE = Pattern.compile("[A-Za-z0-9_.~-]{1,200}");
 
-  private static final Pattern PAGE_NUMBER = Pattern.compile("[1-9][0-9]{0,8}");
+  private static final Pattern PAGE_NUMBER = Pattern.compile("[1-9]\\d{0,8}");
+
+  private static final String LATEST = "latest";
+  private static final String POPULAR = "popular";
 
   /** 블로그·글 링크(블로그 관리 화면 제외)와 메인 링크에 마우스를 올리거나 누르기 시작하면 그 화면 HTML을 미리 받는다. */
   static final String SPECULATION_RULES_JSON =
@@ -172,11 +175,11 @@ public class SharePageController {
       return null;
     }
     String tab = request.getParameter("tab");
-    if (tab == null || !List.of("latest", "popular", "blogs").contains(tab)) {
+    if (tab == null || !List.of(LATEST, POPULAR, "blogs").contains(tab)) {
       if (tab != null && List.of("following", "subscribed").contains(tab)) {
         return null;
       }
-      tab = "latest";
+      tab = LATEST;
     }
     String page = request.getParameter("page");
     if (page == null) {
@@ -185,7 +188,7 @@ public class SharePageController {
       return null;
     }
     if (tab.equals("blogs")) {
-      String sort = "popular".equals(request.getParameter("sort")) ? "popular" : "latest";
+      String sort = POPULAR.equals(request.getParameter("sort")) ? POPULAR : LATEST;
       return "/api/blogs?sort=" + sort + "&page=" + page;
     }
     return "/api/feed?tab=" + tab + "&page=" + page;

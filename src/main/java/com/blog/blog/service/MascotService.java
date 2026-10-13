@@ -10,6 +10,7 @@ import com.blog.blog.domain.Mascot;
 import com.blog.blog.domain.MascotDesign;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogTagRepository;
+import com.blog.board.domain.Tag;
 import jakarta.annotation.PreDestroy;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -446,25 +447,23 @@ public class MascotService {
             info.tags(),
             ThreadLocalRandom.current());
     // 한 번에 하나씩 만들기 때문에(worker, ShedLock) 읽고 저장하는 사이에 같은 조합이 끼어들지 않는다
-    MascotDesign mascot =
-        tx.execute(
-            s -> {
-              Set<String> taken =
-                  new HashSet<>(blogRepository.findMascotsInUse(wanted.base().key(), blogId));
-              if (info.current() != null) {
-                taken.add(info.current().value()); // 태그를 바꾸면 새 그림
-              }
-              MascotDesign design = unique(wanted, taken);
-              blogRepository
-                  .findById(blogId)
-                  .ifPresent(
-                      b -> {
-                        b.changeMascot(design);
-                        b.changeCoverScene(cover);
-                      });
-              return design;
-            });
-    return mascot;
+    return tx.execute(
+        s -> {
+          Set<String> taken =
+              new HashSet<>(blogRepository.findMascotsInUse(wanted.base().key(), blogId));
+          if (info.current() != null) {
+            taken.add(info.current().value()); // 태그를 바꾸면 새 그림
+          }
+          MascotDesign design = unique(wanted, taken);
+          blogRepository
+              .findById(blogId)
+              .ifPresent(
+                  b -> {
+                    b.changeMascot(design);
+                    b.changeCoverScene(cover);
+                  });
+          return design;
+        });
   }
 
   private void assignSafely(Long blogId) {
@@ -578,13 +577,13 @@ public class MascotService {
     Event event =
         chosen.event() != null
             ? chosen.event()
-            : KeywordScenePicker.event(name, tags)
-                .orElseGet(
-                    () ->
-                        random.nextInt(20) < 9
-                            ? SEASONS.get(random.nextInt(SEASONS.size()))
-                            : null);
+            : KeywordScenePicker.event(name, tags).orElseGet(() -> randomSeason(random));
     return chosen.withLayers(backdrop, event);
+  }
+
+  /** 10번 중 4.5번꼴로 계절 장식을 고른다. 나머지는 장식 없음(null) */
+  private static Event randomSeason(RandomGenerator random) {
+    return random.nextInt(20) < 9 ? SEASONS.get(random.nextInt(SEASONS.size())) : null;
   }
 
   /** 쓰고 있는 조합이면 같은 바탕 안에서 비어 있는 조합으로 바꾼다. 모두 차 있으면 원래 조합을 그대로 쓴다. */
@@ -601,7 +600,7 @@ public class MascotService {
   private List<String> tagNames(Long blogId) {
     return blogTagRepository.findWithTagByBlogIdIn(List.of(blogId)).stream()
         .map(BlogTag::getTag)
-        .map(t -> t.getName())
+        .map(Tag::getName)
         .toList();
   }
 

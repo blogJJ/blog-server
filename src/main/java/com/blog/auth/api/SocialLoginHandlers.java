@@ -50,6 +50,9 @@ public class SocialLoginHandlers
   static final String ME_PAGE = "/me.html";
   static final String SIGNUP_PAGE = "/social-signup.html";
 
+  /** 화면에 넘기는 social_error 값: 까닭을 따로 밝히지 않는 실패 */
+  private static final String FAILED = "failed";
+
   private final SocialLoginService socialLoginService;
   private final LoginSessionService sessionService;
   private final JwtProvider jwtProvider;
@@ -85,7 +88,7 @@ public class SocialLoginHandlers
             ? SocialProvider.fromId(token.getAuthorizedClientRegistrationId())
             : Optional.empty();
     if (provider.isEmpty()) {
-      fail(request, response, failPage, "-", "failed");
+      fail(request, response, failPage, "-", FAILED);
       return;
     }
     try {
@@ -99,10 +102,10 @@ public class SocialLoginHandlers
         login(request, response, profile, next, rememberMe);
       }
     } catch (BusinessException e) {
-      String reason = e.getErrorCode() == ErrorCode.TOO_MANY_REQUESTS ? "rate_limited" : "failed";
+      String reason = e.getErrorCode() == ErrorCode.TOO_MANY_REQUESTS ? "rate_limited" : FAILED;
       fail(request, response, failPage, provider.get().getId(), reason);
     } catch (IllegalArgumentException e) {
-      fail(request, response, failPage, provider.get().getId(), "failed");
+      fail(request, response, failPage, provider.get().getId(), FAILED);
     }
   }
 
@@ -117,7 +120,7 @@ public class SocialLoginHandlers
     String reason =
         exception instanceof OAuth2AuthenticationException e ? e.getError().getErrorCode() : "-";
     SecurityEventLogger.socialLoginFailed("-", reason, request.getRemoteAddr());
-    String code = "access_denied".equals(reason) ? "cancelled" : "failed";
+    String code = "access_denied".equals(reason) ? "cancelled" : FAILED;
     response.sendRedirect((linkUserId != null ? ME_PAGE : LOGIN_PAGE) + "?social_error=" + code);
   }
 
@@ -151,7 +154,7 @@ public class SocialLoginHandlers
       throws IOException {
     // 연결을 시작한 회원이 지금도 이 브라우저에 로그인해 있어야 한다
     if (!linkUserId.equals(currentUserId(request))) {
-      fail(request, response, ME_PAGE, profile.provider().getId(), "failed");
+      fail(request, response, ME_PAGE, profile.provider().getId(), FAILED);
       return;
     }
     Outcome outcome = socialLoginService.link(linkUserId, profile);

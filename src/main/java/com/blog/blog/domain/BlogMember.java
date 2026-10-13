@@ -96,8 +96,7 @@ public class BlogMember {
 
   /** 위임해 일반 멤버가 된다. 받은 사람이 부블로그장이었으면 부른 쪽이 이어서 부블로그장으로 올린다. */
   public void demoteFromOwner() {
-    this.role = BlogMemberRole.MEMBER;
-    this.managerSince = null;
+    demoteToMember();
   }
 
   public boolean isOwner() {

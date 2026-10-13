@@ -63,9 +63,22 @@ final class KeywordTagSuggester {
     String text = (title == null ? "" : title) + " " + (plainBody == null ? "" : plainBody);
     String lower = text.toLowerCase(Locale.ROOT);
     String lowerTitle = title == null ? "" : title.toLowerCase(Locale.ROOT);
-    Set<String> picked = new LinkedHashSet<>();
+    Set<String> picked = new LinkedHashSet<>(knownTagsInText(lower, lowerTitle, known, exclude));
+    for (String word : frequentWords(lower, lowerTitle)) {
+      if (picked.size() >= limit) {
+        break;
+      }
+      String tag = normalizeOrNull(word);
+      if (tag != null && !exclude.contains(tag)) {
+        picked.add(tag);
+      }
+    }
+    return picked.stream().limit(limit).toList();
+  }
 
-    // 1) 쓰던 태그 가운데 글에 나오는 것. 많이 나온 순, 같으면 블로그에서 많이 쓴 순
+  /** 1) 쓰던 태그 가운데 글에 나오는 것. 많이 나온 순, 같으면 블로그에서 많이 쓴 순 */
+  private static List<String> knownTagsInText(
+      String lower, String lowerTitle, Collection<String> known, Collection<String> exclude) {
     Map<String, Integer> knownHits = new LinkedHashMap<>();
     for (String tag : known) {
       String word = tag.replace('_', ' ');
@@ -74,11 +87,14 @@ final class KeywordTagSuggester {
         knownHits.put(tag, hits + (lowerTitle.contains(word) ? 2 : 0));
       }
     }
-    knownHits.entrySet().stream()
+    return knownHits.entrySet().stream()
         .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-        .forEach(e -> picked.add(e.getKey()));
+        .map(Map.Entry::getKey)
+        .toList();
+  }
 
-    // 2) 글에 자주 나오는 낱말
+  /** 2) 글에 자주 나오는 낱말. 조사를 떼어 합치고 제목에 나오면 더 쳐서 많이 나온 순 */
+  private static List<String> frequentWords(String lower, String lowerTitle) {
     Map<String, Integer> raw = new LinkedHashMap<>();
     Matcher m = WORD.matcher(lower);
     while (m.find()) {
@@ -101,16 +117,7 @@ final class KeywordTagSuggester {
       }
     }
     words.sort(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()));
-    for (Map.Entry<String, Integer> e : words) {
-      if (picked.size() >= limit) {
-        break;
-      }
-      String tag = normalizeOrNull(e.getKey());
-      if (tag != null && !exclude.contains(tag)) {
-        picked.add(tag);
-      }
-    }
-    return picked.stream().limit(limit).toList();
+    return words.stream().map(Map.Entry::getKey).toList();
   }
 
   /** 조사를 뗀 말이 글에 따로 나오면 그 말로 합친다. */

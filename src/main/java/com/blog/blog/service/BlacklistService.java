@@ -64,13 +64,13 @@ public class BlacklistService {
   @Transactional
   public BlacklistInquiry inquire(Long blogId, Long userId, String rawMessage) {
     User user = userRepository.findById(userId).orElseThrow();
-    BlogBlacklist record =
+    BlogBlacklist entry =
         matches(blogId, user).stream()
             .findFirst()
             .orElseThrow(
                 () -> new BusinessException(ErrorCode.NOT_FOUND, "이 블로그 블랙리스트에 걸려 있지 않아요."));
     if (inquiryRepository.existsByBlacklistIdAndUserIdAndStatus(
-        record.getId(), userId, InquiryStatus.PENDING)) {
+        entry.getId(), userId, InquiryStatus.PENDING)) {
       throw new BusinessException(ErrorCode.CONFLICT, "이미 문의를 남겼어요. 블로그장이 확인하면 알림으로 알려 드려요.");
     }
     String message = rawMessage == null ? null : rawMessage.strip();
@@ -79,13 +79,12 @@ public class BlacklistService {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "문의 내용은 500자까지 쓸 수 있어요.");
     }
     boolean nameMatch =
-        user.getName() != null && hashUtil.matches(user.getName(), record.getNameHash());
+        user.getName() != null && hashUtil.matches(user.getName(), entry.getNameHash());
     boolean phoneMatch =
-        user.getPhone() != null
-            && hashUtil.hashPhone(user.getPhone()).equals(record.getPhoneHash());
+        user.getPhone() != null && hashUtil.hashPhone(user.getPhone()).equals(entry.getPhoneHash());
     return inquiryRepository.save(
         new BlacklistInquiry(
-            record,
+            entry,
             user,
             nameMatch,
             phoneMatch,

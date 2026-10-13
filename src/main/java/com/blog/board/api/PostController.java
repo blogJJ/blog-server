@@ -95,7 +95,7 @@ public class PostController {
     String key =
         viewCountService.viewerKey(
             viewerId, request.getRemoteAddr(), request.getHeader(HttpHeaders.USER_AGENT));
-    if (viewCountService.record(postId, key)) {
+    if (viewCountService.recordView(postId, key)) {
       return withViewCount(detail, detail.viewCount() + 1);
     }
     return detail;

@@ -241,25 +241,10 @@ public class BlogQueryService {
     LocalDateTime now = LocalDateTime.now(clock);
     BlogMember member = access.membership().orElse(null);
 
-    JoinRequestStatus requestStatus = null;
-    Long requestId = null;
-    LocalDateTime reapplyAt = null;
-    if (viewerId != null && member == null) {
-      BlogJoinRequest last =
-          requestRepository
-              .findFirstByBlogIdAndUserIdOrderByIdDesc(blog.getId(), viewerId)
-              .orElse(null);
-      if (last != null) {
-        requestStatus = last.getStatus();
-        if (last.isPending()) {
-          requestId = last.getId();
-        }
-        if (last.getStatus() == JoinRequestStatus.REJECTED) {
-          LocalDateTime at = last.getHandledAt().plus(JoinService.REAPPLY_AFTER_REJECT);
-          reapplyAt = at.isAfter(now) ? at : null;
-        }
-      }
-    }
+    LastRequest request =
+        viewerId != null && member == null
+            ? lastRequest(blog.getId(), viewerId, now)
+            : LastRequest.NONE;
     // 메인 관리자는 멤버가 아니어도 블로그장 관리 권한을 모두 갖는다. 위임만 빼고 (D-122)
     boolean manager = member != null || (viewerId != null && BlogAuthz.isAdmin());
     boolean canEdit = manager && blogAuthz.hasPermission(blog.getId(), ManagerPermission.EDIT_INFO);
@@ -271,9 +256,9 @@ public class BlogQueryService {
         new Viewer(
             viewerId != null,
             member == null ? null : member.getRole(),
-            requestStatus,
-            requestId,
-            reapplyAt,
+            request.status(),
+            request.pendingId(),
+            request.reapplyAt(),
             canEdit,
             canManage,
             canManagePosts,
@@ -306,6 +291,27 @@ public class BlogQueryService {
         blog.getCreatedAt(),
         canEdit ? blog.getShareKey() : null,
         viewer);
+  }
+
+  /** 멤버가 아닌 회원이 이 블로그에 마지막으로 넣은 가입 신청. 대기 중이면 그 번호, 거절됐으면 다시 신청할 수 있는 시각(지났으면 null) */
+  private LastRequest lastRequest(Long blogId, Long viewerId, LocalDateTime now) {
+    return requestRepository
+        .findFirstByBlogIdAndUserIdOrderByIdDesc(blogId, viewerId)
+        .map(
+            last -> {
+              LocalDateTime reapplyAt = null;
+              if (last.getStatus() == JoinRequestStatus.REJECTED) {
+                LocalDateTime at = last.getHandledAt().plus(JoinService.REAPPLY_AFTER_REJECT);
+                reapplyAt = at.isAfter(now) ? at : null;
+              }
+              return new LastRequest(
+                  last.getStatus(), last.isPending() ? last.getId() : null, reapplyAt);
+            })
+        .orElse(LastRequest.NONE);
+  }
+
+  private record LastRequest(JoinRequestStatus status, Long pendingId, LocalDateTime reapplyAt) {
+    static final LastRequest NONE = new LastRequest(null, null, null);
   }
 
   /** 내 블로그 목록 (T052). 폐쇄된 블로그는 빼고, 만든 블로그·참여한 블로그·승인 대기로 나눈다. */

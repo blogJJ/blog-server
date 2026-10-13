@@ -103,7 +103,7 @@ public class SearchService {
     String t = TYPES.contains(type) ? type : "post";
     String s = BlogQueryService.normalizeSort(sort);
     if (viewerId != null) {
-      recentSearchService.record(viewerId, q);
+      recentSearchService.add(viewerId, q);
     }
     List<Long> hidden = blockService.hiddenAuthorIds(viewerId);
     Pageable pageable = PageRequest.of(Math.max(page, 1) - 1, PostCards.pageSize(size));

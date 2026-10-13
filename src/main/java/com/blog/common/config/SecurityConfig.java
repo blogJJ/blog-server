@@ -95,8 +95,7 @@ public class SecurityConfig {
       SocialAuthorizationRequestResolver socialRequestResolver,
       SocialOAuth2UserService socialUserService,
       SocialLoginHandlers socialHandlers,
-      @Value("${app.security.require-https:false}") boolean requireHttps)
-      throws Exception {
+      @Value("${app.security.require-https:false}") boolean requireHttps) {
     JsonSecurityErrorHandler errorHandler = new JsonSecurityErrorHandler(jsonMapper);
 
     if (!socialRegistrations.isEmpty()) {
