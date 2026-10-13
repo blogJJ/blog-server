@@ -3,6 +3,7 @@ package com.blog.auth.service;
 import com.blog.auth.domain.SocialProvider;
 import com.blog.common.config.SocialLoginProperties;
 import com.blog.common.config.SocialLoginProperties.Client;
+import com.blog.common.web.SiteUrl;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -21,8 +23,8 @@ import org.springframework.stereotype.Component;
  * <p>Spring Boot의 spring.security.oauth2.client.registration 설정은 아이디가 비면 서버가 뜨지 않아서 쓰지 않고, 아이디와
  * 비밀값이 모두 있는 제공자만 여기서 등록한다. 하나도 없으면 비어 있고, SecurityConfig가 소셜 로그인 주소를 열지 않는다.
  *
- * <p>돌아오는 주소는 {@code {baseUrl}/login/oauth2/code/{google|github}}. baseUrl은 요청에서 만들고, 운영에서는 프록시가 보낸
- * X-Forwarded-Proto·Host를 따른다(forward-headers-strategy native).
+ * <p>돌아오는 주소는 {@code {사이트 주소}/login/oauth2/code/{google|github}}. 사이트 주소({@code app.site-url})를 정해
+ * 두었으면(prod: https://jj-blog.java21.net) 그 값을 쓰고, 없으면(local·test) 요청에서 만든다 (T160).
  */
 @Component
 public class SocialClientRegistrations implements ClientRegistrationRepository {
@@ -32,7 +34,20 @@ public class SocialClientRegistrations implements ClientRegistrationRepository {
   private final Map<SocialProvider, ClientRegistration> registrations =
       new EnumMap<>(SocialProvider.class);
 
+  /** 돌아오는 주소. 사이트 주소가 없으면 Spring 기본값({baseUrl}은 요청에서 만든다) */
+  private final String redirectUri;
+
   public SocialClientRegistrations(SocialLoginProperties properties) {
+    this(properties, (String) null);
+  }
+
+  @Autowired
+  public SocialClientRegistrations(SocialLoginProperties properties, SiteUrl siteUrl) {
+    this(properties, siteUrl.configured());
+  }
+
+  SocialClientRegistrations(SocialLoginProperties properties, String siteUrl) {
+    this.redirectUri = siteUrl == null ? null : siteUrl + "/login/oauth2/code/{registrationId}";
     add(SocialProvider.GOOGLE, properties.google());
     add(SocialProvider.GITHUB, properties.github());
   }
@@ -56,6 +71,9 @@ public class SocialClientRegistrations implements ClientRegistrationRepository {
                   .getBuilder(provider.getId())
                   .scope("read:user", "user:email");
         };
+    if (redirectUri != null) {
+      builder.redirectUri(redirectUri);
+    }
     registrations.put(
         provider,
         builder.clientId(client.clientId().strip()).clientSecret(client.clientSecret()).build());
