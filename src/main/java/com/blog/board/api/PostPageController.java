@@ -2,6 +2,7 @@ package com.blog.board.api;
 
 import com.blog.board.service.PostQueryService;
 import com.blog.board.service.PostQueryService.OgInfo;
+import com.blog.common.web.SiteUrl;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,11 +17,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.HtmlUtils;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * 글 주소 {@code /blog/{주소}/posts/{번호}}. 화면은 정적 post.html이고, 공유 미리보기용 og 태그만 서버가 채운다 (T069, BRD-07,
- * D-66). 미리보기 이미지는 글의 첫 이미지, 없으면 블로그 대표 이미지. 비회원이 볼 수 없는 글은 og 태그를 채우지 않아 제목이 새지 않는다.
+ * D-66). 미리보기 이미지는 글의 첫 이미지, 없으면 블로그 대표 이미지. 비회원이 볼 수 없는 글은 og 태그를 채우지 않아 제목이 새지 않는다. 주소의 앞부분은
+ * {@link SiteUrl}(운영은 https://jj-blog.java21.net)을 쓴다 (T160).
  */
 @Controller
 public class PostPageController {
@@ -28,10 +29,12 @@ public class PostPageController {
   static final String PLACEHOLDER = "<!--og-->";
 
   private final PostQueryService queryService;
+  private final SiteUrl siteUrl;
   private final String template;
 
-  public PostPageController(PostQueryService queryService) {
+  public PostPageController(PostQueryService queryService, SiteUrl siteUrl) {
     this.queryService = queryService;
+    this.siteUrl = siteUrl;
     try (InputStream in = new ClassPathResource("static/post.html").getInputStream()) {
       this.template = new String(in.readAllBytes(), StandardCharsets.UTF_8);
     } catch (IOException e) {
@@ -53,20 +56,15 @@ public class PostPageController {
         .body(html);
   }
 
-  private static String ogTags(OgInfo og, HttpServletRequest request) {
-    String origin =
-        UriComponentsBuilder.fromUriString(request.getRequestURL().toString())
-            .replacePath(null)
-            .replaceQuery(null)
-            .build()
-            .toUriString();
+  private String ogTags(OgInfo og, HttpServletRequest request) {
+    String origin = siteUrl.origin(request);
     StringBuilder sb = new StringBuilder();
     meta(sb, "og:type", "article");
     meta(sb, "og:site_name", og.blogName());
     meta(sb, "og:title", og.title());
     meta(sb, "og:description", og.description());
     String query = request.getQueryString();
-    meta(sb, "og:url", request.getRequestURL() + (query == null ? "" : "?" + query));
+    meta(sb, "og:url", origin + request.getRequestURI() + (query == null ? "" : "?" + query));
     if (og.image() != null) {
       meta(sb, "og:image", origin + og.image());
     }
