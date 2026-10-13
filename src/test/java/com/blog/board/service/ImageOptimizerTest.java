@@ -15,9 +15,11 @@ import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 올린 이미지 줄이기 (T162). */
@@ -180,6 +182,169 @@ class ImageOptimizerTest {
     assertThat(ImageOptimizer.webpDimensions(webpCanvas(16000, 9000))).containsExactly(16000, 9000);
   }
 
+  @Test
+  @DisplayName("줄이지도 돌리지도 않았는데 WebP가 별로 작지 않으면 원래 JPEG(EXIF만 뺀 것)를 그대로 둔다")
+  void wellCompressedJpegIsKeptInsteadOfRecompressed() {
+    byte[] original = TestImages.jpeg(TestImages.photo(800, 600, 11), 0.3f);
+    byte[] jpeg = TestImages.withExif(original, 1, "SECRET-PLACE");
+
+    Result result = ImageOptimizer.optimize(jpeg, ImageType.JPEG, Limit.POST);
+
+    assertThat(result.type()).isEqualTo(ImageType.JPEG);
+    assertThat(result.data()).isEqualTo(original);
+  }
+
+  @Test
+  @DisplayName("사진 같은 PNG(화소당 1바이트 초과)는 무손실 대신 손실 WebP로 쓴다")
+  void photoLikePngBecomesLossyWebp() {
+    byte[] png = TestImages.encode(TestImages.photo(800, 600, 12), "png");
+    assertThat((double) png.length / (800 * 600)).isGreaterThan(1.0);
+
+    Result result = ImageOptimizer.optimize(png, ImageType.PNG, Limit.POST);
+
+    assertThat(result.type()).isEqualTo(ImageType.WEBP);
+    assertThat(new String(result.data(), 12, 4, StandardCharsets.ISO_8859_1)).isEqualTo("VP8 ");
+    assertThat(result.data().length).isLessThan(png.length / 4);
+    assertThat(ImageOptimizer.webpDimensions(result.data())).containsExactly(800, 600);
+  }
+
+  @Test
+  @DisplayName("WebP 한도(긴 변 16383px)를 넘는 긴 캡처는 원래 형식(PNG)으로 남는다")
+  void tallScreenshotBeyondWebpLimitStaysPng() throws Exception {
+    BufferedImage tall = new BufferedImage(300, 17_000, BufferedImage.TYPE_INT_RGB);
+    paint(tall, 0, 0, 300, 17_000, 0xFFFFFF);
+    paint(tall, 0, 16_000, 300, 1_000, 0x0000FF);
+    byte[] png = TestImages.encode(tall, "png");
+
+    Result result = ImageOptimizer.optimize(png, ImageType.PNG, Limit.POST);
+
+    assertThat(result.type()).isEqualTo(ImageType.PNG);
+    BufferedImage image = ImageIO.read(new ByteArrayInputStream(result.data()));
+    assertThat(image.getWidth()).isEqualTo(300);
+    assertThat(image.getHeight()).isEqualTo(17_000);
+    assertThat(image.getRGB(150, 16_500) & 0xFFFFFF).isEqualTo(0x0000FF);
+  }
+
+  @Test
+  @DisplayName("WebP 한도를 넘는 JPEG도 회전 정보대로 세워 JPEG로 다시 쓰고 EXIF·GPS를 남기지 않는다")
+  void tallRotatedJpegBeyondWebpLimitIsReencodedAsUprightJpeg() throws Exception {
+    // 가로 17000 x 세로 200으로 저장됐고 회전 정보 6(시계 방향 90도)으로 세워 보는 사진. 왼쪽 끝이 빨강
+    BufferedImage raw = new BufferedImage(17_000, 200, BufferedImage.TYPE_INT_RGB);
+    paint(raw, 0, 0, 17_000, 200, 0x808080);
+    paint(raw, 0, 0, 500, 200, 0xFF0000);
+    byte[] jpeg = TestImages.withExif(TestImages.jpeg(raw, 0.9f), 6, "SECRET-PLACE");
+
+    Result result = ImageOptimizer.optimize(jpeg, ImageType.JPEG, Limit.POST);
+
+    assertThat(result.type()).isEqualTo(ImageType.JPEG);
+    assertThat(contains(result.data(), "SECRET-PLACE")).isFalse();
+    Metadata after = ImageMetadataReader.readMetadata(new ByteArrayInputStream(result.data()));
+    assertThat(after.getFirstDirectoryOfType(GpsDirectory.class)).isNull();
+    BufferedImage image = ImageIO.read(new ByteArrayInputStream(result.data()));
+    assertThat(image.getWidth()).isEqualTo(200);
+    assertThat(image.getHeight()).isEqualTo(17_000);
+    assertThat(isReddish(image.getRGB(100, 200))).isTrue(); // 왼쪽 끝이 위로 간다
+    assertThat(isReddish(image.getRGB(100, 16_800))).isFalse();
+  }
+
+  @Test
+  @DisplayName("2400만 화소가 넘는 사진은 솎아 읽어 줄여도 프로필 크기와 그림 배치가 맞다")
+  void hugePhotoIsSubsampledWhileDecodingAndStillFitsProfile() {
+    BufferedImage raw = new BufferedImage(6000, 4500, BufferedImage.TYPE_INT_RGB);
+    paint(raw, 0, 0, 3000, 4500, 0xFF0000); // 왼쪽 절반 빨강
+    paint(raw, 3000, 0, 3000, 4500, 0x0000FF); // 오른쪽 절반 파랑
+    byte[] jpeg = TestImages.jpeg(raw, 0.8f);
+
+    Result result = ImageOptimizer.optimize(jpeg, ImageType.JPEG, Limit.PROFILE);
+
+    assertThat(result.type()).isEqualTo(ImageType.WEBP);
+    BufferedImage image = TestImages.readWebp(result.data());
+    assertThat(image.getWidth()).isEqualTo(512);
+    assertThat(image.getHeight()).isEqualTo(384);
+    assertThat(isReddish(image.getRGB(100, 192))).isTrue();
+    assertThat(image.getRGB(400, 192) & 0xFF).isGreaterThan(200);
+  }
+
+  @Test
+  @DisplayName("움직이는 PNG(APNG)는 풀지 않고 메타데이터만 지워 그대로 둔다")
+  void animatedPngIsKeptAndOnlyCleaned() {
+    byte[] png = TestImages.encode(TestImages.photo(400, 300, 13), "png");
+    byte[] actl = {0, 0, 0, 2, 0, 0, 0, 0}; // 장면 2개, 무한 반복
+    byte[] apng = TestImages.pngWithChunk(png, "acTL", actl);
+    byte[] dirty = TestImages.pngWithChunk(apng, "tEXt", "GPS\037.5,127.0".getBytes());
+
+    Result result = ImageOptimizer.optimize(dirty, ImageType.PNG, Limit.POST);
+
+    assertThat(ImageOptimizer.isAnimatedPng(dirty, ImageType.PNG)).isTrue();
+    assertThat(ImageOptimizer.isAnimatedPng(png, ImageType.PNG)).isFalse();
+    assertThat(result.type()).isEqualTo(ImageType.PNG);
+    assertThat(result.data()).isEqualTo(apng);
+  }
+
+  @Test
+  @DisplayName("머리가 깨졌거나 가로·세로가 0인 파일은 '손상'(IllegalArgumentException)으로 막는다")
+  void brokenHeadersAreRejectedAsBroken() {
+    byte[] gif = TestImages.animatedGif();
+    assertThatThrownBy(
+            () -> ImageOptimizer.optimize(Arrays.copyOf(gif, 8), ImageType.GIF, Limit.POST))
+        .isInstanceOf(IllegalArgumentException.class);
+    byte[] zeroWidth = gif.clone();
+    zeroWidth[6] = zeroWidth[7] = 0;
+    assertThatThrownBy(() -> ImageOptimizer.optimize(zeroWidth, ImageType.GIF, Limit.POST))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Broken image");
+    byte[] jpeg = TestImages.jpeg();
+    assertThatThrownBy(
+            () -> ImageOptimizer.optimize(Arrays.copyOf(jpeg, 20), ImageType.JPEG, Limit.POST))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Broken image");
+  }
+
+  @Test
+  @DisplayName("WebP 머리는 VP8·VP8L 시작 표시가 틀리거나 너무 짧거나 모르는 조각이면 '손상'이다")
+  void brokenWebpHeadersAreRejected() {
+    byte[] lossy =
+        ImageOptimizer.optimize(
+                TestImages.jpeg(TestImages.photo(320, 240, 14), 0.95f), ImageType.JPEG, Limit.POST)
+            .data();
+    assertThat(new String(lossy, 12, 4, StandardCharsets.ISO_8859_1)).isEqualTo("VP8 ");
+    byte[] badStartCode = lossy.clone();
+    badStartCode[23] = 0;
+    byte[] lossless =
+        ImageOptimizer.optimize(TestImages.pngWithAlpha(300, 200), ImageType.PNG, Limit.POST)
+            .data();
+    assertThat(new String(lossless, 12, 4, StandardCharsets.ISO_8859_1)).isEqualTo("VP8L");
+    byte[] badSignature = lossless.clone();
+    badSignature[20] = 0;
+    byte[] unknown = lossy.clone();
+    System.arraycopy("JUNK".getBytes(StandardCharsets.ISO_8859_1), 0, unknown, 12, 4);
+
+    for (byte[] broken :
+        new byte[][] {badStartCode, badSignature, unknown, Arrays.copyOf(lossy, 29)}) {
+      assertThatThrownBy(() -> ImageOptimizer.optimize(broken, ImageType.WEBP, Limit.POST))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("Broken WebP");
+    }
+  }
+
+  @Test
+  @DisplayName("요청 스레드가 끊기면 줄이지 않고 메타데이터만 지운 원래 파일을 돌려주며 끊김 표시는 남긴다")
+  void interruptedRequestKeepsCleanedOriginal() {
+    byte[] original = TestImages.jpeg(TestImages.photo(2400, 1800, 15), 0.9f);
+    byte[] jpeg = TestImages.withExif(original, 1, "SECRET-PLACE");
+
+    Thread.currentThread().interrupt();
+    Result result;
+    try {
+      result = ImageOptimizer.optimize(jpeg, ImageType.JPEG, Limit.POST);
+    } finally {
+      assertThat(Thread.interrupted()).isTrue();
+    }
+
+    assertThat(result.type()).isEqualTo(ImageType.JPEG);
+    assertThat(result.data()).isEqualTo(original);
+  }
+
   private static byte[] webpCanvas(int width, int height) {
     ByteBuffer b = ByteBuffer.allocate(30 + 8).order(ByteOrder.LITTLE_ENDIAN);
     b.put("RIFF".getBytes(StandardCharsets.ISO_8859_1)).putInt(30);
@@ -213,5 +378,19 @@ class ImageOptimizerTest {
     } catch (java.io.IOException e) {
       throw new java.io.UncheckedIOException(e);
     }
+  }
+
+  @Test
+  @DisplayName("PNG 조각 길이가 int 끝에 가까운 값이어도 움직이는 PNG 검사가 넘치지 않고 끝난다 (500 대신 손상으로 막히게)")
+  void hugeChunkLengthDoesNotOverflowAnimatedPngCheck() {
+    // IHDR 다음 조각의 길이를 0x7FFFFFF0으로 꾸민다. int로 더하면 다음 위치가 음수가 되어 예외가 났다
+    byte[] png = TestImages.pngWithChunk(TestImages.png(), "tEXt", new byte[4]);
+    int at = 8 + 12 + 13;
+    png[at] = 0x7F;
+    png[at + 1] = (byte) 0xFF;
+    png[at + 2] = (byte) 0xFF;
+    png[at + 3] = (byte) 0xF0;
+
+    assertThat(ImageOptimizer.isAnimatedPng(png, ImageType.PNG)).isFalse();
   }
 }

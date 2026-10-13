@@ -8,7 +8,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.w3c.dom.Document;
 
 /** Claude가 그린 SVG 정리 (T155, D-126). 그림은 남고 스크립트·외부 주소·HTML은 빠지거나 통째로 버려진다. */
@@ -221,6 +224,125 @@ class SvgSanitizerTest {
     Path out = Path.of("build", "cover-art", "cafe-sanitized.svg");
     Files.createDirectories(out.getParent());
     Files.writeString(out, clean, StandardCharsets.UTF_8);
+  }
+
+  @Test
+  @DisplayName("viewBox가 없으면 width·height로 만들어 쓴다")
+  void viewBoxFallsBackToWidthAndHeight() {
+    String clean =
+        SvgSanitizer.sanitize(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"300\" height=\"150\">"
+                + "<rect width=\"10\" height=\"10\"/></svg>");
+
+    assertThat(clean)
+        .startsWith(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 300 150\" width=\"300\""
+                + " height=\"150\"");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0 0 100", "0 0 100 abc", "0 0 50% 50", "0 0 0 100", "0 0 100 -5"})
+  @DisplayName("viewBox가 숫자 네 개가 아니거나 폭·높이가 0 이하면 버린다")
+  void invalidViewBoxIsRejected(String viewBox) {
+    assertThatThrownBy(
+            () ->
+                SvgSanitizer.sanitize(
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\""
+                        + viewBox
+                        + "\"><rect width=\"1\" height=\"1\"/></svg>"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Invalid viewBox");
+  }
+
+  @Test
+  @DisplayName("빈 문서와, 이름만 svg이고 다른 네임스페이스인 루트는 버린다")
+  void blankOrForeignNamespaceRootIsRejected() {
+    assertThatThrownBy(() -> SvgSanitizer.sanitize("   "))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                SvgSanitizer.sanitize(
+                    "<svg xmlns=\"http://www.w3.org/1999/xhtml\" viewBox=\"0 0 1 1\">"
+                        + "<rect width=\"1\" height=\"1\"/></svg>"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Root is not svg");
+  }
+
+  @Test
+  @DisplayName("xmlns를 빼먹은 SVG는 받고, 안쪽의 svg·다른 네임스페이스 요소는 통째로 뺀다")
+  void nestedSvgAndForeignElementsAreDropped() {
+    String clean =
+        SvgSanitizer.sanitize(
+            "<svg viewBox=\"0 0 10 10\" xmlns:h=\"http://www.w3.org/1999/xhtml\">"
+                + "<rect width=\"1\" height=\"1\"/>"
+                + "<svg><script>alert(1)</script><rect width=\"2\" height=\"2\"/></svg>"
+                + "<h:div><rect width=\"3\" height=\"3\"/></h:div></svg>");
+
+    assertThat(clean)
+        .endsWith("preserveAspectRatio=\"xMidYMid slice\"><rect height=\"1\" width=\"1\"/></svg>");
+  }
+
+  @Test
+  @DisplayName("편집기 네임스페이스 속성, 그림 요소의 href, 잘못된 id는 그 속성만 뺀다")
+  void foreignAttributesHrefOnShapesAndBadIdsAreDropped() {
+    String clean =
+        SvgSanitizer.sanitize(
+            OPEN.replace(
+                    ">",
+                    " xmlns:inkscape=\"http://www.inkscape.org/namespaces/inkscape\""
+                        + " xmlns:x=\"urn:x\">")
+                + "<g inkscape:label=\"Layer 1\" id=\"layer1\">"
+                + "<rect href=\"#layer1\" x:href=\"#layer1\" width=\"1\" height=\"1\"/>"
+                + "<circle id=\"1bad\" r=\"2\"/><circle id=\"has space\" r=\"3\"/></g></svg>");
+
+    assertThat(clean)
+        .doesNotContain("inkscape")
+        .doesNotContain("href")
+        .contains("<g id=\"layer1\"><rect height=\"1\" width=\"1\"/>")
+        .contains("<circle r=\"2\"/><circle r=\"3\"/></g>");
+  }
+
+  @Test
+  @DisplayName("CSS 식·IE behavior·역슬래시 이스케이프·글자 꺾쇠가 든 값은 그 속성만 뺀다")
+  void dangerousAttributeValuesAreDropped() {
+    String clean =
+        SvgSanitizer.sanitize(
+            OPEN
+                + "<rect width=\"1\" height=\"1\" fill=\"expression(alert(1))\"/>"
+                + "<rect width=\"2\" height=\"2\" style=\"behavior:url(#a)\"/>"
+                + "<rect width=\"3\" height=\"3\" style=\"fill:\\75 rl(x)\"/>"
+                + "<rect width=\"4\" height=\"4\" transform=\"&lt;b&gt;\"/>"
+                + "<path d=\""
+                + "M0 0 ".repeat(20_001)
+                + "\" fill=\"#000\"/></svg>");
+
+    assertThat(clean)
+        .doesNotContain("expression")
+        .doesNotContain("behavior")
+        .doesNotContain("\\")
+        .doesNotContain("&lt;")
+        .contains("<rect height=\"1\" width=\"1\"/>")
+        .contains("<rect height=\"2\" width=\"2\"/>")
+        .contains("<rect height=\"3\" width=\"3\"/>")
+        .contains("<rect height=\"4\" width=\"4\"/>")
+        .contains("<path fill=\"#000\"/>");
+  }
+
+  @Test
+  @DisplayName("32단계보다 깊거나 요소가 5000개를 넘는 그림은 통째로 버린다")
+  void tooDeepOrTooManyElementsIsRejected() {
+    String deep = OPEN + "<g>".repeat(33) + "<rect width=\"1\" height=\"1\"/>" + "</g>".repeat(33);
+    assertThatThrownBy(() -> SvgSanitizer.sanitize(deep + "</svg>"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("SVG too complex");
+    String okDepth =
+        OPEN + "<g>".repeat(31) + "<rect width=\"1\" height=\"1\"/>" + "</g>".repeat(31);
+    assertThat(SvgSanitizer.sanitize(okDepth + "</svg>")).contains("<rect");
+
+    String many = OPEN + "<g/>".repeat(5001) + "</svg>";
+    assertThatThrownBy(() -> SvgSanitizer.sanitize(many))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("SVG too complex");
   }
 
   private static void assertWellFormed(String svg) throws Exception {

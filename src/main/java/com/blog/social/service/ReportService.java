@@ -317,10 +317,11 @@ public class ReportService {
     };
   }
 
+  /** MySQL VARCHAR(1000)처럼 글자(코드 포인트) 수로 자른다. String.length로 자르면 이모지가 반으로 갈려 "?"로 저장된다 */
   private static String cut(String snapshot) {
-    return snapshot.length() <= Report.SNAPSHOT_MAX
+    return snapshot.codePointCount(0, snapshot.length()) <= Report.SNAPSHOT_MAX
         ? snapshot
-        : snapshot.substring(0, Report.SNAPSHOT_MAX);
+        : snapshot.substring(0, snapshot.offsetByCodePoints(0, Report.SNAPSHOT_MAX));
   }
 
   private record Target(Blog blog, Long authorId, String snapshot) {}

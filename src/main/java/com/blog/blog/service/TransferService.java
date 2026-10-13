@@ -228,6 +228,25 @@ public class TransferService {
   }
 
   /**
+   * 관리자가 블로그장을 박탈하면 그 블로그의 대기 요청을 취소하고 받는 사람에게 알린다 (D-145). 박탈 뒤에는 보낸 사람이 블로그장이 아니라 수락할 수 없고, 남겨 두면
+   * 새 블로그장이 7일 동안 새 요청을 못 보낸다(D-123).
+   */
+  @Transactional
+  public void cancelForDemotedOwner(Long blogId, Long adminId) {
+    LocalDateTime now = now();
+    for (BlogOwnerTransfer t : transferRepository.findPendingByBlogId(blogId)) {
+      t.cancel(now);
+      notificationService.notify(
+          t.getToUser().getId(),
+          adminId,
+          NotificationType.OWNER_TRANSFER_RESULT,
+          NotificationTargetType.BLOG,
+          blogId,
+          "'" + t.getBlog().getName() + "' 블로그장이 바뀌어 블로그장 위임 요청이 취소되었어요.");
+    }
+  }
+
+  /**
    * 받는 멤버가 블로그를 떠나거나 탈퇴하면 그 사람에게 온 대기 요청을 취소하고 블로그장에게 알린다.
    *
    * @param blogId 이 블로그의 요청만. null이면 모든 블로그 (회원 탈퇴)

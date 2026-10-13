@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'com.diffplug.spotless' version '8.10.4'
+    id 'jacoco'
 }
 
 group = 'com.blog'
@@ -94,6 +95,19 @@ tasks.named('test') {
     useJUnitPlatform()
     // 운영과 같은 시간대. BlogServerApplication.main이 정하는 것을 테스트에서도 맞춘다
     systemProperty 'user.timezone', 'Asia/Seoul'
+    finalizedBy 'jacocoTestReport'
+}
+
+// 테스트 커버리지: build/reports/jacoco/test/html/index.html, SonarQube·SonarLint가 읽는 XML도 함께 만든다
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 // 배포용 실행 파일은 build/libs/blog-server.jar 하나만 만든다. Dockerfile이 이 이름으로 복사한다
