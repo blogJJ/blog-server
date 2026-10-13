@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>수정: 쓴 사람만, "수정됨"이 붙는다. 삭제: 쓴 사람, 그 블로그 블로그장·글 관리 권한 부블로그장, 메인 관리자.
  *   <li>답글이 남은 첫 댓글을 지우면 deleted=true로 내려가 화면이 "삭제된 댓글입니다"로 보여 주고, 답글이 없으면 목록에서 빠진다.
  *   <li>알림: 글 작성자에게 "댓글", 답한 회원에게 "대댓글". 같은 사람이면 "대댓글" 하나만.
+ *   <li>저장 뒤 자동 검사(CommentModerationService, T166, D-133)가 수상한 댓글을 숨기고 블로그장 확인을 받는다. 확인을 기다리는 댓글은 쓴
+ *       사람에게만 평소처럼 보이고, 쓴 사람은 그대로 고치거나 지우거나 답글을 달 수 있다.
  * </ul>
  */
 @Service
@@ -81,6 +84,7 @@ public class CommentService {
   private final NotificationService notificationService;
   private final Clock clock;
   private final BlockService blockService;
+  private final ApplicationEventPublisher events;
 
   public CommentService(
       CommentRepository commentRepository,
@@ -91,7 +95,8 @@ public class CommentService {
       AccountGuard accountGuard,
       NotificationService notificationService,
       Clock clock,
-      BlockService blockService) {
+      BlockService blockService,
+      ApplicationEventPublisher events) {
     this.commentRepository = commentRepository;
     this.postRepository = postRepository;
     this.userRepository = userRepository;
@@ -101,6 +106,7 @@ public class CommentService {
     this.notificationService = notificationService;
     this.clock = clock;
     this.blockService = blockService;
+    this.events = events;
   }
 
   /** 댓글 또는 대댓글을 단다. */
@@ -108,6 +114,7 @@ public class CommentService {
   public Comment create(Long postId, Long userId, String shareKey, CommentForm form) {
     accountGuard.check(userId, Activity.WRITE_COMMENT);
     Post post = visiblePost(postId, userId, shareKey);
+    boolean staff = isStaff(post, userId, shareKey);
     String content = validate(form.content());
     User author = userRepository.getReferenceById(userId);
 
@@ -118,7 +125,7 @@ public class CommentService {
           commentRepository
               .findById(form.parentId())
               .filter(c -> c.getPost().getId().equals(postId))
-              .filter(Comment::isActive)
+              .filter(c -> c.isShownTo(userId))
               .orElseThrow(
                   () -> new BusinessException(ErrorCode.INVALID_INPUT, "답할 댓글이 지워졌거나 없어요."));
       parent = target.getParent() == null ? target : target.getParent();
@@ -127,6 +134,11 @@ public class CommentService {
     Comment comment = commentRepository.save(new Comment(post, author, parent, replyTo, content));
     postRepository.addCommentCount(postId, 1);
     notifyNew(post, comment, userId);
+    if (!staff) {
+      events.publishEvent(
+          new CommentModerationService.CommentWritten(
+              comment.getId(), post.getBlog().getId(), userId));
+    }
     return comment;
   }
 
@@ -134,25 +146,36 @@ public class CommentService {
   @Transactional
   public Comment update(Long commentId, Long userId, CommentForm form) {
     accountGuard.check(userId, Activity.WRITE_COMMENT);
-    Comment comment = liveComment(commentId);
+    Comment comment = liveComment(commentId, userId);
     if (!comment.isWrittenBy(userId)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, "댓글은 쓴 사람만 고칠 수 있어요.");
     }
-    visiblePost(comment.getPost().getId(), userId, null);
-    comment.edit(validate(form.content()));
+    Post post = visiblePost(comment.getPost().getId(), userId, null);
+    String content = validate(form.content());
+    boolean changed = !content.equals(comment.getContent());
+    comment.edit(content);
+    // 보이는 댓글(승인한 댓글 포함)을 고치면 다시 검사한다. 확인을 기다리는 댓글은 그대로 기다린다
+    if (changed && comment.isActive() && !isStaff(post, userId, null)) {
+      events.publishEvent(
+          new CommentModerationService.CommentWritten(
+              comment.getId(), post.getBlog().getId(), userId));
+    }
     return comment;
   }
 
   /** 지운다. 행은 남기고 DELETED로 바꾼다. */
   @Transactional
   public void delete(Long commentId, Long userId, UserRole role) {
-    Comment comment = liveComment(commentId);
+    Comment comment = liveComment(commentId, userId);
     Long blogId = comment.getPost().getBlog().getId();
     if (!comment.isWrittenBy(userId) && !canModerate(blogId, role)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, "이 댓글을 지울 권한이 없어요.");
     }
+    boolean counted = comment.isActive(); // 확인을 기다리는 댓글은 숨길 때 이미 뺐다
     comment.delete(LocalDateTime.now(clock));
-    postRepository.addCommentCount(comment.getPost().getId(), -1);
+    if (counted) {
+      postRepository.addCommentCount(comment.getPost().getId(), -1);
+    }
   }
 
   /**
@@ -174,7 +197,8 @@ public class CommentService {
             : new HashSet<>(blockService.hiddenAuthorIds(viewerId));
     boolean moderator = viewerId != null && canModerate(post.getBlog().getId(), viewerRole);
     Page<Comment> roots =
-        commentRepository.findRoots(postId, PageRequest.of(Math.max(page, 1) - 1, PAGE_SIZE));
+        commentRepository.findRoots(
+            postId, viewerId, PageRequest.of(Math.max(page, 1) - 1, PAGE_SIZE));
     return PageResponse.of(roots, list -> rows(list, viewerId, moderator, hidden));
   }
 
@@ -185,7 +209,7 @@ public class CommentService {
     }
     Map<Long, List<CommentRow>> replies = new LinkedHashMap<>();
     roots.forEach(r -> replies.put(r.getId(), new ArrayList<>()));
-    for (Comment r : commentRepository.findReplies(replies.keySet())) {
+    for (Comment r : commentRepository.findReplies(replies.keySet(), viewerId)) {
       if (!hidden.contains(r.getAuthor().getId())) {
         replies.get(r.getParent().getId()).add(row(r, viewerId, moderator, List.of(), false));
       }
@@ -204,7 +228,8 @@ public class CommentService {
 
   private CommentRow row(
       Comment c, Long viewerId, boolean moderator, List<CommentRow> replies, boolean blocked) {
-    boolean deleted = !c.isActive();
+    // 확인을 기다리는 댓글은 쓴 사람에게 평소처럼 보인다 (T166, D-133)
+    boolean deleted = !c.isShownTo(viewerId);
     boolean shown = !deleted && !blocked;
     boolean mine = viewerId != null && c.isWrittenBy(viewerId);
     return new CommentRow(
@@ -252,6 +277,13 @@ public class CommentService {
         || blogAuthz.hasPermission(blogId, ManagerPermission.MANAGE_POSTS);
   }
 
+  /** 블로그장·부블로그장·메인 관리자. 이들이 쓴 댓글은 자동 검사하지 않는다 (D-133) */
+  private boolean isStaff(Post post, Long userId, String shareKey) {
+    return BlogAuthz.isAdmin()
+        || CommentModerationService.isStaff(
+            accessService.check(post.getBlog(), userId, shareKey).membership());
+  }
+
   private Post visiblePost(Long postId, Long viewerId, String shareKey) {
     Post post =
         postRepository
@@ -262,11 +294,12 @@ public class CommentService {
     return post;
   }
 
-  private Comment liveComment(Long commentId) {
+  /** 보이는 댓글. 확인을 기다리는 댓글은 쓴 사람에게만 보인다 */
+  private Comment liveComment(Long commentId, Long userId) {
     Comment comment =
         commentRepository
             .findById(commentId)
-            .filter(Comment::isActive)
+            .filter(c -> c.isShownTo(userId))
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     if (!comment.getPost().isPublished() || !comment.getPost().getBlog().isOpen()) {
       throw new BusinessException(ErrorCode.NOT_FOUND);
