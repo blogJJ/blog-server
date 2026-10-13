@@ -379,4 +379,18 @@ class ImageOptimizerTest {
       throw new java.io.UncheckedIOException(e);
     }
   }
+
+  @Test
+  @DisplayName("PNG 조각 길이가 int 끝에 가까운 값이어도 움직이는 PNG 검사가 넘치지 않고 끝난다 (500 대신 손상으로 막히게)")
+  void hugeChunkLengthDoesNotOverflowAnimatedPngCheck() {
+    // IHDR 다음 조각의 길이를 0x7FFFFFF0으로 꾸민다. int로 더하면 다음 위치가 음수가 되어 예외가 났다
+    byte[] png = TestImages.pngWithChunk(TestImages.png(), "tEXt", new byte[4]);
+    int at = 8 + 12 + 13;
+    png[at] = 0x7F;
+    png[at + 1] = (byte) 0xFF;
+    png[at + 2] = (byte) 0xFF;
+    png[at + 3] = (byte) 0xF0;
+
+    assertThat(ImageOptimizer.isAnimatedPng(png, ImageType.PNG)).isFalse();
+  }
 }

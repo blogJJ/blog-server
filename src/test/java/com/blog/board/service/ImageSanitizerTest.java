@@ -73,14 +73,14 @@ class ImageSanitizerTest {
   }
 
   @ParameterizedTest(name = "orientation {0}")
-  @ValueSource(ints = {3, 6, 8})
-  @DisplayName("회전 정보가 있는 휴대폰 JPEG는 먼저 세워 다시 쓰고 EXIF·GPS를 지운다 (BRD-05)")
+  @ValueSource(ints = {2, 3, 4, 5, 6, 7, 8})
+  @DisplayName("회전·뒤집기 정보가 있는 휴대폰 JPEG는 먼저 바로 세워 다시 쓰고 EXIF·GPS를 지운다 (BRD-05)")
   void rotatedJpegIsTurnedUprightBeforeExifIsRemoved(int orientation) throws Exception {
-    // 왼쪽 절반 빨강, 오른쪽 절반 파랑인 가로 그림
+    // 80x40 가로 그림. 왼쪽 위 4분의 1만 빨강, 나머지는 파랑
     BufferedImage raw = new BufferedImage(80, 40, BufferedImage.TYPE_INT_RGB);
     for (int y = 0; y < 40; y++) {
       for (int x = 0; x < 80; x++) {
-        raw.setRGB(x, y, x < 40 ? 0xFF0000 : 0x0000FF);
+        raw.setRGB(x, y, x < 40 && y < 20 ? 0xFF0000 : 0x0000FF);
       }
     }
     byte[] jpeg = TestImages.withExif(TestImages.jpeg(raw, 0.95f), orientation, "HOME-ADDRESS");
@@ -95,26 +95,30 @@ class ImageSanitizerTest {
     assertThat(after.getFirstDirectoryOfType(GpsDirectory.class)).isNull();
     assertThat(after.getFirstDirectoryOfType(ExifIFD0Directory.class)).isNull();
 
+    // 빨간 칸이 가야 할 모서리: 왼쪽 위(0)·오른쪽 위(1)·왼쪽 아래(2)·오른쪽 아래(3)
+    int corner =
+        switch (orientation) {
+          case 2 -> 1; // 좌우 뒤집기
+          case 3 -> 3; // 180도
+          case 4 -> 2; // 위아래 뒤집기
+          case 5 -> 0; // 대각선 뒤집기
+          case 6 -> 1; // 시계 방향 90도
+          case 7 -> 3;
+          default -> 2; // 8: 반시계 방향 90도
+        };
     BufferedImage image = ImageIO.read(new ByteArrayInputStream(cleaned));
-    switch (orientation) {
-      case 3 -> { // 180도: 빨강이 오른쪽으로
-        assertThat(image.getWidth()).isEqualTo(80);
-        assertThat(image.getHeight()).isEqualTo(40);
-        assertThat(isRed(image.getRGB(70, 20))).isTrue();
-        assertThat(isRed(image.getRGB(10, 20))).isFalse();
-      }
-      case 6 -> { // 시계 방향 90도: 왼쪽이 위로
-        assertThat(image.getWidth()).isEqualTo(40);
-        assertThat(image.getHeight()).isEqualTo(80);
-        assertThat(isRed(image.getRGB(20, 10))).isTrue();
-        assertThat(isRed(image.getRGB(20, 70))).isFalse();
-      }
-      default -> { // 8, 반시계 방향 90도: 왼쪽이 아래로
-        assertThat(image.getWidth()).isEqualTo(40);
-        assertThat(image.getHeight()).isEqualTo(80);
-        assertThat(isRed(image.getRGB(20, 70))).isTrue();
-        assertThat(isRed(image.getRGB(20, 10))).isFalse();
-      }
+    boolean swap = orientation >= 5;
+    assertThat(image.getWidth()).isEqualTo(swap ? 40 : 80);
+    assertThat(image.getHeight()).isEqualTo(swap ? 80 : 40);
+    int w = image.getWidth();
+    int h = image.getHeight();
+    int[][] centers = {
+      {w / 4, h / 4}, {w * 3 / 4, h / 4}, {w / 4, h * 3 / 4}, {w * 3 / 4, h * 3 / 4}
+    };
+    for (int c = 0; c < 4; c++) {
+      assertThat(isRed(image.getRGB(centers[c][0], centers[c][1])))
+          .as("모서리 %d", c)
+          .isEqualTo(c == corner);
     }
   }
 
