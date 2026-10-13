@@ -457,7 +457,17 @@ class PostFlowTest {
         .andExpect(status().isOk())
         .andExpect(
             content().string(containsString("property=\"og:title\" content=\"공유할 &lt;글&gt;\"")))
-        .andExpect(content().string(containsString("og:description\" content=\"첫 문단이에요\"")));
+        .andExpect(content().string(containsString("og:description\" content=\"첫 문단이에요\"")))
+        // 사이트 주소를 정하지 않은 test 프로필은 요청 주소로 만든다 (T160)
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "og:url\" content=\"http://localhost/blog/"
+                            + slugOf(blogId)
+                            + "/posts/"
+                            + postId
+                            + "\"")));
     mockMvc
         .perform(get("/blog/" + slugOf(privateBlog) + "/posts/" + secret))
         .andExpect(status().isOk())

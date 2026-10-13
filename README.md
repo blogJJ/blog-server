@@ -59,6 +59,7 @@ IntelliJ에서 `BlogServerApplication`을 바로 실행할 때는 Run Configurat
 - DB 변경(Flyway)은 잠금을 30초까지만 기다린다(`spring.flyway.init-sqls`). 배포 로그에 `Lock wait timeout exceeded`가 보이면 누군가 트랜잭션을 열어 둔 것이다. DB 툴에서 `SHOW FULL PROCESSLIST;`로 오래 `Sleep` 중인 외부 연결을 찾아 커밋하거나 `KILL`한 뒤 다시 배포한다. DB 툴은 자동 커밋을 켜 두고 쓴다.
 - 구글·깃허브 소셜 로그인(T157)은 키를 넣어야 켜진다. 만드는 법과 넣을 secrets는 [docs/social-login.md](docs/social-login.md).
 - nginx 설정(설명서 5단계)은 이 저장소 밖에서 한다. nginx는 `X-Forwarded-Proto`를 넘겨야 한다(안 넘기면 https로 돌려보낸다).
+- https 고정(T160): prod는 https 응답에 HSTS(`max-age=31536000`, 공용 학교 도메인이라 `includeSubDomains` 없음)를 붙이고, 공유 미리보기·소셜 로그인 돌아오는 주소 같은 절대 주소를 `app.site-url`(기본 `https://jj-blog.java21.net`, `SITE_URL`로 바꿈, https가 아니면 서버가 뜨지 않음)로 만든다. 앱은 `X-Forwarded-Proto: http`로 온 요청을 https로 돌려보낸다. 그런데 `http://jj-blog.java21.net`을 쳤는데도 http에 머무르면 바깥 nginx가 80번 요청을 `X-Forwarded-Proto: https`로 넘기고 있는 것이라 앱은 구분할 수 없다. 이 저장소에서는 고칠 수 없으니 바깥 nginx의 80번 server 블록에 `return 301 https://$host$request_uri;`를 넣어 달라고 한다. 한 번 https로 들어온 브라우저는 HSTS 덕분에 1년 동안 http를 쓰지 않는다.
 
 ## 릴리즈 노트
 
