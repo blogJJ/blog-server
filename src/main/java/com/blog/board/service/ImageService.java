@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
  *   <li>jpg·jpeg·png·gif·webp만. 확장자, 브라우저가 보낸 MIME, 파일 앞부분(시그니처) 세 가지가 모두 같은 종류여야 한다.
  *   <li>장당 3MB. 글 하나에 10장은 글을 저장할 때 센다.
  *   <li>EXIF 등 메타데이터를 지우고 UUID 이름으로 저장한다. 원래 이름은 DB에만 남기고 화면에는 주지 않는다.
+ *   <li>쓰임별 크기로 줄여 WebP로 저장한다. 화소가 너무 많은 그림은 풀기 전에 막는다 ({@link ImageOptimizer}, T162).
  * </ul>
  */
 @Service
@@ -75,7 +76,7 @@ public class ImageService {
   @Transactional
   public Uploaded uploadPostImage(Long userId, MultipartFile file) {
     accountGuard.check(userId, Activity.WRITE_POST);
-    Checked checked = check(file);
+    Checked checked = check(file, ImageOptimizer.Limit.POST);
     String storedName = store(checked);
     PostImage image =
         imageRepository.save(
@@ -88,9 +89,14 @@ public class ImageService {
     return new Uploaded(image.getId(), storedName, url(storedName));
   }
 
-  /** 블로그 대표 이미지·프로필 사진처럼 한 장만 두는 이미지. 저장 이름을 돌려준다. */
-  public String storeSingle(MultipartFile file) {
-    return store(check(file));
+  /** 블로그 대표 이미지. 저장 이름을 돌려준다. */
+  public String storeCover(MultipartFile file) {
+    return store(check(file, ImageOptimizer.Limit.COVER));
+  }
+
+  /** 프로필 사진. 저장 이름을 돌려준다. */
+  public String storeProfile(MultipartFile file) {
+    return store(check(file, ImageOptimizer.Limit.PROFILE));
   }
 
   /** 지운다. 없거나 실패해도 요청은 계속한다 (남은 파일은 정리 배치가 지운다). */
@@ -121,7 +127,7 @@ public class ImageService {
 
   private record Checked(ImageType type, byte[] data) {}
 
-  private static Checked check(MultipartFile file) {
+  private static Checked check(MultipartFile file, ImageOptimizer.Limit limit) {
     if (file == null || file.isEmpty()) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "이미지를 골라 주세요.");
     }
@@ -150,7 +156,11 @@ public class ImageService {
       throw notAllowed();
     }
     try {
-      return new Checked(bySig, ImageSanitizer.sanitize(data, bySig));
+      ImageOptimizer.Result result = ImageOptimizer.optimize(data, bySig, limit);
+      return new Checked(result.type(), result.data());
+    } catch (ImageOptimizer.TooManyPixelsException e) {
+      throw new BusinessException(
+          ErrorCode.PAYLOAD_TOO_LARGE, "이미지가 너무 커요. 가로×세로 5천만 화소까지 올릴 수 있어요.");
     } catch (IllegalArgumentException e) {
       throw new BusinessException(ErrorCode.INVALID_INPUT, "이미지 파일이 손상되어 올릴 수 없어요.");
     }

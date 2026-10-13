@@ -130,7 +130,7 @@ public class BlogController {
   @PreAuthorize("@blogAuthz.hasPermission(#blogId, 'EDIT_INFO')")
   public Map<String, String> changeCover(
       @PathVariable Long blogId, @RequestParam("file") MultipartFile file) {
-    String stored = imageService.storeSingle(file);
+    String stored = imageService.storeCover(file);
     String old;
     try {
       old = blogService.changeCover(blogId, stored);

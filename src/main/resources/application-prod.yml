@@ -5,6 +5,8 @@ app:
   security:
     # http 요청은 https로 돌려보낸다. 상태 확인 주소만 예외 (SEC-10)
     require-https: true
+  # 서버가 만드는 절대 주소는 늘 https 사이트 주소로 (T160). https가 아니면 서버가 뜨지 않는다
+  site-url: ${SITE_URL:https://jj-blog.java21.net}
   # 운영에서는 메일을 꼭 보낸다. 환경변수로도 바꿀 수 없게 고정한다
   mail:
     log-only: false

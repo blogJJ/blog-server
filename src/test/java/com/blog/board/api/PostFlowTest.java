@@ -2,7 +2,6 @@ package com.blog.board.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -40,7 +39,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 글 쓰기·읽기·이미지를 실제 API로 확인한다 (T062~T065, T069, BRD-01~05, BRD-07, BRD-11, SC-007). */
+/**
+ * 글 쓰기·읽기·이미지를 실제 API로 확인한다 (T062~T065, BRD-01~05, BRD-11, SC-007). 공유 미리보기는 SharePreviewFlowTest.
+ */
 @IntegrationTest
 class PostFlowTest {
 
@@ -48,6 +49,7 @@ class PostFlowTest {
   @Autowired JsonMapper jsonMapper;
   @Autowired JdbcTemplate jdbc;
   @Autowired UserRepository userRepository;
+  @Autowired com.blog.common.storage.FileStorage fileStorage;
 
   // ---------- 쓰기·수정·삭제 (T063) ----------
 
@@ -264,6 +266,7 @@ class PostFlowTest {
             upload(user, "photo.png", "image/png", TestImages.png())
                 .andExpect(status().isCreated()));
     String url = res.get("url").asString();
+    // 아주 작은 PNG는 WebP로 바꿔도 별로 줄지 않아 그대로 둔다 (T162)
     assertThat(url).matches("/api/images/[0-9a-f-]{36}\\.png");
     mockMvc
         .perform(get(url))
@@ -299,6 +302,73 @@ class PostFlowTest {
     assertThat(new String(served, java.nio.charset.StandardCharsets.ISO_8859_1))
         .doesNotContain("GPS-37.5")
         .doesNotContain("Exif");
+  }
+
+  @Test
+  void largePhotoIsStoredSmallAsWebpWithLongCache() throws Exception {
+    User user = newUser();
+    byte[] photo =
+        TestImages.withExif(
+            TestImages.jpeg(TestImages.photo(3000, 2000, 7), 0.9f), 1, "GPS-HOME-ADDRESS");
+
+    JsonNode res =
+        body(upload(user, "big.jpg", "image/jpeg", photo).andExpect(status().isCreated()));
+    String url = res.get("url").asString();
+    assertThat(url).matches("/api/images/[0-9a-f-]{36}\\.webp");
+    byte[] served =
+        mockMvc
+            .perform(get(url))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("image/webp"))
+            .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"))
+            .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    assertThat(served.length).isLessThan(photo.length / 3);
+    assertThat(new String(served, java.nio.charset.StandardCharsets.ISO_8859_1))
+        .doesNotContain("GPS-HOME-ADDRESS");
+    assertThat(TestImages.readWebp(served).getWidth()).isEqualTo(1600);
+    Map<String, Object> row =
+        jdbc.queryForMap(
+            "select original_name, content_type, size_bytes from post_images where stored_name = ?",
+            url.substring(12));
+    assertThat(row.get("original_name")).isEqualTo("big.jpg");
+    assertThat(row.get("content_type")).isEqualTo("image/webp");
+    assertThat(((Number) row.get("size_bytes")).intValue()).isEqualTo(served.length);
+
+    // 움직이는 GIF는 그대로 둔다
+    byte[] gif = TestImages.animatedGif();
+    String gifUrl =
+        body(upload(user, "move.gif", "image/gif", gif).andExpect(status().isCreated()))
+            .get("url")
+            .asString();
+    assertThat(gifUrl).endsWith(".gif");
+    mockMvc
+        .perform(get(gifUrl))
+        .andExpect(content().contentType("image/gif"))
+        .andExpect(content().bytes(gif));
+
+    // 가로·세로가 너무 큰 그림은 풀기 전에 막는다
+    upload(user, "bomb.png", "image/png", TestImages.pngHeader(20_000, 20_000))
+        .andExpect(status().isContentTooLarge())
+        .andExpect(jsonPath("$.message").value(containsString("화소")));
+  }
+
+  @Test
+  void imagesStoredBeforeOptimizationStillServe() throws Exception {
+    // T162 전에 저장된 jpg·png 파일은 주소 그대로, 원래 형식으로 나간다
+    byte[] png = TestImages.png();
+    String stored;
+    try (var in = new java.io.ByteArrayInputStream(png)) {
+      stored = fileStorage.store(in, "png");
+    }
+    mockMvc
+        .perform(get("/api/images/" + stored))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType("image/png"))
+        .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"))
+        .andExpect(content().bytes(png));
   }
 
   @Test
@@ -371,29 +441,6 @@ class PostFlowTest {
     assertThat(cover).startsWith("/api/images/");
     call(null, get("/api/blogs/by-slug/" + slugOf(blogId)), null)
         .andExpect(jsonPath("$.coverImage").value(cover));
-  }
-
-  // ---------- 공유 미리보기 (T069) ----------
-
-  @Test
-  void postPageFillsOgTagsOnlyForPublicPosts() throws Exception {
-    User owner = newUser();
-    long blogId = createBlog(owner, "PUBLIC");
-    long postId = writePost(owner, blogId, "공유할 <글>", "첫 문단이에요", List.of(), false);
-    long privateBlog = createBlog(owner, "PRIVATE");
-    long secret = writePost(owner, privateBlog, "비밀 제목", "본문", List.of(), false);
-
-    mockMvc
-        .perform(get("/blog/" + slugOf(blogId) + "/posts/" + postId))
-        .andExpect(status().isOk())
-        .andExpect(
-            content().string(containsString("property=\"og:title\" content=\"공유할 &lt;글&gt;\"")))
-        .andExpect(content().string(containsString("og:description\" content=\"첫 문단이에요\"")));
-    mockMvc
-        .perform(get("/blog/" + slugOf(privateBlog) + "/posts/" + secret))
-        .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("비밀 제목"))))
-        .andExpect(content().string(not(containsString("og:title"))));
   }
 
   // ---------- 도우미 ----------

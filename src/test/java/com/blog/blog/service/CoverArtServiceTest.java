@@ -171,7 +171,7 @@ class CoverArtServiceTest {
     MockMultipartFile svg =
         new MockMultipartFile(
             "file", "cover.svg", "image/svg+xml", DRAWN.getBytes(StandardCharsets.UTF_8));
-    assertThatThrownBy(() -> imageService.storeSingle(svg)).isInstanceOf(BusinessException.class);
+    assertThatThrownBy(() -> imageService.storeCover(svg)).isInstanceOf(BusinessException.class);
   }
 
   private String coverOf(Blog blog) {

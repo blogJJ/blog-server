@@ -105,6 +105,15 @@ class SecurityConfigTest {
   }
 
   @Test
+  void hstsIsOnlyForProd() throws Exception {
+    // https 요청이어도 prod(require-https)가 아니면 HSTS를 붙이지 않는다 (T160). prod는 ProdHttpsBehindProxyTest
+    mockMvc
+        .perform(get("https://localhost/api/blogs"))
+        .andExpect(status().isOk())
+        .andExpect(header().doesNotExist("Strict-Transport-Security"));
+  }
+
+  @Test
   void unknownNonGetRequestOutsideApiIsDenied() throws Exception {
     mockMvc.perform(post("/somewhere").with(csrf())).andExpect(status().isUnauthorized());
   }
