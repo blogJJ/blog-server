@@ -49,6 +49,8 @@ public enum ErrorCode {
   REQUEST_TIMEOUT(HttpStatus.SERVICE_UNAVAILABLE, "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요."),
   /** 메일 발송 실패. 가입된 이메일인지와 상관없이 같은 문구 (T023, OPS-07, D-107). */
   MAIL_SEND_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "메일을 보내지 못했어요. 잠시 뒤 다시 시도해 주세요."),
+  /** 글쓰기 도우미(맞춤법 검사)를 지금 쓸 수 없음. 키가 없거나 호출이 실패했다 (T167). */
+  ASSIST_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "지금은 맞춤법 검사를 할 수 없어요. 잠시 뒤 다시 시도해 주세요."),
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 생겼어요. 잠시 뒤 다시 시도해 주세요.");
 
   private final HttpStatus status;
