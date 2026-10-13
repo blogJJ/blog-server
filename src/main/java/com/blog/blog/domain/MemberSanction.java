@@ -79,6 +79,8 @@ public class MemberSanction {
 
   protected MemberSanction() {}
 
+  // 제재 기록 한 줄의 컬럼을 한 번에 채우는 JPA 엔티티 생성자다
+  @SuppressWarnings("java:S107")
   public MemberSanction(
       Blog blog,
       User user,

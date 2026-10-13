@@ -172,6 +172,8 @@ class TurnstileVerifierTest {
     return verifier;
   }
 
+  // 시간 초과를 시험하려고 일부러 늦게 답하는 가짜 서버다. 기다리는 쪽이 아니라 늦게 답하는 쪽이라 sleep이 맞다
+  @SuppressWarnings("java:S2925")
   private void start(int status, String contentType, String body, long delayMillis)
       throws IOException {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

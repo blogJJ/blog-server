@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -161,17 +162,19 @@ public class CommentModerationService {
    * @return 숨겼으면 true
    */
   public boolean review(CommentWritten event) {
-    String content =
-        tx.execute(
-            s ->
-                commentRepository
-                    .findById(event.commentId())
-                    .filter(Comment::isActive)
-                    .map(Comment::getContent)
-                    .orElse(null));
-    if (content == null) {
+    Optional<String> found =
+        Objects.requireNonNullElse(
+            tx.execute(
+                s ->
+                    commentRepository
+                        .findById(event.commentId())
+                        .filter(Comment::isActive)
+                        .map(Comment::getContent)),
+            Optional.empty());
+    if (found.isEmpty()) {
       return false;
     }
+    String content = found.get();
     if (!withinLimits(event)) {
       log.info("댓글 검사 횟수를 넘어 댓글 {}을(를) 검사하지 않음", event.commentId());
       return false;

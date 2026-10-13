@@ -78,6 +78,8 @@ public class Report {
 
   protected Report() {}
 
+  // 신고 한 줄의 컬럼을 한 번에 채우는 JPA 엔티티 생성자다
+  @SuppressWarnings("java:S107")
   public Report(
       User reporter,
       ReportTargetType targetType,

@@ -32,7 +32,7 @@ public class ProdSecretsCheck {
   /** application.yml 기본값과 .env.example에 적힌 예시 값. 운영에서 쓰면 안 된다. */
   static final Set<String> EXAMPLE_VALUES = Set.of("blog", "root", "changeme", "secret");
 
-  public ProdSecretsCheck(Environment env) {
+  ProdSecretsCheck(Environment env) {
     List<String> invalid = findInvalid(env);
     if (!invalid.isEmpty()) {
       throw new IllegalStateException(

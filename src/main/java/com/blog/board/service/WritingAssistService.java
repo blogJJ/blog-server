@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
@@ -168,7 +169,7 @@ public class WritingAssistService {
     List<Fix> out = new ArrayList<>();
     List<int[]> taken = new ArrayList<>();
     int cursor = 0;
-    for (SpellingFix f : raw) {
+    for (SpellingFix f : raw.stream().filter(Objects::nonNull).toList()) {
       if (out.size() >= MAX_FIXES) {
         break;
       }
