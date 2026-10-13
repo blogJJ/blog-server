@@ -56,6 +56,8 @@ public class AccountGuard {
   }
 
   /** 이미 읽어 둔 회원으로 확인한다. */
+  // activity는 지금은 정지 여부만 보지만, 활동마다 막을 수 있게 호출하는 쪽이 넘기는 약속이라 남겨 둔다
+  @SuppressWarnings("java:S1172")
   public void check(User user, Activity activity) {
     LocalDateTime now = LocalDateTime.now(clock);
     if (user.isSuspendedAt(now)) {

@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.Set;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -52,9 +53,9 @@ public final class ImageSanitizer {
     int orientation = orientation(data);
     if (orientation >= 2
         && orientation <= 8) { // 돌리기(3·6·8)와 뒤집기(2·4·5·7) 모두 ImageOptimizer.orient와 같게
-      byte[] rotated = rotateJpeg(data, orientation);
-      if (rotated != null) {
-        return stripJpeg(rotated); // ImageIO가 새로 쓴 파일에는 JFIF만 있지만 한 번 더 거른다
+      Optional<byte[]> rotated = rotateJpeg(data, orientation);
+      if (rotated.isPresent()) {
+        return stripJpeg(rotated.get()); // ImageIO가 새로 쓴 파일에는 JFIF만 있지만 한 번 더 거른다
       }
     }
     return stripJpeg(data);
@@ -112,18 +113,18 @@ public final class ImageSanitizer {
     return 1;
   }
 
-  /** 회전 정보대로 돌려 JPEG로 다시 쓴다. CMYK처럼 ImageIO가 못 읽으면 null. */
-  private static byte[] rotateJpeg(byte[] data, int orientation) {
+  /** 회전 정보대로 돌려 JPEG로 다시 쓴다. CMYK처럼 ImageIO가 못 읽으면 빈 값. */
+  private static Optional<byte[]> rotateJpeg(byte[] data, int orientation) {
     try {
       BufferedImage src = ImageIO.read(new ByteArrayInputStream(data));
       if (src == null) {
-        return null;
+        return Optional.empty();
       }
       BufferedImage dst = ImageOptimizer.orient(toRgb(src), orientation);
 
       Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
       if (!writers.hasNext()) {
-        return null;
+        return Optional.empty();
       }
       ImageWriter writer = writers.next();
       ByteArrayOutputStream out = new ByteArrayOutputStream(data.length);
@@ -136,9 +137,9 @@ public final class ImageSanitizer {
       } finally {
         writer.dispose();
       }
-      return out.toByteArray();
+      return Optional.of(out.toByteArray());
     } catch (IOException | RuntimeException e) {
-      return null;
+      return Optional.empty();
     }
   }
 

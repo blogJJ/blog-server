@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,18 +73,20 @@ public class CoverArtService {
     if (!enabled || !claude.enabled()) {
       return Optional.empty();
     }
-    Info info =
-        tx.execute(
-            s ->
-                blogRepository
-                    .findById(blogId)
-                    .filter(Blog::isOpen)
-                    .filter(b -> b.getCoverImage() == null)
-                    .map(b -> new Info(b.getName(), tagNames(b.getId())))
-                    .orElse(null));
-    if (info == null) {
+    Optional<Info> found =
+        Objects.requireNonNullElse(
+            tx.execute(
+                s ->
+                    blogRepository
+                        .findById(blogId)
+                        .filter(Blog::isOpen)
+                        .filter(b -> b.getCoverImage() == null)
+                        .map(b -> new Info(b.getName(), tagNames(b.getId())))),
+            Optional.empty());
+    if (found.isEmpty()) {
       return Optional.empty();
     }
+    Info info = found.get();
     Optional<String> drawn = claude.draw(info.name(), info.tags());
     if (drawn.isEmpty()) {
       return Optional.empty();
@@ -101,14 +104,16 @@ public class CoverArtService {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
-    Integer filled;
+    int filled;
     try {
-      filled = tx.execute(s -> blogRepository.fillEmptyCoverImage(blogId, stored));
+      filled =
+          Objects.requireNonNullElse(
+              tx.execute(s -> blogRepository.fillEmptyCoverImage(blogId, stored)), 0);
     } catch (RuntimeException e) {
       imageService.deleteQuietly(stored);
       throw e;
     }
-    if (filled == null || filled == 0) {
+    if (filled == 0) {
       // 그리는 동안 블로그장이 이미지를 올렸거나 블로그가 닫혔다
       imageService.deleteQuietly(stored);
       return Optional.empty();

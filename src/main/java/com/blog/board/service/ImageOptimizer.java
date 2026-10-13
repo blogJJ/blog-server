@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.IIOImage;
@@ -103,7 +105,23 @@ public final class ImageOptimizer {
   }
 
   /** 저장할 결과. type은 실제로 쓴 형식이다 (JPEG를 올려도 WebP가 될 수 있다). */
-  public record Result(ImageType type, byte[] data) {}
+  public record Result(ImageType type, byte[] data) {
+    // 배열 필드라 기본 equals·hashCode는 주소를 비교한다. 내용으로 비교하고, toString에는 크기만 쓴다
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof Result(ImageType t, byte[] d) && type == t && Arrays.equals(data, d);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * Objects.hashCode(type) + Arrays.hashCode(data);
+    }
+
+    @Override
+    public String toString() {
+      return "Result[type=" + type + ", bytes=" + (data == null ? 0 : data.length) + "]";
+    }
+  }
 
   /** 화소 수가 너무 많아 받지 않는 그림. */
   public static final class TooManyPixelsException extends RuntimeException {

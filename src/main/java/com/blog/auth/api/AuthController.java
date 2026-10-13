@@ -45,6 +45,8 @@ public class AuthController {
   private final RateLimitGuard rateLimitGuard;
   private final Clock clock;
 
+  // 로그인·쿠키·봇 확인·횟수 제한을 한곳에서 묶는 컨트롤러라 주입받는 것이 많다
+  @SuppressWarnings("java:S107")
   public AuthController(
       LoginService loginService,
       LoginSessionService sessionService,

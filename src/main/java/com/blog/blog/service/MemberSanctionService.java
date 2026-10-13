@@ -195,6 +195,8 @@ public class MemberSanctionService {
     }
   }
 
+  // MemberSanction 생성자에 그대로 넘기는 값들이다
+  @SuppressWarnings("java:S107")
   private MemberSanction save(
       Blog blog,
       Long targetId,

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -125,7 +126,23 @@ public class ImageService {
     }
   }
 
-  private record Checked(ImageType type, byte[] data) {}
+  private record Checked(ImageType type, byte[] data) {
+    // 배열 필드라 기본 equals·hashCode는 주소를 비교한다. 내용으로 비교하고, toString에는 크기만 쓴다
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof Checked(ImageType t, byte[] d) && type == t && Arrays.equals(data, d);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * Objects.hashCode(type) + Arrays.hashCode(data);
+    }
+
+    @Override
+    public String toString() {
+      return "Checked[type=" + type + ", bytes=" + (data == null ? 0 : data.length) + "]";
+    }
+  }
 
   private static Checked check(MultipartFile file, ImageOptimizer.Limit limit) {
     if (file == null || file.isEmpty()) {

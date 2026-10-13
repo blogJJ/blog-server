@@ -17,6 +17,7 @@ import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -154,10 +155,10 @@ public class MascotService {
         break;
       }
       try {
-        Mascot to = rebalanceOne(id, base, counts, ceiling);
-        if (to != null) {
+        Optional<Mascot> to = rebalanceOne(id, base, counts, ceiling);
+        if (to.isPresent()) {
           counts.merge(base, -1L, Long::sum);
-          counts.merge(to, 1L, Long::sum);
+          counts.merge(to.get(), 1L, Long::sum);
           moved++;
         }
       } catch (RuntimeException e) {
@@ -167,32 +168,36 @@ public class MascotService {
     return moved;
   }
 
-  private Mascot rebalanceOne(Long blogId, Mascot from, Map<Mascot, Long> counts, long ceiling) {
-    return tx.execute(
-        s ->
-            blogRepository
-                .findById(blogId)
-                .filter(Blog::isOpen)
-                .filter(b -> b.getMascot() != null && b.getMascot().base() == from)
-                .map(
-                    b -> {
-                      Mascot to =
-                          rebalanceTarget(
-                              from,
-                              KeywordMascotPicker.matches(b.getName(), tagNames(b.getId())),
-                              counts,
-                              ceiling);
-                      if (to == null) {
-                        return null;
-                      }
-                      MascotDesign now = b.getMascot();
-                      b.changeMascot(
-                          unique(
-                              new MascotDesign(to, now.tone(), now.hat(), now.charm()),
-                              new HashSet<>(blogRepository.findMascotsInUse(to.key(), blogId))));
-                      return to;
-                    })
-                .orElse(null));
+  /** 옮겼으면 새 바탕, 옮길 곳이 없거나 블로그가 없으면 빈 값 */
+  private Optional<Mascot> rebalanceOne(
+      Long blogId, Mascot from, Map<Mascot, Long> counts, long ceiling) {
+    return Objects.requireNonNullElse(
+        tx.execute(
+            s ->
+                blogRepository
+                    .findById(blogId)
+                    .filter(Blog::isOpen)
+                    .filter(b -> b.getMascot() != null && b.getMascot().base() == from)
+                    .map(
+                        b -> {
+                          Mascot to =
+                              rebalanceTarget(
+                                  from,
+                                  KeywordMascotPicker.matches(b.getName(), tagNames(b.getId())),
+                                  counts,
+                                  ceiling);
+                          if (to == null) {
+                            return null;
+                          }
+                          MascotDesign now = b.getMascot();
+                          b.changeMascot(
+                              unique(
+                                  new MascotDesign(to, now.tone(), now.hat(), now.charm()),
+                                  new HashSet<>(
+                                      blogRepository.findMascotsInUse(to.key(), blogId))));
+                          return to;
+                        })),
+        Optional.empty());
   }
 
   /** 바탕마다 쓰는 열린 블로그 수. 아무도 안 쓰는 바탕은 0. */
@@ -418,20 +423,25 @@ public class MascotService {
    * @return 만든 조합. 블로그가 없거나 폐쇄됐으면 null
    */
   public MascotDesign assign(Long blogId) {
-    Info info =
-        tx.execute(
-            s ->
-                blogRepository
-                    .findById(blogId)
-                    .filter(Blog::isOpen)
-                    .map(
-                        b ->
-                            new Info(
-                                b.getName(), tagNames(b.getId()), b.getMascot(), b.getCoverScene()))
-                    .orElse(null));
-    if (info == null) {
+    Optional<Info> found =
+        Objects.requireNonNullElse(
+            tx.execute(
+                s ->
+                    blogRepository
+                        .findById(blogId)
+                        .filter(Blog::isOpen)
+                        .map(
+                            b ->
+                                new Info(
+                                    b.getName(),
+                                    tagNames(b.getId()),
+                                    b.getMascot(),
+                                    b.getCoverScene()))),
+            Optional.empty());
+    if (found.isEmpty()) {
       return null;
     }
+    Info info = found.get();
     Optional<ClaudeMascotClient.Art> chosen = claude.choose(info.name(), info.tags());
     // 주제에 맞는 바탕 후보 중 다른 블로그가 가장 적게 쓰는 바탕 (D-143). 이 블로그의 지금 바탕은 세지 않는다
     List<Mascot> candidates =
