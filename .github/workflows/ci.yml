@@ -1,12 +1,13 @@
-# PR과 main 푸시마다 ./gradlew build(코드 모양 검사, 컴파일, 테스트)를 돌린다 (T135, OPS-05, D-105)
+# PR과 main·develop 푸시마다 ./gradlew build(코드 모양 검사, 컴파일, 테스트)를 돌린다 (T135, OPS-05, D-105)
+# Git Flow (T165): develop은 CI만 돌고, main의 CI가 통과하면 Deploy → Release가 이어진다(deploy.yml, release.yml은 main만)
 # 이 검사를 merge 필수로 하려면 저장소 관리자가 GitHub 설정 > Branches > main 보호 규칙에서
-# "Require status checks to pass"를 켜고 build와 migrations를 고른다.
+# "Require status checks to pass"를 켜고 build와 migrations를 고른다. develop에도 같은 규칙을 건다.
 name: CI
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
