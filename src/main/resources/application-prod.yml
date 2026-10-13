@@ -2,12 +2,11 @@
 # 비밀값이 비었거나 .env.example의 예시 값이면 ProdSecretsCheck가 서버를 멈춘다.
 
 app:
-  # 공유 미리보기의 og:url·og:image 절대 주소. 미리보기 서버는 https 그림만 받는 곳이 있어 https로 고정한다 (T161)
-  site:
-    base-url: ${SITE_BASE_URL:https://jj-blog.java21.net}
   security:
     # http 요청은 https로 돌려보낸다. 상태 확인 주소만 예외 (SEC-10)
     require-https: true
+  # 서버가 만드는 절대 주소는 늘 https 사이트 주소로 (T160). https가 아니면 서버가 뜨지 않는다
+  site-url: ${SITE_URL:https://jj-blog.java21.net}
   # 운영에서는 메일을 꼭 보낸다. 환경변수로도 바꿀 수 없게 고정한다
   mail:
     log-only: false

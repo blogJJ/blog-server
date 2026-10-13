@@ -1,6 +1,7 @@
 package com.blog.main.api;
 
 import com.blog.board.service.SvgRasterizer;
+import com.blog.common.web.SiteUrl;
 import com.blog.main.service.ShareMetaService;
 import com.blog.main.service.ShareMetaService.ShareMeta;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,7 +13,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -21,7 +21,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.HtmlUtils;
 
 /**
@@ -29,8 +28,7 @@ import org.springframework.web.util.HtmlUtils;
  * D-66, D-70). 화면은 그대로 정적 HTML이고 JS가 주소를 읽어 API를 부른다. 서버는 {@code <title>}과 {@code <!--og-->} 자리에
  * Open Graph·트위터 카드 태그만 넣는다. 값은 모두 HTML 이스케이프한다(SEC-06).
  *
- * <p>og:url·og:image는 절대 주소여야 한다. {@code app.site.base-url}(운영 https://jj-blog.java21.net)이 있으면
- * 그것을, 없으면 요청 주소를 쓴다.
+ * <p>og:url·og:image는 절대 주소여야 해서 앞부분은 {@link SiteUrl}(운영 https://jj-blog.java21.net, T160)을 쓴다.
  */
 @Controller
 public class SharePageController {
@@ -39,13 +37,12 @@ public class SharePageController {
   private static final Pattern TITLE = Pattern.compile("<title>[^<]*</title>");
 
   private final ShareMetaService metaService;
-  private final String baseUrl;
+  private final SiteUrl siteUrl;
   private final Map<String, String> templates = new ConcurrentHashMap<>();
 
-  public SharePageController(
-      ShareMetaService metaService, @Value("${app.site.base-url:}") String baseUrl) {
+  public SharePageController(ShareMetaService metaService, SiteUrl siteUrl) {
     this.metaService = metaService;
-    this.baseUrl = baseUrl == null ? "" : baseUrl.strip().replaceAll("/+$", "");
+    this.siteUrl = siteUrl;
   }
 
   @GetMapping({"/", "/index.html"})
@@ -72,10 +69,7 @@ public class SharePageController {
 
   private ResponseEntity<String> page(String file, ShareMeta meta, HttpServletRequest request) {
     String template = templates.computeIfAbsent(file, SharePageController::load);
-    String origin =
-        baseUrl.isEmpty()
-            ? ServletUriComponentsBuilder.fromContextPath(request).build().toUriString()
-            : baseUrl;
+    String origin = siteUrl.origin(request);
     String html =
         TITLE
             .matcher(template)

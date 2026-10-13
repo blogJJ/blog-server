@@ -36,7 +36,10 @@ import tools.jackson.databind.json.JsonMapper;
  *       붙인다 (SEC-10).
  *   <li>주소 권한: 비회원·회원·관리자만 여기서 나눈다. 블로그별 역할은 {@code @PreAuthorize("@blogAuthz...")}로 메서드에서 확인한다
  *       (SEC-11, T017).
- *   <li>보안 헤더: X-Frame-Options DENY, nosniff, CSP, HSTS(HTTPS일 때), Referrer-Policy (SEC-12).
+ *   <li>보안 헤더: X-Frame-Options DENY, nosniff, CSP, Referrer-Policy (SEC-12). HSTS는
+ *       prod(require-https)에서만 https 응답에 1년({@value #HSTS_MAX_AGE_SECONDS}초)으로 붙인다 (T160). 학교가 나눠 준
+ *       공용 도메인의 하위 주소라 includeSubDomains·preload는 붙이지 않는다. https인지는 request.isSecure()로 보고, 프록시
+ *       뒤에서는 Tomcat이 X-Forwarded-Proto로 정한다(forward-headers-strategy native).
  *   <li>소셜 로그인(T157, D-128): 키가 있는 제공자가 하나라도 있으면 Spring OAuth2 로그인을 켠다. {@code GET
  *       /oauth2/authorization/{google|github}}로 보내고 {@code /login/oauth2/code/{google|github}}로
  *       돌아온다. 돌아온 뒤에는 일반 로그인과 같은 JWT 쿠키를 쓴다 (SocialLoginHandlers). state 값만 서버 세션에 잠깐 둔다.
@@ -64,6 +67,8 @@ public class SecurityConfig {
           + "frame-ancestors 'none'";
 
   static final String HEALTH_PATH = "/actuator/health";
+
+  static final int HSTS_MAX_AGE_SECONDS = 31_536_000;
 
   /** https는 항상 443, http로 돌아갈 때는 80 */
   static final PortMapper ALWAYS_443 =
@@ -134,7 +139,13 @@ public class SecurityConfig {
                     .referrerPolicy(
                         referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                     .httpStrictTransportSecurity(
-                        hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000)))
+                        hsts -> {
+                          if (requireHttps) {
+                            hsts.includeSubDomains(false).maxAgeInSeconds(HSTS_MAX_AGE_SECONDS);
+                          } else {
+                            hsts.disable();
+                          }
+                        }))
         .exceptionHandling(
             ex -> ex.authenticationEntryPoint(errorHandler).accessDeniedHandler(errorHandler))
         .authorizeHttpRequests(
