@@ -134,7 +134,9 @@ class MascotServiceTest {
         closed.getId());
 
     // 다른 테스트가 남긴 블로그가 있어도 모두 지나갈 때까지 돈다
-    while (mascotService.refreshLegacyCovers() > 0) {}
+    while (mascotService.refreshLegacyCovers() > 0) {
+      // 한 번에 한 묶음씩 고치므로 남은 것이 없을 때까지 다시 부른다
+    }
 
     String cover = coverOf(legacy.getId());
     // 장면을 고르는 단어가 없어 지금과 다른 장면, 배경은 태그('화산')에서 고른다
@@ -165,7 +167,9 @@ class MascotServiceTest {
         "update blogs set cover_scene = 'kitchen.day.clear.warm.12.food' where id = ?",
         blog.getId());
 
-    while (mascotService.refreshLegacyCovers() > 0) {}
+    while (mascotService.refreshLegacyCovers() > 0) {
+      // 한 번에 한 묶음씩 고치므로 남은 것이 없을 때까지 다시 부른다
+    }
 
     CoverScene cover = CoverScene.parse(coverOf(blog.getId())).orElseThrow();
     assertThat(cover.mixed()).isTrue();
@@ -259,7 +263,9 @@ class MascotServiceTest {
           blogs.get(i).getId());
     }
 
-    while (mascotService.rebalanceMascots() > 0) {}
+    while (mascotService.rebalanceMascots() > 0) {
+      // 한 번에 한 묶음씩 고치므로 남은 것이 없을 때까지 다시 부른다
+    }
 
     List<String> after = blogs.stream().map(b -> mascotOf(b.getId())).toList();
     long stillComputer = after.stream().filter(m -> m.startsWith("computer.")).count();

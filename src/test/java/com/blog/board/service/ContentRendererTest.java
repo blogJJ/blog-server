@@ -17,8 +17,17 @@ class ContentRendererTest {
   void dangerousHtmlIsRemoved() {
     String html =
         renderer.render(
-            "# 제목\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n"
-                + "[클릭](javascript:alert(1))\n\n<a href=\"https://example.com\" onclick=\"x()\">링크</a>");
+            """
+            # 제목
+
+            <script>alert(1)</script>
+
+            <img src=x onerror=alert(1)>
+
+            [클릭](javascript:alert(1))
+
+            <a href="https://example.com" onclick="x()">링크</a>\
+            """);
 
     assertThat(html).contains("<h1>제목</h1>");
     assertThat(html).doesNotContain("<script").doesNotContain("onerror").doesNotContain("onclick");
@@ -50,7 +59,8 @@ class ContentRendererTest {
   @Test
   void lengthCountsEveryCharacterUpTo5000() {
     assertThat(ContentRenderer.validate("가".repeat(5000))).hasSize(5000);
-    assertThatThrownBy(() -> ContentRenderer.validate("가".repeat(5001)))
+    String tooLong = "가".repeat(5001);
+    assertThatThrownBy(() -> ContentRenderer.validate(tooLong))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("5,000자");
     // 이모지 하나는 한 글자

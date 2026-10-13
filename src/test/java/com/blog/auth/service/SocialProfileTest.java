@@ -82,10 +82,8 @@ class SocialProfileTest {
 
   @Test
   void missingProviderIdIsRejected() {
-    assertThatThrownBy(
-            () ->
-                SocialProfile.from(
-                    SocialProvider.GOOGLE, user(Map.of("name", "x", "id", "1"), "id")))
+    OAuth2User noSub = user(Map.of("name", "x", "id", "1"), "id");
+    assertThatThrownBy(() -> SocialProfile.from(SocialProvider.GOOGLE, noSub))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

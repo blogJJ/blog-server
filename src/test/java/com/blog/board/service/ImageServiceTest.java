@@ -106,8 +106,8 @@ class ImageServiceTest {
         .when(guard)
         .check(1L, Activity.WRITE_POST);
 
-    assertThatThrownBy(
-            () -> service.uploadPostImage(1L, file("a.png", "image/png", TestImages.png())))
+    MockMultipartFile png = file("a.png", "image/png", TestImages.png());
+    assertThatThrownBy(() -> service.uploadPostImage(1L, png))
         .isInstanceOf(BusinessException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.ACCOUNT_SUSPENDED);

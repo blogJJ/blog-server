@@ -103,7 +103,9 @@ class GlobalExceptionHandlerTest {
     }
 
     @PostMapping("/api/test/valid")
-    void valid(@Valid @RequestBody NameRequest request) {}
+    void valid(@Valid @RequestBody NameRequest request) {
+      // 검증 실패 응답만 확인하므로 본문은 비워 둔다.
+    }
 
     @GetMapping("/api/test/boom")
     void boom() {

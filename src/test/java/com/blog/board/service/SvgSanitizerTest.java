@@ -191,7 +191,8 @@ class SvgSanitizerTest {
       big.append("<rect x=\"1\" y=\"2\" width=\"3\" height=\"4\" fill=\"#abcdef\"/>");
     }
     big.append("</svg>");
-    assertThatThrownBy(() -> SvgSanitizer.sanitize(big.toString()))
+    String oversize = big.toString();
+    assertThatThrownBy(() -> SvgSanitizer.sanitize(oversize))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("too large");
   }
