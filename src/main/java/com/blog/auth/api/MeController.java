@@ -190,7 +190,7 @@ public class MeController {
   @PutMapping("/profile-image")
   public Map<String, String> changeProfileImage(
       @AuthenticationPrincipal AuthUser authUser, @RequestParam("file") MultipartFile file) {
-    String stored = imageService.storeSingle(file);
+    String stored = imageService.storeProfile(file);
     String old;
     try {
       old = meService.changeProfileImage(authUser.id(), stored);

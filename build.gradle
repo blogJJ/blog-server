@@ -48,6 +48,8 @@ dependencies {
 
     // 이미지 EXIF 확인·제거 (BRD-05)
     implementation 'com.drewnoakes:metadata-extractor:2.21.0'
+    // 올린 사진을 줄여 WebP로 저장 (T162). libwebp를 JNI로 묶어 리눅스 x64·arm64, 맥, 윈도우용이 jar에 들어 있다
+    implementation 'com.github.usefulness:webp-imageio:0.11.0'
 
     // 공유 미리보기: Claude가 그린 SVG 대표 그림을 PNG로 바꿈. 순수 자바, 의존성 없음, MIT (T161)
     implementation 'com.github.weisj:jsvg:2.2.0'
