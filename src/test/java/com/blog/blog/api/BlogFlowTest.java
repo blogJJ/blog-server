@@ -462,7 +462,7 @@ class BlogFlowTest {
     mockMvc
         .perform(get("/blog/some-blog"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("src=\"/js/blog.js\"")));
+        .andExpect(content().string(containsString("src=\"/js/blog.js?v=")));
     mockMvc.perform(get("/blog/some-blog/admin")).andExpect(forwardedUrl("/blog-admin.html"));
   }
 

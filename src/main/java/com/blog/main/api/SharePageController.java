@@ -172,8 +172,8 @@ public class SharePageController {
       return null;
     }
     String tab = request.getParameter("tab");
-    if (!List.of("latest", "popular", "blogs").contains(tab)) {
-      if (List.of("following", "subscribed").contains(tab)) {
+    if (tab == null || !List.of("latest", "popular", "blogs").contains(tab)) {
+      if (tab != null && List.of("following", "subscribed").contains(tab)) {
         return null;
       }
       tab = "latest";
