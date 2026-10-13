@@ -148,6 +148,21 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
       nativeQuery = true)
   List<Long> findIdsWithLegacyCover(@Param("limit") int limit);
 
+  /**
+   * 운동 장면을 다시 볼 블로그 (T158 후속). 장면이 눈밭이거나 태그 이름이 운동 단어 정규식에 맞는 블로그를 번호 순서로 {@code afterId} 다음부터 읽는다.
+   * 다시 고를지는 서비스가 태그로 정한다. 폐쇄된 블로그는 뺀다.
+   */
+  @Query(
+      value =
+          "select b.id from blogs b where b.id > :afterId and b.cover_scene is not null"
+              + " and b.status <> 'CLOSED' and (b.cover_scene like 'snowfield.%'"
+              + " or exists (select 1 from blog_tags bt join tags t on t.id = bt.tag_id"
+              + " where bt.blog_id = b.id and t.name regexp :pattern))"
+              + " order by b.id limit :limit",
+      nativeQuery = true)
+  List<Long> findIdsForSportRefresh(
+      @Param("pattern") String pattern, @Param("afterId") long afterId, @Param("limit") int limit);
+
   /** 다른 블로그가 쓰는 같은 바탕 그림의 마스코트 값 (D-118). 폐쇄된 블로그는 뺀다. */
   @Query(
       value =
