@@ -203,8 +203,10 @@ class CommentModerationFlowTest {
     User author = newUser();
     long blogId = createBlog(owner);
     long postId = writePost(owner, blogId);
-    comment(newUser(), postId, "보통 댓글", null);
+    // 검사는 다른 스레드에서 돌므로 가짜 Claude는 댓글을 쓰기 전에 정해 둔다(검사 중에 when()을 부르면 엇갈릴 수 있음)
     when(claude.check("스팸")).thenReturn(Optional.of(SUSPECT));
+    comment(newUser(), postId, "보통 댓글", null);
+    verify(claude, timeout(5000)).check("보통 댓글");
     long id = comment(author, postId, "스팸", null);
     awaitStatus(id, "HIDDEN");
     assertThat(count("select comment_count from posts where id = ?", postId)).isEqualTo(1);
