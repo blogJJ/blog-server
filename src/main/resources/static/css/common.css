@@ -2193,3 +2193,47 @@ a.site-header__nickname {
     flex-direction: column;
   }
 }
+
+/* 이용약관·개인정보 처리방침 (T133): 읽기 쉬운 폭, 표는 좁은 화면에서 가로로 넘긴다 */
+.doc {
+  max-width: 760px;
+  line-height: 1.7;
+}
+
+.doc h2 {
+  margin: 28px 0 8px;
+  font-size: 18px;
+}
+
+.doc ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.doc__meta {
+  margin: 0 0 8px;
+  color: var(--color-text-sub);
+  font-size: 13px;
+}
+
+.doc__table {
+  overflow-x: auto;
+}
+
+.doc__table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.doc__table th,
+.doc__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc__table th {
+  background: var(--color-surface);
+}
