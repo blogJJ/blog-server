@@ -113,6 +113,10 @@ public class NotificationInboxService {
 
   @Transactional(readOnly = true)
   public Settings settings(Long userId) {
+    return settingsOf(userId);
+  }
+
+  private Settings settingsOf(Long userId) {
     User user = loadUser(userId);
     List<SettingRow> items =
         LABELS.entrySet().stream()
@@ -157,7 +161,7 @@ public class NotificationInboxService {
             notificationService.setEnabled(userId, type, on);
           });
     }
-    return settings(userId);
+    return settingsOf(userId);
   }
 
   private List<Row> rows(List<Notification> list) {

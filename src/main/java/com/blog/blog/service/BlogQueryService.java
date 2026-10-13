@@ -169,12 +169,16 @@ public class BlogQueryService {
   /** 검색 (T049). 이름·소개는 단어마다 모두 들어 있는 블로그, 태그는 정리한 값과 같은 블로그. 관련도 순. */
   @Transactional(readOnly = true)
   public PageResponse<BlogSummary> search(String rawQuery, int page) {
-    return search(rawQuery, "relevance", page);
+    return find(rawQuery, "relevance", page);
   }
 
   /** 통합 검색의 블로그 분류 (T107, BRD-08). sort는 relevance(기본)·latest·popular. */
   @Transactional(readOnly = true)
   public PageResponse<BlogSummary> search(String rawQuery, String sort, int page) {
+    return find(rawQuery, sort, page);
+  }
+
+  private PageResponse<BlogSummary> find(String rawQuery, String sort, int page) {
     String q = validateQuery(rawQuery);
     String fulltext = toBooleanQuery(q);
     String tag;

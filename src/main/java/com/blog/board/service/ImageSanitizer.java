@@ -74,24 +74,29 @@ public final class ImageSanitizer {
         out.write(data, i, data.length - i);
         return out.toByteArray();
       }
-      if (marker == 0xFF) { // 채움 바이트
-        i++;
-      } else if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { // 길이 없는 표시
-        out.write(data, i, 2);
-        i += 2;
-      } else {
-        int length = ((data[i + 2] & 0xFF) << 8) | (data[i + 3] & 0xFF);
-        if (length < 2 || i + 2 + length > data.length) {
-          throw new IllegalArgumentException(BROKEN_JPEG);
-        }
-        boolean drop = marker == 0xE1 || marker == 0xED;
-        if (!drop) {
-          out.write(data, i, 2 + length);
-        }
-        i += 2 + length;
-      }
+      i = copySegment(data, i, marker, out);
     }
     throw new IllegalArgumentException(BROKEN_JPEG);
+  }
+
+  /** i 위치의 표시 하나를 out에 옮기고(EXIF APP1·IPTC APP13은 버림) 다음 위치를 돌려준다 */
+  private static int copySegment(byte[] data, int i, int marker, ByteArrayOutputStream out) {
+    if (marker == 0xFF) { // 채움 바이트
+      return i + 1;
+    }
+    if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { // 길이 없는 표시
+      out.write(data, i, 2);
+      return i + 2;
+    }
+    int length = ((data[i + 2] & 0xFF) << 8) | (data[i + 3] & 0xFF);
+    if (length < 2 || i + 2 + length > data.length) {
+      throw new IllegalArgumentException(BROKEN_JPEG);
+    }
+    boolean drop = marker == 0xE1 || marker == 0xED;
+    if (!drop) {
+      out.write(data, i, 2 + length);
+    }
+    return i + 2 + length;
   }
 
   private static int orientation(byte[] data) {
@@ -178,15 +183,7 @@ public final class ImageSanitizer {
     while (i + 8 <= data.length) {
       String chunk = new String(data, i, 4, StandardCharsets.ISO_8859_1);
       int size = ByteBuffer.wrap(data, i + 4, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
-      int padded = size + (size & 1);
-      if (size < 0 || i + 8L + padded > data.length) {
-        // 마지막 조각의 채움 바이트가 빠진 파일도 있다
-        if (size >= 0 && i + 8L + size == data.length) {
-          padded = size;
-        } else {
-          throw new IllegalArgumentException("Broken WebP");
-        }
-      }
+      int padded = paddedSize(data.length, i, size);
       if (!chunk.equals("EXIF") && !chunk.equals("XMP ")) {
         int start = body.size();
         body.write(data, i, 8 + padded);
@@ -206,5 +203,17 @@ public final class ImageSanitizer {
     out.put(data, 8, 4); // WEBP
     out.put(chunks);
     return out.array();
+  }
+
+  /** WebP 조각의 짝수로 맞춘 크기. 마지막 조각의 채움 바이트가 빠진 파일도 받는다 */
+  private static int paddedSize(int total, int i, int size) {
+    int padded = size + (size & 1);
+    if (size >= 0 && i + 8L + padded <= total) {
+      return padded;
+    }
+    if (size >= 0 && i + 8L + size == total) {
+      return size;
+    }
+    throw new IllegalArgumentException("Broken WebP");
   }
 }

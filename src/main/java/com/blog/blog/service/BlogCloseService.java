@@ -120,7 +120,7 @@ public class BlogCloseService {
    */
   @Transactional
   public Blog revokeClose(Long blogId, Long actorId) {
-    return revokeClose(blogId, actorId, false);
+    return revoke(blogId, actorId, false);
   }
 
   /**
@@ -130,6 +130,10 @@ public class BlogCloseService {
    */
   @Transactional
   public Blog revokeClose(Long blogId, Long actorId, boolean byAdmin) {
+    return revoke(blogId, actorId, byAdmin);
+  }
+
+  private Blog revoke(Long blogId, Long actorId, boolean byAdmin) {
     Blog blog = lock(blogId);
     if (!byAdmin && !blog.getOwner().getId().equals(actorId)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, "폐쇄 철회는 블로그장만 할 수 있어요.");
