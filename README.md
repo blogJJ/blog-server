@@ -125,7 +125,7 @@ cp .env.example .env          # JWT_SECRET을 채운다 (예: openssl rand -base
 ./gradlew build    # spotlessCheck + 컴파일 + 테스트 + build/libs/blog-server.jar
 ```
 
-JUnit 5 테스트 메서드 약 570개(`@Test`·`@ParameterizedTest`)입니다. 테스트가 끝나면 JaCoCo가 커버리지 보고서를 `build/reports/jacoco/test/html/index.html`(SonarQube·SonarLint용 XML은 `jacocoTestReport.xml`)에 만듭니다. 2026-10-13 기준 줄 95.7%, 분기 84.8%(소나 방식 합산 92.8%)입니다. 통합 테스트는 Testcontainers로 진짜 MySQL 8을 띄워 Flyway 마이그레이션과 엔티티 매핑까지 확인하므로 dockerd(Docker Desktop)가 켜져 있어야 합니다. AI 호출은 가짜 클라이언트·가짜 서버로 대신합니다.
+JUnit 5 테스트 메서드 약 570개(`@Test`·`@ParameterizedTest`)입니다. 테스트가 끝나면 JaCoCo가 커버리지 보고서를 `build/reports/jacoco/test/html/index.html`(SonarQube·SonarLint용 XML은 `jacocoTestReport.xml`)에 만듭니다. 2026-10-13 기준 줄 95.7%, 분기 84.8%(소나 방식 합산 92.8%)입니다. main·develop에 푸시되면 CI가 분석 결과를 SonarQube 프로젝트 `jj-blog`로 보냅니다(저장소 시크릿 `SONAR_HOST_URL`·`SONAR_TOKEN` 필요). 통합 테스트는 Testcontainers로 진짜 MySQL 8을 띄워 Flyway 마이그레이션과 엔티티 매핑까지 확인하므로 dockerd(Docker Desktop)가 켜져 있어야 합니다. AI 호출은 가짜 클라이언트·가짜 서버로 대신합니다.
 
 ## 브랜치 / 배포
 
