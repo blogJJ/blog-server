@@ -22,3 +22,6 @@ app:
   # 글쓰기 도우미도 진짜 API를 부르지 않는다. ClaudeWritingClientTest가 가짜 서버로 확인한다
   writing-assist:
     api-key: ""
+  # 댓글 자동 검사도 진짜 API를 부르지 않는다. CommentModerationFlowTest가 가짜 클라이언트로 확인한다
+  comment-filter:
+    api-key: ""

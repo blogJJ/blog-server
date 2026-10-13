@@ -79,7 +79,7 @@
     $('notice-owner').hidden = !blog.ownerNotice;
     $('notice-owner').textContent = blog.ownerNotice || '';
 
-    var canManage = v.canEditInfo || v.canManageMembers;
+    var canManage = v.canEditInfo || v.canManageMembers || v.canManagePosts;
     $('manage').hidden = !canManage;
     $('manage').href = ui.blogUrl(blog.slug) + '/admin';
     $('cover-wrap').hidden = !blog.coverImage && !hasScene && !canManage;

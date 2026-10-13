@@ -173,6 +173,14 @@ app:
     spelling-per-day: 20
     tag-timeout: 20s
     spelling-timeout: 50s
+  # 새 댓글 자동 검사 (T166, D-133). 키·모델은 mascot 값을 같이 쓴다. 키가 비어 있거나 실패하면 검사하지 않고 댓글을 그대로 둔다
+  comment-filter:
+    enabled: true
+    timeout: 20s
+    # 한 시간에 Claude에 묻는 횟수. 넘으면 묻지 않고 그대로 둔다
+    per-user-per-hour: 20
+    per-blog-per-hour: 200
+    per-hour: 1000
   storage:
     # 이미지 저장 위치. 1차는 서버 디스크, 이중화 때 S3 (SCL-02)
     local-dir: ${STORAGE_LOCAL_DIR:./uploads}
