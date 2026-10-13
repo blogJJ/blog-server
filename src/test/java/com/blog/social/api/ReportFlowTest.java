@@ -85,19 +85,20 @@ class ReportFlowTest {
   }
 
   @Test
-  @DisplayName("D-85: 신고 당시 내용은 1000자까지만 남긴다")
-  void snapshotIsCutToOneThousandChars() throws Exception {
+  @DisplayName("D-85: 신고 당시 내용은 DB처럼 글자 수로 세어 1000자까지 남기고, 이모지를 반으로 자르지 않는다")
+  void snapshotCountsCharactersLikeTheDatabase() throws Exception {
     User owner = newUser();
     long blogId = createBlog(owner, "PUBLIC");
-    // 소개는 500자까지지만 이모지는 두 칸이라 "[블로그] 이름\n소개"가 1000칸을 넘는다
+    // 이모지는 Java 문자열에서 두 칸이라, 길이로 자르면 1000칸째에서 이모지가 갈려 "?"로 저장됐다.
+    // "[블로그] 넷글자다\n" + 이모지 500개는 511자라 자를 필요가 없다
     jdbc.update(
-        "update blogs set name = '긴소개', description = ? where id = ?", "😀".repeat(500), blogId);
+        "update blogs set name = '넷글자다', description = ? where id = ?", "😀".repeat(500), blogId);
 
     long reportId =
         created(call(newUser(), post("/api/reports"), report("BLOG", blogId, null, "SPAM", null)));
     String snapshot = column(reportId, "target_snapshot", String.class);
-    assertThat(snapshot).startsWith("[블로그] 긴소개\n😀").endsWith("😀");
-    assertThat(snapshot.length()).isEqualTo(1000);
+    assertThat(snapshot).isEqualTo("[블로그] 넷글자다\n" + "😀".repeat(500));
+    assertThat(snapshot).doesNotContain("?");
   }
 
   @Test
