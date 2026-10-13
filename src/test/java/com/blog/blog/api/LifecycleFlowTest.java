@@ -401,8 +401,9 @@ class LifecycleFlowTest {
   }
 
   @Test
-  @DisplayName("관리자가 블로그장 권한을 박탈해 블로그장이 바뀌면 이전 블로그장의 위임 요청은 수락할 수 없다 (ADM-07, BLG-08)")
-  void staleTransferCannotBeAcceptedAfterTheOwnerChanged() throws Exception {
+  @DisplayName(
+      "관리자가 블로그장 권한을 박탈하면 이전 블로그장이 보낸 위임 요청은 취소되고, 새 블로그장은 바로 새 요청을 보낼 수 있다 (ADM-07, BLG-08, D-145)")
+  void demotionCancelsThePendingTransfer() throws Exception {
     User owner = newUser();
     User manager = newUser();
     User member = newUser();
@@ -426,19 +427,19 @@ class LifecycleFlowTest {
         .andExpect(status().isNoContent());
     assertThat(ownerId(blogId)).isEqualTo(manager.getId());
 
-    call(member, post("/api/transfers/" + transferId + "/accept"), null)
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.message").value(containsString("블로그장이 바뀌어")));
-    assertThat(ownerId(blogId)).isEqualTo(manager.getId());
-    assertThat(role(blogId, member)).isEqualTo("MEMBER");
-
-    // 새 블로그장이 남은 요청을 취소할 수 있다 (D-124)
-    call(manager, post("/api/blogs/" + blogId + "/transfers/pending/cancel"), null)
-        .andExpect(status().isNoContent());
+    // 요청은 취소되고 받은 사람에게 알림이 간다. 수락해도 블로그장이 되지 않는다
     assertThat(
             jdbc.queryForObject(
                 "select status from blog_owner_transfers where id = ?", String.class, transferId))
         .isEqualTo("CANCELED");
+    assertThat(notifications(member, "OWNER_TRANSFER_RESULT")).isEqualTo(1);
+    call(member, post("/api/transfers/" + transferId + "/accept"), null)
+        .andExpect(status().is4xxClientError());
+    assertThat(ownerId(blogId)).isEqualTo(manager.getId());
+    assertThat(role(blogId, member)).isEqualTo("MEMBER");
+
+    // 대기 요청이 없으니 새 블로그장이 곧바로 위임을 요청할 수 있다 (D-123)
+    requestTransfer(manager, blogId, member);
   }
 
   @Test
