@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.blog.common.web.AssetVersions;
 import com.blog.common.web.SiteUrl;
 import com.blog.main.service.ShareMetaService;
 import com.blog.main.service.ShareMetaService.ShareMeta;
@@ -21,7 +22,8 @@ class SharePageControllerTest {
             new ShareMeta(
                 "제목", "제목 - 블로그", "설명", "/api/images/1", false, "article", "/blog/a/posts/7"));
     SharePageController controller =
-        new SharePageController(metaService, new SiteUrl("https://jj-blog.java21.net", true));
+        new SharePageController(
+            metaService, new SiteUrl("https://jj-blog.java21.net", true), new AssetVersions());
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/blog/a/posts/7");
     request.setScheme("http");
     request.setServerName("10.0.0.1");

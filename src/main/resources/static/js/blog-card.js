@@ -21,6 +21,34 @@
   var JOIN_POLICY = { OPEN: '자유 참여', APPROVAL: '승인제' };
   var ROLE = { OWNER: '블로그장', MANAGER: '부블로그장', MEMBER: '멤버' };
 
+  /**
+   * 픽셀 장면을 화면에 보일 때(아래쪽 카드는 스크롤해서 가까워질 때) 그린다 (T164). 장면 하나를 처음 그리는 데 휴대폰에서 수십~수백 ms가 걸려,
+   * 바로 그리면 글자·목록이 그만큼 늦게 보였다. 그리기 전에도 같은 비율(192x80)로 자리를 잡아 화면이 밀리지 않게 한다.
+   */
+  function drawScene(canvas, blog) {
+    canvas.width = 192;
+    canvas.height = 80;
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+    function draw() {
+      window.PixelCover.render(canvas, window.PixelCover.fromValue(blog.coverScene, blog.slug, blog.mascot));
+    }
+    if (typeof IntersectionObserver !== 'function') {
+      setTimeout(draw, 0);
+      return;
+    }
+    var io = new IntersectionObserver(
+      function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) {
+          io.disconnect();
+          draw();
+        }
+      },
+      { rootMargin: '200px 0px' }
+    );
+    io.observe(canvas);
+  }
+
   function blogUrl(slug) {
     return '/blog/' + encodeURIComponent(slug);
   }
@@ -50,7 +78,7 @@
       canvas.setAttribute('aria-hidden', 'true');
       scene.appendChild(canvas);
       a.appendChild(scene);
-      window.PixelCover.render(canvas, window.PixelCover.fromValue(blog.coverScene, blog.slug, blog.mascot));
+      drawScene(canvas, blog);
     }
     var title = el('div', 'blog-card__title');
     if (window.Mascot) {
@@ -174,6 +202,7 @@
   window.BlogUi = {
     el: el,
     card: card,
+    drawScene: drawScene,
     postCard: postCard,
     profileUrl: profileUrl,
     tagList: tagList,

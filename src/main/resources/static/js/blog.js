@@ -52,11 +52,11 @@
     // 대표 이미지가 없으면 서버가 고른 움직이는 픽셀 장면 (BLG-15, D-119)
     var hasScene = !blog.coverImage && !!window.PixelCover;
     $('cover-scene').hidden = !hasScene;
-    if (hasScene) {
-      window.PixelCover.render(
-        $('cover-scene').querySelector('canvas'),
-        window.PixelCover.fromValue(blog.coverScene, blog.slug, blog.mascot)
-      );
+    // 이름·글 목록이 먼저 보이게 장면은 화면을 한 번 그린 뒤에 그린다 (T164). 구독 등으로 다시 그릴 때는 이미 그린 장면을 둔다
+    var scene = $('cover-scene').querySelector('canvas');
+    if (hasScene && !scene.__pixelCover && !scene.dataset.pending) {
+      scene.dataset.pending = 'true';
+      ui.drawScene(scene, blog);
     }
     $('description').textContent = blog.description || '';
     $('tags').replaceChildren(ui.tagList(blog.tags));
