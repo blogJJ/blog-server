@@ -136,26 +136,32 @@ public class MascotService {
     long ceiling = ceiling(open);
     int moved = 0;
     for (Mascot base : Mascot.values()) {
-      if (counts.get(base) <= ceiling) {
-        continue;
+      if (moved >= REBALANCE_BATCH) {
+        break;
       }
-      for (Long id : blogRepository.findOpenIdsByMascotBase(base.key(), REBALANCE_SCAN)) {
-        if (moved >= REBALANCE_BATCH) {
-          return moved;
+      if (counts.get(base) > ceiling) {
+        moved += moveFrom(base, counts, ceiling, REBALANCE_BATCH - moved);
+      }
+    }
+    return moved;
+  }
+
+  /** 몫을 넘은 바탕에서 블로그를 하나씩 옮긴다. 몫까지 줄었거나 budget만큼 옮기면 멈춘다. @return 옮긴 수 */
+  private int moveFrom(Mascot base, Map<Mascot, Long> counts, long ceiling, int budget) {
+    int moved = 0;
+    for (Long id : blogRepository.findOpenIdsByMascotBase(base.key(), REBALANCE_SCAN)) {
+      if (moved >= budget || counts.get(base) <= ceiling) {
+        break;
+      }
+      try {
+        Mascot to = rebalanceOne(id, base, counts, ceiling);
+        if (to != null) {
+          counts.merge(base, -1L, Long::sum);
+          counts.merge(to, 1L, Long::sum);
+          moved++;
         }
-        if (counts.get(base) <= ceiling) {
-          break;
-        }
-        try {
-          Mascot to = rebalanceOne(id, base, counts, ceiling);
-          if (to != null) {
-            counts.merge(base, -1L, Long::sum);
-            counts.merge(to, 1L, Long::sum);
-            moved++;
-          }
-        } catch (RuntimeException e) {
-          log.warn("블로그 {} 마스코트 바탕을 옮기지 못함: {}", id, e.toString());
-        }
+      } catch (RuntimeException e) {
+        log.warn("블로그 {} 마스코트 바탕을 옮기지 못함: {}", id, e.toString());
       }
     }
     return moved;

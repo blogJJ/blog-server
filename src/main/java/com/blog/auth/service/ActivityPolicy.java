@@ -42,7 +42,7 @@ public class ActivityPolicy {
     if (session.isRememberMe() || !isUserActivity(request)) {
       return;
     }
-    extend(session);
+    extendNow(session);
   }
 
   /** 연장 요청(POST /api/auth/extend)처럼 무조건 늘릴 때 */
@@ -51,6 +51,10 @@ public class ActivityPolicy {
     if (session.isRememberMe()) {
       return;
     }
+    extendNow(session);
+  }
+
+  private void extendNow(RefreshToken session) {
     LocalDateTime now = LocalDateTime.now(clock);
     LocalDateTime until = now.plus(LoginSessionService.IDLE_TIMEOUT);
     if (session.getExpiresAt().isAfter(until.minus(MIN_INTERVAL))) {

@@ -31,7 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SearchService {
 
-  public static final List<String> TYPES = List.of("blog", "post", "tag", "nickname");
+  private static final String BLOG = "blog";
+  private static final String POST = "post";
+  private static final String TAG = "tag";
+  private static final String NICKNAME = "nickname";
+  public static final List<String> TYPES = List.of(BLOG, POST, TAG, NICKNAME);
   public static final String NO_RESULT = "검색 결과가 없습니다";
 
   /**
@@ -100,7 +104,7 @@ public class SearchService {
   public SearchResult search(
       String rawQuery, String type, String sort, Long viewerId, int size, int page) {
     String q = BlogQueryService.validateQuery(rawQuery);
-    String t = TYPES.contains(type) ? type : "post";
+    String t = TYPES.contains(type) ? type : POST;
     String s = BlogQueryService.normalizeSort(sort);
     if (viewerId != null) {
       recentSearchService.add(viewerId, q);
@@ -108,9 +112,9 @@ public class SearchService {
     List<Long> hidden = blockService.hiddenAuthorIds(viewerId);
     Pageable pageable = PageRequest.of(Math.max(page, 1) - 1, PostCards.pageSize(size));
     return switch (t) {
-      case "blog" -> SearchResult.of(t, q, s, blogQueryService.search(q, s, page), null);
-      case "tag" -> SearchResult.of(t, q, s, byTag(q, s, hidden, pageable), null);
-      case "nickname" -> byNickname(q, s, hidden, pageable);
+      case BLOG -> SearchResult.of(t, q, s, blogQueryService.search(q, s, page), null);
+      case TAG -> SearchResult.of(t, q, s, byTag(q, s, hidden, pageable), null);
+      case NICKNAME -> byNickname(q, s, hidden, pageable);
       default -> SearchResult.of(t, q, s, byTitle(q, s, hidden, pageable), null);
     };
   }
@@ -150,7 +154,7 @@ public class SearchService {
             .orElse(null);
     if (user == null) {
       return SearchResult.of(
-          "nickname", q, sort, PageResponse.of(Page.<Post>empty(pageable), cards::of), null);
+          NICKNAME, q, sort, PageResponse.of(Page.<Post>empty(pageable), cards::of), null);
     }
     PageResponse<PostCards.PostCard> posts =
         PageResponse.of(
@@ -161,7 +165,7 @@ public class SearchService {
             user.getNickname(),
             ImageService.url(user.getProfileImage()),
             user.getBio());
-    return SearchResult.of("nickname", q, sort, posts, hit);
+    return SearchResult.of(NICKNAME, q, sort, posts, hit);
   }
 
   /** 일치 검색은 관련도가 모두 같아 relevance도 최신순 */

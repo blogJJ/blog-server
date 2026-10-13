@@ -100,17 +100,7 @@ public class JoinService {
         blogRepository
             .findById(blogId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-    BlogAccessService.Access access = accessService.check(blog, userId, shareKey);
-    if (access.membership().isPresent()) {
-      throw new BusinessException(ErrorCode.CONFLICT, "이미 이 블로그의 멤버예요.");
-    }
-    if (blacklistService.isBlacklisted(blogId, userId)) {
-      throw new BusinessException(ErrorCode.BLACKLISTED);
-    }
-    if (blockRepository.existsByBlockerIdAndBlockedId(blog.getOwner().getId(), userId)) {
-      // 블로그장이 차단한 회원의 신청은 자동 거절 (SOC-05, D-36)
-      throw new BusinessException(ErrorCode.FORBIDDEN, "이 블로그에는 참여 신청을 할 수 없어요. 신청이 자동으로 거절되었어요.");
-    }
+    rejectIfNotAllowed(blog, userId, shareKey);
     LocalDateTime now = now();
     List<BlogMember> managers = memberRepository.findManagers(blogId);
     User owner = blog.getOwner();
@@ -132,16 +122,50 @@ public class JoinService {
       return new JoinResult(true, null);
     }
 
-    if (last != null && last.getStatus() == JoinRequestStatus.REJECTED) {
-      LocalDateTime reapplyAt = last.getHandledAt().plus(REAPPLY_AFTER_REJECT);
-      if (now.isBefore(reapplyAt)) {
-        throw new BusinessException(
-            ErrorCode.CONFLICT,
-            "참여 신청이 거절되어 " + reapplyAt.format(DATE_TIME_FORMAT) + " 이후에 다시 신청할 수 있어요.");
-      }
-    }
+    rejectIfTooSoon(last, now);
     BlogJoinRequest request = requestRepository.save(new BlogJoinRequest(blog, user));
 
+    notificationService.notifyAll(
+        requestReceivers(owner, ownerSuspended, managers),
+        userId,
+        NotificationType.JOIN_REQUEST,
+        NotificationTargetType.BLOG,
+        blogId,
+        "'" + blog.getName() + "'에 참여 신청이 왔어요.");
+    return new JoinResult(false, request);
+  }
+
+  /** 이미 멤버, 블랙리스트, 블로그장이 차단한 회원은 신청할 수 없다 */
+  private void rejectIfNotAllowed(Blog blog, Long userId, String shareKey) {
+    BlogAccessService.Access access = accessService.check(blog, userId, shareKey);
+    if (access.membership().isPresent()) {
+      throw new BusinessException(ErrorCode.CONFLICT, "이미 이 블로그의 멤버예요.");
+    }
+    if (blacklistService.isBlacklisted(blog.getId(), userId)) {
+      throw new BusinessException(ErrorCode.BLACKLISTED);
+    }
+    if (blockRepository.existsByBlockerIdAndBlockedId(blog.getOwner().getId(), userId)) {
+      // 블로그장이 차단한 회원의 신청은 자동 거절 (SOC-05, D-36)
+      throw new BusinessException(ErrorCode.FORBIDDEN, "이 블로그에는 참여 신청을 할 수 없어요. 신청이 자동으로 거절되었어요.");
+    }
+  }
+
+  /** 거절된 뒤 다시 신청할 수 있는 시각 전이면 막는다 */
+  private static void rejectIfTooSoon(BlogJoinRequest last, LocalDateTime now) {
+    if (last == null || last.getStatus() != JoinRequestStatus.REJECTED) {
+      return;
+    }
+    LocalDateTime reapplyAt = last.getHandledAt().plus(REAPPLY_AFTER_REJECT);
+    if (now.isBefore(reapplyAt)) {
+      throw new BusinessException(
+          ErrorCode.CONFLICT,
+          "참여 신청이 거절되어 " + reapplyAt.format(DATE_TIME_FORMAT) + " 이후에 다시 신청할 수 있어요.");
+    }
+  }
+
+  /** 신청 알림을 받을 사람: 블로그장(정지 중이 아니면)과 멤버 관리 권한이 있는 부블로그장. 블로그장이 정지 중이면 부블로그장 모두 */
+  private List<Long> requestReceivers(
+      User owner, boolean ownerSuspended, List<BlogMember> managers) {
     List<Long> receivers = new ArrayList<>();
     if (!ownerSuspended) {
       receivers.add(owner.getId());
@@ -153,14 +177,7 @@ public class JoinService {
         receivers.add(manager.getUser().getId());
       }
     }
-    notificationService.notifyAll(
-        receivers,
-        userId,
-        NotificationType.JOIN_REQUEST,
-        NotificationTargetType.BLOG,
-        blogId,
-        "'" + blog.getName() + "'에 참여 신청이 왔어요.");
-    return new JoinResult(false, request);
+    return receivers;
   }
 
   /** 승인 (T051). 권한은 컨트롤러가 확인한다. */

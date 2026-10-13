@@ -74,6 +74,10 @@ public class VerificationCodeService {
    */
   @Transactional(noRollbackFor = BusinessException.class)
   public void verify(String email, VerificationPurpose purpose, String code) {
+    check(email, purpose, code);
+  }
+
+  private void check(String email, VerificationPurpose purpose, String code) {
     LocalDateTime now = now();
     VerificationCode latest =
         repository
@@ -97,7 +101,7 @@ public class VerificationCodeService {
    */
   @Transactional(noRollbackFor = BusinessException.class)
   public void verifyAndUse(String email, VerificationPurpose purpose, String code) {
-    verify(email, purpose, code);
+    check(email, purpose, code);
     repository
         .findFirstByEmailAndPurposeOrderByIdDesc(email, purpose)
         .ifPresent(c -> c.markUsed(now()));

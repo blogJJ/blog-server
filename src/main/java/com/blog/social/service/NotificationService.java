@@ -69,7 +69,7 @@ public class NotificationService {
       Long targetId,
       String message) {
     List<Notification> created =
-        notifyAll(List.of(receiverId), actorId, type, targetType, targetId, message);
+        create(List.of(receiverId), actorId, type, targetType, targetId, message);
     return created.stream().findFirst();
   }
 
@@ -80,6 +80,16 @@ public class NotificationService {
    */
   @Transactional
   public List<Notification> notifyAll(
+      Collection<Long> receiverIds,
+      Long actorId,
+      NotificationType type,
+      NotificationTargetType targetType,
+      Long targetId,
+      String message) {
+    return create(receiverIds, actorId, type, targetType, targetId, message);
+  }
+
+  private List<Notification> create(
       Collection<Long> receiverIds,
       Long actorId,
       NotificationType type,

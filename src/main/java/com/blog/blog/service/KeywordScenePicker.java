@@ -20,6 +20,8 @@ import java.util.Set;
  * 앞에서부터 보고 사전 단어가 들어 있으면 그 장면·주제, 하나도 없으면 빈 값이라 바탕 그림으로 정한다(MascotService.sceneFor). 배경과 계절도 맞는 단어가
  * 없으면 빈 값이고, 그때는 MascotService가 무작위로 섞는다.
  */
+// 키워드 사전은 같은 단어(space, travel, winter 등)가 여러 장면·배경에 들어가는 것이 정상이라 상수로 빼지 않는다
+@SuppressWarnings("java:S1192")
 public final class KeywordScenePicker {
 
   private static final Map<Scene, List<String>> SCENES = new LinkedHashMap<>();
