@@ -207,6 +207,9 @@ public class NotificationInboxService {
         if (slug == null) {
           yield null;
         }
+        if (n.getType() == NotificationType.COMMENT_REVIEW) {
+          yield "/blog/" + slug + "/admin#comments"; // 블로그 관리의 댓글 확인 탭 (T166)
+        }
         yield n.getType() == NotificationType.JOIN_REQUEST
             ? "/blog/" + slug + "/admin"
             : "/blog/" + slug;
@@ -256,6 +259,7 @@ public class NotificationInboxService {
     map.put(NotificationType.BLOG_SUBSCRIBE, "내 블로그 구독");
     map.put(NotificationType.JOIN_REQUEST, "참여 신청");
     map.put(NotificationType.JOIN_RESULT, "참여 승인·거절");
+    map.put(NotificationType.COMMENT_REVIEW, "확인이 필요한 댓글");
     map.put(NotificationType.REPORT_RESULT, "신고 처리 결과");
     map.put(NotificationType.NOTICE, "공지사항");
     return map;
