@@ -7,6 +7,10 @@
     <!--og-->
     <link rel="stylesheet" href="/css/common.css" />
     <link rel="stylesheet" href="/css/mascot.css" />
+    <!-- 블로그 화면에서만 쓰는 스크립트를 한가할 때 미리 받아 둔다 (T164) -->
+    <link rel="prefetch" href="/js/pixel-cover.js" />
+    <link rel="prefetch" href="/js/blog.js" />
+    <link rel="prefetch" href="/js/post-list.js" />
     <script src="/js/theme.js"></script>
     <script src="/js/api.js" defer></script>
     <script src="/js/layout.js" defer></script>
@@ -17,6 +21,7 @@
     <script src="/js/report.js" defer></script>
     <script src="/js/post-view.js" defer></script>
     <script src="/js/comments.js" defer></script>
+    <script src="/js/similar-posts.js" defer></script>
   </head>
   <body>
     <!-- 글 상세 /blog/{주소}/posts/{번호} (T071, BRD-01, BRD-07). og 태그는 서버가 채운다(T069). 좋아요·댓글(BRD-06) -->
@@ -43,6 +48,11 @@
         <p class="post__counts" id="counts"></p>
         <a class="button" id="back">목록으로</a>
       </article>
+      <!-- 비슷한 글 (T168). 본문을 그린 뒤 이 자리에 가까워지면 불러오고, 없으면 숨긴 채로 둔다 -->
+      <section class="similar" id="similar" aria-labelledby="similar-title" hidden>
+        <h2 class="similar__title" id="similar-title">이런 글은 어때요</h2>
+        <ul class="similar__list" id="similar-list"></ul>
+      </section>
       <section class="comments" id="comments" hidden>
         <h2 class="comments__title">댓글 <span id="comment-count">0</span></h2>
         <form class="comment-form" id="comment-form" novalidate hidden>

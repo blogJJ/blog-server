@@ -289,7 +289,7 @@
       return;
     }
     var v = blog.viewer;
-    if (!v.canEditInfo && !v.canManageMembers) {
+    if (!v.canEditInfo && !v.canManageMembers && !v.canManagePosts) {
       blocked('이 블로그를 관리할 권한이 없어요.');
       return;
     }
@@ -303,6 +303,7 @@
     $('tab-members').hidden = !v.canManageMembers;
     $('tab-reports').hidden = !v.canManageMembers;
     $('tab-blacklist').hidden = !v.canManageMembers;
+    $('tab-comments').hidden = !v.canManagePosts; // 댓글 확인 (T166, blog-admin-comments.js)
     $('tab-close').hidden = !v.owner; // 위임·폐쇄는 블로그장만 (blog-admin-close.js)
     $('tab-close').textContent = v.canTransfer ? '위임·폐쇄' : '폐쇄'; // 메인 관리자는 위임하지 않는다 (D-122)
     if (v.canEditInfo) {
@@ -311,7 +312,12 @@
       renderShare();
       renderCover();
     }
-    showTab(v.canManageMembers ? 'requests' : 'info');
+    // 알림에서 "#comments"로 들어오면 댓글 확인 탭부터 (T166)
+    if (window.location.hash === '#comments' && v.canManagePosts) {
+      showTab('comments');
+    } else {
+      showTab(v.canManageMembers ? 'requests' : v.canEditInfo ? 'info' : 'comments');
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function () {

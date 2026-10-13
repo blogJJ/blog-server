@@ -1,0 +1,117 @@
+/* 글쓰기 화면 도우미: 태그 추천·맞춤법 검사 (T167) */
+.assist-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.assist-bar .post-edit__count {
+  margin: 0 0 0 auto;
+}
+
+.assist-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.assist-label-row .assist-button {
+  min-height: 28px;
+  padding: 0 8px;
+  color: var(--color-primary);
+}
+
+.assist-tags {
+  margin-top: 6px;
+}
+
+.assist-tags .field__hint {
+  margin: 0;
+}
+
+.assist-chip {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.assist-chip .chip__word {
+  padding: 4px 12px;
+  color: var(--color-primary);
+}
+
+.assist-panel {
+  margin: 12px 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.assist-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assist-panel__empty {
+  margin: 8px 0 0;
+  color: var(--color-text-sub);
+}
+
+.assist-fixes {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assist-fix {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.assist-fix.is-done {
+  opacity: 0.6;
+}
+
+.assist-fix p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.assist-fix__context {
+  color: var(--color-text-sub);
+  font-size: 14px;
+}
+
+.assist-fix__original {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--color-warn-soft);
+  color: var(--color-text);
+}
+
+.assist-fix__change del {
+  color: var(--color-muted);
+}
+
+.assist-fix__change ins {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.assist-fix__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.assist-fix__actions .button {
+  min-height: 30px;
+  padding: 0 12px;
+}

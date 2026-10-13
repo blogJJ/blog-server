@@ -58,6 +58,19 @@ public class Comment extends BaseTimeEntity {
   @Column(name = "deleted_at")
   private LocalDateTime deletedAt;
 
+  /** 자동 검사 결과 (T166, D-133). 검사하지 않았거나 문제없으면 null */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "review_status")
+  private CommentReview reviewStatus;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "review_reason")
+  private CommentReviewReason reviewReason;
+
+  /** 자동 검사가 숨긴 시각 */
+  @Column(name = "held_at")
+  private LocalDateTime heldAt;
+
   protected Comment() {}
 
   public Comment(Post post, User author, Comment parent, User replyToUser, String content) {
@@ -82,6 +95,30 @@ public class Comment extends BaseTimeEntity {
   /** 관리자 숨김 (ADM-03). 화면에는 삭제된 댓글처럼 보인다. */
   public void hide() {
     this.status = CommentStatus.HIDDEN;
+  }
+
+  /** 자동 검사가 수상하다고 본 댓글을 숨기고 블로그장 확인을 기다린다 (T166, D-133). 다른 사람에게는 관리자 숨김처럼 빠지고, 쓴 사람에게는 그대로 보인다. */
+  public void hold(CommentReviewReason reason, LocalDateTime now) {
+    this.status = CommentStatus.HIDDEN;
+    this.reviewStatus = CommentReview.PENDING;
+    this.reviewReason = reason;
+    this.heldAt = now;
+  }
+
+  /** 확인을 기다리던 댓글을 승인해 다시 보이게 한다. */
+  public void approve() {
+    this.status = CommentStatus.ACTIVE;
+    this.reviewStatus = CommentReview.APPROVED;
+  }
+
+  /** 자동 검사로 숨겨져 확인을 기다리는 중 */
+  public boolean isHeld() {
+    return status == CommentStatus.HIDDEN && reviewStatus == CommentReview.PENDING;
+  }
+
+  /** 이 사람에게 보이는지. 확인을 기다리는 댓글은 쓴 사람에게만 보인다. */
+  public boolean isShownTo(Long viewerId) {
+    return isActive() || (isHeld() && viewerId != null && isWrittenBy(viewerId));
   }
 
   public boolean isActive() {
@@ -126,5 +163,17 @@ public class Comment extends BaseTimeEntity {
 
   public LocalDateTime getDeletedAt() {
     return deletedAt;
+  }
+
+  public CommentReview getReviewStatus() {
+    return reviewStatus;
+  }
+
+  public CommentReviewReason getReviewReason() {
+    return reviewReason;
+  }
+
+  public LocalDateTime getHeldAt() {
+    return heldAt;
   }
 }

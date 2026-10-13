@@ -21,6 +21,8 @@ public enum NotificationType {
   JOIN_REQUEST(NotificationTab.BLOG, true),
   /** 참여 승인·거절 결과 */
   JOIN_RESULT(NotificationTab.BLOG, true),
+  /** 내 블로그에 확인이 필요한 댓글 (블로그장·글 관리 부블로그장, T166, D-133) */
+  COMMENT_REVIEW(NotificationTab.BLOG, true),
   /** 블로그장 위임 요청을 받음 */
   OWNER_TRANSFER_REQUEST(NotificationTab.BLOG, false),
   /** 위임 수락·거절·7일 자동 취소 */

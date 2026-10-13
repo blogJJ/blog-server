@@ -85,6 +85,12 @@ springdoc:
     enabled: false
 
 server:
+  # 글자 응답(HTML·JS·CSS·JSON·SVG)을 gzip으로 줄여 보낸다 (T164). pixel-cover.js가 약 390KB → 약 107KB.
+  # 바깥 nginx가 gzip을 하지 않아도 앱이 줄인 응답을 그대로 넘긴다
+  compression:
+    enabled: true
+    min-response-size: 1KB
+    mime-types: text/html,text/css,text/javascript,application/javascript,application/json,image/svg+xml,text/plain
   # 기본 오류 응답에 내부 정보를 싣지 않는다 (OPS-02, D-102). API 오류는 GlobalExceptionHandler가 만든다
   error:
     include-stacktrace: never
@@ -164,6 +170,23 @@ app:
     enabled: true
     max-tokens: 16000
     timeout: 3m
+  # 글쓰기 화면의 태그 추천·맞춤법 검사 (T167). 키·모델은 mascot 값을 같이 쓴다. 키가 비면 태그는 단어 세기로 고르고 맞춤법 버튼은 숨긴다
+  # 회원별 횟수 제한으로 비용을 묶는다. nginx가 60초에 끊으므로 기다리는 시간은 그보다 짧게
+  writing-assist:
+    tags-per-minute: 5
+    tags-per-day: 60
+    spelling-per-minute: 3
+    spelling-per-day: 20
+    tag-timeout: 20s
+    spelling-timeout: 50s
+  # 새 댓글 자동 검사 (T166, D-133). 키·모델은 mascot 값을 같이 쓴다. 키가 비어 있거나 실패하면 검사하지 않고 댓글을 그대로 둔다
+  comment-filter:
+    enabled: true
+    timeout: 20s
+    # 한 시간에 Claude에 묻는 횟수. 넘으면 묻지 않고 그대로 둔다
+    per-user-per-hour: 20
+    per-blog-per-hour: 200
+    per-hour: 1000
   storage:
     # 이미지 저장 위치. 1차는 서버 디스크, 이중화 때 S3 (SCL-02)
     local-dir: ${STORAGE_LOCAL_DIR:./uploads}

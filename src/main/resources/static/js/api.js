@@ -4,6 +4,8 @@
  * - 쓰기 요청(POST·PUT·PATCH·DELETE)에 XSRF-TOKEN 쿠키 값을 X-XSRF-TOKEN 헤더로 싣는다 (SEC-10).
  * - 5초가 지나면 요청을 끊고 "다시 시도" 안내 오류를 던진다 (D-48).
  * - 401이면 토큰 재발급(POST /api/auth/refresh)을 한 번 해 보고 원래 요청을 다시 보낸다 (SEC-04).
+ *   로그인 쿠키가 없어서 난 401(X-Auth-Session: none)은 재발급하지 않는다 (T164).
+ * - 글쓰기 도우미처럼 오래 걸리는 요청만 { timeoutMs: 60000 }으로 기다리는 시간을 늘린다 (T167).
  * - 알림 폴링처럼 사용자가 직접 하지 않은 요청은 { auto: true }로 보낸다. 로그인 30분 연장에 세지 않는다 (D-72).
  * - 실패하면 Api.ApiError(code, message, status, errorId)를 던진다. message는 서버가 준 안내 문구다.
  *
@@ -71,7 +73,7 @@
     var controller = new AbortController();
     var timer = setTimeout(function () {
       controller.abort();
-    }, TIMEOUT_MS);
+    }, options.timeoutMs || TIMEOUT_MS);
     try {
       return await fetch(url, {
         method: method,
@@ -124,7 +126,9 @@
   async function request(method, url, body, options) {
     options = options || {};
     var response = await send(method, url, body, options);
-    if (response.status === 401 && !options.noRefresh && shouldRefresh(url)) {
+    // 로그인 쿠키가 아예 없어서 난 401이면(서버가 X-Auth-Session: none을 붙임) 재발급할 토큰도 없으니 바로 실패로 본다 (T164)
+    var noSession = response.headers.get('X-Auth-Session') === 'none';
+    if (response.status === 401 && !noSession && !options.noRefresh && shouldRefresh(url)) {
       if (await refreshToken()) {
         response = await send(method, url, body, options);
       }
