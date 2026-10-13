@@ -2,8 +2,12 @@ package com.blog.main.repository;
 
 import com.blog.board.domain.Post;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -14,6 +18,8 @@ import org.springframework.data.repository.query.Param;
  *
  * <p>공통 조건: 게시 중인 글, 폐쇄·숨김이 아닌 블로그, {@code hidden}(보는 사람이 차단한 작성자, 없으면 BlockService.NONE)이 아닌 작성자.
  * 정렬은 Pageable의 Sort로 넘긴다(최신 = createdAt, 인기 = likeCount, D-89).
+ *
+ * <p>목록 쿼리는 글 번호만 고르고({@code …Ids}) 내용은 {@link #withContent}로 한 페이지만 읽는다 (T131).
  */
 public interface MainPostRepository extends Repository<Post, Long> {
 
@@ -43,50 +49,37 @@ public interface MainPostRepository extends Repository<Post, Long> {
 
   /** 전체 최신·인기 탭: 공개 블로그의 글 */
   @Query(
-      value =
-          "select p from Post p join fetch p.blog b join fetch p.author where" + LIVE + PUBLIC_BLOG,
+      value = "select p.id from Post p join p.blog b where" + LIVE + PUBLIC_BLOG,
       countQuery = "select count(p) from Post p join p.blog b where" + LIVE + PUBLIC_BLOG)
-  Page<Post> findPublic(@Param("hidden") Collection<Long> hidden, Pageable pageable);
+  Page<Long> findPublicIds(@Param("hidden") Collection<Long> hidden, Pageable pageable);
 
   /** 팔로우 탭: 내가 팔로우한 회원의 글. 블로그를 떠나 "탈퇴한 계정"으로 보이는 글은 뺀다 */
   @Query(
-      value =
-          "select p from Post p join fetch p.blog b join fetch p.author where"
-              + LIVE
-              + VISIBLE_TO_ME
-              + FOLLOWING,
+      value = "select p.id from Post p join p.blog b where" + LIVE + VISIBLE_TO_ME + FOLLOWING,
       countQuery =
           "select count(p) from Post p join p.blog b where" + LIVE + VISIBLE_TO_ME + FOLLOWING)
-  Page<Post> findFollowing(
+  Page<Long> findFollowingIds(
       @Param("me") Long me, @Param("hidden") Collection<Long> hidden, Pageable pageable);
 
   /** 구독 탭: 내가 구독한 블로그의 글 */
   @Query(
-      value =
-          "select p from Post p join fetch p.blog b join fetch p.author where"
-              + LIVE
-              + VISIBLE_TO_ME
-              + SUBSCRIBED,
+      value = "select p.id from Post p join p.blog b where" + LIVE + VISIBLE_TO_ME + SUBSCRIBED,
       countQuery =
           "select count(p) from Post p join p.blog b where" + LIVE + VISIBLE_TO_ME + SUBSCRIBED)
-  Page<Post> findSubscribed(
+  Page<Long> findSubscribedIds(
       @Param("me") Long me, @Param("hidden") Collection<Long> hidden, Pageable pageable);
 
   /** 태그 검색: 태그 규칙으로 정리한 값과 정확히 같은 태그가 달린 공개 블로그의 글 */
   @Query(
-      value =
-          "select p from Post p join fetch p.blog b join fetch p.author where"
-              + LIVE
-              + PUBLIC_BLOG
-              + TAGGED,
+      value = "select p.id from Post p join p.blog b where" + LIVE + PUBLIC_BLOG + TAGGED,
       countQuery = "select count(p) from Post p join p.blog b where" + LIVE + PUBLIC_BLOG + TAGGED)
-  Page<Post> findByTag(
+  Page<Long> findByTagIds(
       @Param("tag") String tag, @Param("hidden") Collection<Long> hidden, Pageable pageable);
 
   /** 닉네임 검색: 그 회원이 공개 블로그에 쓴 글. "탈퇴한 계정"으로 보이는 글은 뺀다 */
   @Query(
       value =
-          "select p from Post p join fetch p.blog b join fetch p.author where"
+          "select p.id from Post p join p.blog b where"
               + LIVE
               + PUBLIC_BLOG
               + " and p.author.id = :authorId and p.authorHidden = false",
@@ -95,7 +88,7 @@ public interface MainPostRepository extends Repository<Post, Long> {
               + LIVE
               + PUBLIC_BLOG
               + " and p.author.id = :authorId and p.authorHidden = false")
-  Page<Post> findByAuthor(
+  Page<Long> findByAuthorIds(
       @Param("authorId") Long authorId,
       @Param("hidden") Collection<Long> hidden,
       Pageable pageable);
@@ -130,4 +123,48 @@ public interface MainPostRepository extends Repository<Post, Long> {
 
   @Query("select p from Post p join fetch p.blog join fetch p.author where p.id in :ids")
   List<Post> findWithBlogAndAuthor(@Param("ids") Collection<Long> ids);
+
+  /** 전체 최신·인기 탭 */
+  default Page<Post> findPublic(Collection<Long> hidden, Pageable pageable) {
+    return withContent(findPublicIds(hidden, pageable));
+  }
+
+  /** 팔로우 탭 */
+  default Page<Post> findFollowing(Long me, Collection<Long> hidden, Pageable pageable) {
+    return withContent(findFollowingIds(me, hidden, pageable));
+  }
+
+  /** 구독 탭 */
+  default Page<Post> findSubscribed(Long me, Collection<Long> hidden, Pageable pageable) {
+    return withContent(findSubscribedIds(me, hidden, pageable));
+  }
+
+  /** 태그 검색 */
+  default Page<Post> findByTag(String tag, Collection<Long> hidden, Pageable pageable) {
+    return withContent(findByTagIds(tag, hidden, pageable));
+  }
+
+  /** 닉네임 검색 */
+  default Page<Post> findByAuthor(Long authorId, Collection<Long> hidden, Pageable pageable) {
+    return withContent(findByAuthorIds(authorId, hidden, pageable));
+  }
+
+  /**
+   * 고른 번호 순서대로 글·블로그·작성자를 읽는다 (T131). 본문(content)까지 붙인 큰 행을 통째로 정렬하면 글이 많을 때 몇 초씩 걸려서, 번호만 먼저 정렬해 한
+   * 페이지를 고르고 그 글만 읽는다.
+   */
+  default Page<Post> withContent(Page<Long> ids) {
+    if (ids.isEmpty()) {
+      return new PageImpl<>(List.of(), ids.getPageable(), ids.getTotalElements());
+    }
+    Map<Long, Integer> order = new HashMap<>();
+    for (int i = 0; i < ids.getContent().size(); i++) {
+      order.put(ids.getContent().get(i), i);
+    }
+    List<Post> posts =
+        findWithBlogAndAuthor(ids.getContent()).stream()
+            .sorted(Comparator.comparing(p -> order.get(p.getId())))
+            .toList();
+    return new PageImpl<>(posts, ids.getPageable(), ids.getTotalElements());
+  }
 }

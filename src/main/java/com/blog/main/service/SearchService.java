@@ -10,12 +10,8 @@ import com.blog.common.error.BusinessException;
 import com.blog.common.web.PageResponse;
 import com.blog.main.repository.MainPostRepository;
 import com.blog.social.service.BlockService;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -125,18 +121,9 @@ public class SearchService {
     if (fulltext.isEmpty()) {
       return PageResponse.of(Page.<Post>empty(pageable), cards::of);
     }
-    Page<Long> ids = postRepository.searchTitleIds(fulltext, sort, hidden, pageable);
-    Map<Long, Integer> order = new HashMap<>();
-    for (int i = 0; i < ids.getContent().size(); i++) {
-      order.put(ids.getContent().get(i), i);
-    }
-    List<Post> posts =
-        ids.isEmpty()
-            ? List.of()
-            : postRepository.findWithBlogAndAuthor(ids.getContent()).stream()
-                .sorted(Comparator.comparing(p -> order.get(p.getId())))
-                .toList();
-    return PageResponse.of(new PageImpl<>(posts, pageable, ids.getTotalElements()), cards::of);
+    return PageResponse.of(
+        postRepository.withContent(postRepository.searchTitleIds(fulltext, sort, hidden, pageable)),
+        cards::of);
   }
 
   private PageResponse<PostCards.PostCard> byTag(
