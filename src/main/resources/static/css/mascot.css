@@ -1,4 +1,4 @@
-/* 블로그 마스코트 (mascot.js): 동물 10종, 사물 8종 + 색조·모자·장식. 사이트 테마 변수에 기대지 않는다. */
+/* 블로그 마스코트 (mascot.js): 동물 20종, 사물 10종 + 색조·모자·장식. 사이트 테마 변수에 기대지 않는다. */
 .mascot {
   display: inline-block;
   line-height: 0;
@@ -42,6 +42,22 @@
 .mascot--hamster .mascot__frame { animation-delay: -2.2s; }
 .mascot--owl .mascot__frame,
 .mascot--owl .mascot__body { animation-delay: -4.2s; }
+/* D-143에서 더한 동물 */
+.mascot--panda .mascot__frame { animation-delay: -0.9s; }
+.mascot--koala .mascot__frame,
+.mascot--koala .mascot__body { animation-delay: -2.8s; }
+.mascot--pig .mascot__frame { animation-delay: -1.5s; }
+.mascot--sheep .mascot__frame,
+.mascot--sheep .mascot__body { animation-delay: -3.4s; }
+.mascot--duck .mascot__frame { animation-delay: -4.5s; }
+.mascot--turtle .mascot__frame,
+.mascot--turtle .mascot__body { animation-delay: -2.0s; }
+.mascot--hedgehog .mascot__frame { animation-delay: -0.4s; }
+.mascot--whale .mascot__frame,
+.mascot--whale .mascot__body { animation-delay: -3.9s; }
+.mascot--lion .mascot__frame { animation-delay: -1.7s; }
+.mascot--mouse .mascot__frame,
+.mascot--mouse .mascot__body { animation-delay: -2.6s; }
 
 /* 사물: 프레임 B가 눈 감음이 아니라 작은 변화라서 더 자주, 더 길게 보인다 */
 .mascot--computer .mascot__frame--a,
@@ -64,14 +80,18 @@
 .mascot--camera .mascot__frame--a,
 .mascot--book .mascot__frame--a,
 .mascot--headphones .mascot__frame--a,
-.mascot--gamepad .mascot__frame--a {
+.mascot--gamepad .mascot__frame--a,
+.mascot--pencil .mascot__frame--a,
+.mascot--plant .mascot__frame--a {
   animation: mascot-detail-a 3.6s steps(1, end) infinite;
 }
 
 .mascot--camera .mascot__frame--b,
 .mascot--book .mascot__frame--b,
 .mascot--headphones .mascot__frame--b,
-.mascot--gamepad .mascot__frame--b {
+.mascot--gamepad .mascot__frame--b,
+.mascot--pencil .mascot__frame--b,
+.mascot--plant .mascot__frame--b {
   animation: mascot-detail-b 3.6s steps(1, end) infinite;
 }
 
@@ -80,6 +100,9 @@
 .mascot--headphones .mascot__frame { animation-delay: -2.3s; }
 .mascot--gamepad .mascot__frame,
 .mascot--gamepad .mascot__body { animation-delay: -0.7s; }
+.mascot--pencil .mascot__frame { animation-delay: -1.6s; }
+.mascot--plant .mascot__frame,
+.mascot--plant .mascot__body { animation-delay: -2.9s; }
 .mascot--coffee .mascot__body,
 .mascot--computer .mascot__body { animation-delay: -0.6s; }
 

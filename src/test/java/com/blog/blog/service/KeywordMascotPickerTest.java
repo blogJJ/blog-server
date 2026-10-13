@@ -40,4 +40,22 @@ class KeywordMascotPickerTest {
     assertThat(KeywordMascotPicker.pick("아무 이름", List.of())).isEqualTo(first);
     assertThat(KeywordMascotPicker.pick(null, List.of())).isNotNull();
   }
+
+  @Test
+  void matchesEveryBaseFromTagsThenName() {
+    // D-143: 태그 순서대로, 이름은 마지막. 같은 바탕은 한 번만
+    assertThat(KeywordMascotPicker.matches("바다 일기", List.of("수영", "캠핑")))
+        .containsExactly(Mascot.PENGUIN, Mascot.WHALE, Mascot.BIRD, Mascot.RABBIT, Mascot.PENCIL);
+    assertThat(KeywordMascotPicker.matches("이름", List.of("반려식물"))).contains(Mascot.PLANT);
+    assertThat(KeywordMascotPicker.matches("이름", List.of("ㅁㅁ"))).isEmpty();
+  }
+
+  @Test
+  void candidatesFallBackToEveryBaseStartingFromName() {
+    assertThat(KeywordMascotPicker.candidates("민준의 식탁", List.of("집밥")))
+        .containsExactly(Mascot.BEAR);
+    List<Mascot> all = KeywordMascotPicker.candidates("아무 이름", List.of("ㅁㅁ"));
+    assertThat(all).hasSize(Mascot.values().length).doesNotHaveDuplicates();
+    assertThat(all.get(0)).isEqualTo(KeywordMascotPicker.pick("아무 이름", List.of()));
+  }
 }

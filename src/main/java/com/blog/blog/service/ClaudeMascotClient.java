@@ -12,6 +12,7 @@ import com.blog.blog.domain.MascotDesign;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -36,8 +37,12 @@ public class ClaudeMascotClient {
       You design a small pixel-art mascot for a Korean community blog by combining parts. \
       Base: when one object plainly matches the main topic (COMPUTER for programming, CAMERA for \
       photography, BOOK for reading, PLANE for overseas travel, HEADPHONES for music, GAMEPAD for \
-      games, COFFEE for cafes, CAKE for baking), choose it; otherwise choose the animal whose \
-      personality best fits the topic and mood. Tone recolours the base (ORIGINAL keeps its natural \
+      games, COFFEE for cafes, CAKE for baking, PENCIL for writing and journaling, PLANT for \
+      houseplants and gardening), choose it; otherwise choose the animal whose personality best \
+      fits the topic and mood. Also give up to two alternative bases that would fit the blog \
+      almost as well, best first, different from the base; animals that suit the mood are good \
+      alternatives. The server may use an alternative so that blogs do not all share the same \
+      picture. Tone recolours the base (ORIGINAL keeps its natural \
       colours). Hat sits on top and charm floats beside it; pick ones that suit the blog's mood, and \
       NONE is fine when nothing fits. \
       Also pick a wide cover scene for the blog header that fits the tags best: STUDY (studying, \
@@ -82,6 +87,9 @@ public class ClaudeMascotClient {
   /** Claude가 돌려줄 답. enum이라 목록 밖의 값은 나오지 않는다. */
   record Choice(
       @JsonPropertyDescription("Base picture: an animal or a topic object") Mascot base,
+      @JsonPropertyDescription(
+              "Up to two other bases that also fit the blog, best first, never the base itself")
+          List<Mascot> alternatives,
       @JsonPropertyDescription("Colour variant of the base") MascotDesign.Tone tone,
       @JsonPropertyDescription("Hat on top, or NONE") MascotDesign.Hat hat,
       @JsonPropertyDescription("Small floating charm beside it, or NONE") MascotDesign.Charm charm,
@@ -105,12 +113,42 @@ public class ClaudeMascotClient {
       return new Art(
           new MascotDesign(base, tone, hat, charm),
           // 섞기 모드(D-129). 배경·계절이 NONE이면 저장할 때 MascotService.withLayers가 정한다
-          new CoverScene(scene, time, weather, palette, 0, prop, backdrop, event, true));
+          new CoverScene(scene, time, weather, palette, 0, prop, backdrop, event, true),
+          alternatives);
     }
   }
 
-  /** 고른 마스코트와 장면. 장면의 배치 번호는 저장할 때 정한다. */
-  public record Art(MascotDesign mascot, CoverScene cover) {}
+  /** 고른 마스코트와 장면. 장면의 배치 번호는 저장할 때 정한다. alternatives는 바탕 대신 써도 어울리는 다른 바탕(최대 2개, D-143)이다. */
+  public record Art(MascotDesign mascot, CoverScene cover, List<Mascot> alternatives) {
+
+    public Art {
+      Mascot base = mascot == null ? null : mascot.base();
+      alternatives =
+          alternatives == null
+              ? List.of()
+              : alternatives.stream()
+                  .filter(Objects::nonNull)
+                  .filter(m -> m != base)
+                  .distinct()
+                  .limit(MAX_ALTERNATIVES)
+                  .toList();
+    }
+
+    public Art(MascotDesign mascot, CoverScene cover) {
+      this(mascot, cover, List.of());
+    }
+
+    /** 고른 바탕과 다른 바탕들. 쓰는 블로그가 같으면 앞의 것을 쓴다 (D-143). */
+    public List<Mascot> bases() {
+      List<Mascot> out = new ArrayList<>();
+      out.add(mascot.base());
+      out.addAll(alternatives);
+      return out;
+    }
+  }
+
+  // Claude가 돌려준 다른 바탕 중 쓰는 수
+  static final int MAX_ALTERNATIVES = 2;
 
   private final AnthropicClient client;
   private final String model;

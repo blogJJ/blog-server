@@ -1,5 +1,5 @@
 /*
- * 블로그 마스코트: 16x16 픽셀 동물 10종과 사물 8종을 SVG로 그린다.
+ * 블로그 마스코트: 16x16 픽셀 동물 20종과 사물 10종을 SVG로 그린다 (D-143에서 동물 10종, 사물 2종을 더함).
  * 그림은 문자열 배열(글자 하나가 픽셀 하나, '.'은 투명)과 색 표로 적는다.
  * 프레임 A(기본)와 B(동물은 눈 감음, 사물은 작은 변화)를 겹쳐 그리고, 깜빡임·흔들림은 mascot.css가 맡는다.
  *
@@ -244,6 +244,227 @@
         '...oyyo..oyyo...'
       ]
     },
+    // D-143에서 더한 동물 10종
+    panda: {
+      lid: 'd',
+      palette: { w: '#f7f6f2', d: '#45434d' },
+      rows: [
+        '................',
+        '.ooo........ooo.',
+        'odddoooooooodddo',
+        'oddwwwwwwwwwwddo',
+        'owwddwwwwwwddwwo',
+        'owdhedwwwwdhedwo',
+        'owdeedwwwwdeedwo',
+        'owkddwwoowwddkwo',
+        '.owwwwwwwwwwwwo.',
+        '..owwwwwwwwwwo..',
+        '...oooooooooo...',
+        '..odddwwwwdddo..',
+        '.oddddwwwwddddo.',
+        '.odddwwwwwwdddo.',
+        '..odddwwwwdddo..',
+        '...oooo..oooo...'
+      ]
+    },
+    koala: {
+      lid: 'g',
+      palette: { g: '#9ea6b4', p: '#f6d3da', w: '#f4f2f0' },
+      rows: [
+        '.oooo......oooo.',
+        'oppggo....oggppo',
+        'oppggooooooggppo',
+        '.oggggggggggggo.',
+        '.oghegggggghego.',
+        '.ogeegoooogeego.',
+        '.okggooooooggko.',
+        '.ogggoooooogggo.',
+        '..ogggoooogggo..',
+        '...oggwwwwggo...',
+        '....oooooooo....',
+        '...ogwwwwwwgo...',
+        '..oggwwwwwwggo..',
+        '..oggwwwwwwggo..',
+        '..ogggwwwwgggo..',
+        '...oooo..oooo...'
+      ]
+    },
+    pig: {
+      lid: 'p',
+      palette: { p: '#f7a9bd', D: '#e57e9b', s: '#fcd0dc', n: '#c4577a' },
+      rows: [
+        '................',
+        '................',
+        '.oo..........oo.',
+        '.oDo........oDo.',
+        '.oDpoooooooopDo.',
+        'oppppppppppppppo',
+        'oppheppppppheppo',
+        'oppeeppppppeeppo',
+        'opkkpoooooopkkpo',
+        'opppossnnssopppo',
+        'oppppooooooppppo',
+        '.oppppppppppppo.',
+        '..oooooooooooo..',
+        '.opppsssssspppo.',
+        '.opppsssssspppo.',
+        '..oooo....oooo..'
+      ]
+    },
+    sheep: {
+      lid: 'f',
+      palette: { w: '#fbf8f1', f: '#f1d2b8', l: '#8a6f63' },
+      rows: [
+        '................',
+        '....oo.oo.oo....',
+        '..oowwowwowwoo..',
+        '.owwwwwwwwwwwwo.',
+        'owwwffffffffwwwo',
+        'offwfheffhefwffo',
+        'owwwfeeffeefwwwo',
+        'owwwkffooffkwwwo',
+        '.owwwffffffwwwo.',
+        'owwwwwffffwwwwwo',
+        'owwwwwwwwwwwwwwo',
+        'owwwwwwwwwwwwwwo',
+        '.oowwoowwoowwoo.',
+        '...olo....olo...',
+        '...olo....olo...',
+        '...ooo....ooo...'
+      ]
+    },
+    duck: {
+      lid: 'y',
+      palette: { y: '#ffd84a', d: '#f2b829', r: '#f6913a' },
+      rows: [
+        '................',
+        '................',
+        '......oooo......',
+        '.....oyyyyo.....',
+        '....oyyyyyyo....',
+        '....oyyyyheyo...',
+        '....oyyyyeeyooo.',
+        '....oyyykyyorrro',
+        '....oyyyyyyyooo.',
+        'oyo.oyyyyyyo....',
+        'oyyooyyyyyyyooo.',
+        'oyyyyyyyyyyyyyyo',
+        'oyyyyddddyyyyyyo',
+        '.oyyyydddyyyyyo.',
+        '..oyyyyyyyyyyo..',
+        '...oooooooooo...'
+      ]
+    },
+    turtle: {
+      lid: 'g',
+      palette: { g: '#8fce6a', b: '#a8743f', B: '#d9a55e', y: '#f3e2a4' },
+      rows: [
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+        '....oooo........',
+        '...obbbbo...ooo.',
+        '..obBbbBbo.ogggo',
+        '.obBBbBBbboogheo',
+        'obbBbbBbbbbogeeo',
+        'obbbbbbbbbbggkgo',
+        'oyyyyyyyyyyoooo.',
+        '.oooooooooooo...',
+        '..ogo.....ogo...',
+        '..ooo.....ooo...'
+      ]
+    },
+    hedgehog: {
+      lid: 'f',
+      palette: { d: '#8a5a3c', D: '#b9825a', f: '#f4ddc0' },
+      rows: [
+        '................',
+        '...o..o..o..o...',
+        '..odoodoodoodo..',
+        '.oddddddddddddo.',
+        'oddDdddDdddDdddo',
+        'oddffffffffffddo',
+        'oddfheffffhefddo',
+        'oddfeeffffeefddo',
+        'oddkfffoofffkddo',
+        'odddffffffffdddo',
+        '.odddffffffdddo.',
+        '..oddddddddddo..',
+        '.oddffffffffddo.',
+        '.oddffffffffddo.',
+        '..odffffffffdo..',
+        '...oooo..oooo...'
+      ]
+    },
+    whale: {
+      lid: 'b',
+      palette: { b: '#5b8fd6', l: '#cfe6fb', s: '#9fd3f5' },
+      rows: [
+        '................',
+        '..s...s.........',
+        '...s.s......o..o',
+        '....s......obooo',
+        '...oooooo..obbo.',
+        '..obbbbbboo.obo.',
+        '.obbbbbbbbbo.obo',
+        'obhebbbbbbbbbobo',
+        'obeebbbbbbbbbbo.',
+        'okbbbbbbbbbbbbo.',
+        'ollbbbbbbbbbbbo.',
+        'ollllbbbbbbbbo..',
+        '.oolllllllllo...',
+        '...oooooooo.....',
+        '................',
+        '................'
+      ]
+    },
+    lion: {
+      lid: 'y',
+      palette: { m: '#d4742c', y: '#f6c65a', w: '#fdf0d0' },
+      rows: [
+        '................',
+        '....oooooooo....',
+        '..oommmmmmmmoo..',
+        '.ommmmmmmmmmmmo.',
+        'ommyyyyyyyyyymmo',
+        'ommyheyyyyheymmo',
+        'ommyeeyyyyeeymmo',
+        'ommkyywoowyykmmo',
+        'ommyywwwwwwyymmo',
+        '.ommyyyyyyyymmo.',
+        '..ommyyyyyymmo..',
+        '...ommmmmmmmo...',
+        '....oooooooo....',
+        '...oyywwwwyyo...',
+        '...oyywwwwyyo...',
+        '...oooo..oooo...'
+      ]
+    },
+    mouse: {
+      lid: 'g',
+      palette: { g: '#b4b8c4', p: '#f6b3c4', w: '#f6f4f2' },
+      rows: [
+        '.oooo......oooo.',
+        'ogppgo....ogppgo',
+        'ogpppgo..ogpppgo',
+        'ogppgoooooogppgo',
+        '.ooggggggggggoo.',
+        '..oghegggghego..',
+        '..ogeeggggeego..',
+        '..okgggppgggko..',
+        '...oggggggggo...',
+        '....oooooooo....',
+        '....ogwwwwgo....',
+        '...oggwwwwggo...',
+        '...oggwwwwggo.p.',
+        '...oggwwwwggo..p',
+        '....oggggggo..p.',
+        '....oooooooopp..'
+      ]
+    },
     // 사물은 눈이 없어서 프레임 B를 줄 단위로 직접 적는다(changes: 줄 번호 → 바뀐 줄)
     computer: {
       palette: { g: '#c9ccd6', s: '#2f3a56', c: '#7fd1ae', y: '#f6c453', p: '#f29bb0', w: '#ffffff' },
@@ -436,6 +657,50 @@
         '................'
       ],
       changes: { 1: '......oo........', 2: '......oFfo......' }
+    },
+    pencil: {
+      palette: { p: '#f29bb0', g: '#c9ccd6', y: '#ffd23f', Y: '#fff0a0', d: '#e8a317', w: '#f3d5a8', s: '#8a90a3' },
+      rows: [
+        '...........ooo..',
+        '..........opppo.',
+        '.........opppppo',
+        '........oggpppo.',
+        '.......oYyggpo..',
+        '......oYyydgo...',
+        '.....oYyyydo....',
+        '....oYyyydo.....',
+        '...oYyyydo......',
+        '..owyyydo.......',
+        '..owwwdo........',
+        '.owwwwo.........',
+        '.oowwo..........',
+        '.osoo...........',
+        '.oo.............',
+        '................'
+      ],
+      changes: { 14: '.oo.s...........', 15: '.....s..........' }
+    },
+    plant: {
+      palette: { l: '#7ccf5a', L: '#4f9e36', t: '#d9794a', T: '#f0a070', s: '#8a5536' },
+      rows: [
+        '................',
+        '.......oo.......',
+        '......olLo......',
+        '..oo..olLo..oo..',
+        '.olLo.olLo.oLlo.',
+        '.ollLoolLooLllo.',
+        '..ollLoLoLlllo..',
+        '...oolLLLloo....',
+        '.....ooLoo......',
+        '...oooooooooo...',
+        '..oTTTTTTTTTTo..',
+        '..oooooooooooo..',
+        '...ottttttttto..',
+        '...otttttttto...',
+        '....ottttttto...',
+        '....ooooooooo...'
+      ],
+      changes: { 1: '................', 2: '.......oo.......', 3: '..oo..olLo..oo..' }
     }
   };
 
@@ -450,6 +715,16 @@
     frog: '개구리',
     hamster: '햄스터',
     owl: '부엉이',
+    panda: '판다',
+    koala: '코알라',
+    pig: '돼지',
+    sheep: '양',
+    duck: '오리',
+    turtle: '거북이',
+    hedgehog: '고슴도치',
+    whale: '고래',
+    lion: '사자',
+    mouse: '생쥐',
     computer: '컴퓨터',
     camera: '카메라',
     book: '책',
@@ -457,15 +732,20 @@
     headphones: '헤드폰',
     gamepad: '게임기',
     coffee: '커피',
-    cake: '케이크'
+    cake: '케이크',
+    pencil: '연필',
+    plant: '화분'
   };
 
   var KEYS = [
     'bear', 'cat', 'dog', 'rabbit', 'fox', 'penguin', 'bird', 'frog', 'hamster', 'owl',
-    'computer', 'camera', 'book', 'plane', 'headphones', 'gamepad', 'coffee', 'cake'
+    'panda', 'koala', 'pig', 'sheep', 'duck', 'turtle', 'hedgehog', 'whale', 'lion', 'mouse',
+    'computer', 'camera', 'book', 'plane', 'headphones', 'gamepad', 'coffee', 'cake',
+    'pencil', 'plant'
   ];
 
-  var ANIMAL_COUNT = 10;
+  // 동물이 KEYS 앞쪽에 모여 있다. 색조 계산과 서버가 고르기 전 기본 그림(ANIMALS)이 이 수에 기댄다
+  var ANIMAL_COUNT = 20;
 
   // 색조: 그림 자기 색(윤곽·눈·볼 제외)만 HSL로 바꾼다
   var TONES = ['original', 'pastel', 'mint', 'berry', 'sky', 'cocoa'];

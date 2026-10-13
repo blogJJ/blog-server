@@ -13,6 +13,7 @@ import com.blog.blog.domain.MascotDesign;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.support.IntegrationTest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -241,6 +242,74 @@ class MascotServiceTest {
                 .map(b -> coverOf(b.getId()))
                 .toList())
         .isEqualTo(before);
+  }
+
+  @Test
+  void overusedBaseIsSpreadOnceWithoutTouchingCovers() {
+    // T169(D-143): 한 바탕에 몰린 블로그를 덜 쓰는 바탕으로 옮긴다. 장면과 대표 이미지는 그대로다
+    List<Blog> blogs = new ArrayList<>();
+    for (int i = 0; i < 35; i++) {
+      blogs.add(newBlog("이름", i == 0 ? List.of("반려식물") : List.of()));
+    }
+    for (int i = 0; i < blogs.size(); i++) {
+      jdbc.update(
+          "update blogs set mascot = ?, cover_image = '/uploads/r.png',"
+              + " cover_scene = 'desk.day.clear.warm.3.-.~' where id = ?",
+          MascotDesign.ofVariant(Mascot.COMPUTER, i).value(),
+          blogs.get(i).getId());
+    }
+
+    while (mascotService.rebalanceMascots() > 0) {}
+
+    List<String> after = blogs.stream().map(b -> mascotOf(b.getId())).toList();
+    long stillComputer = after.stream().filter(m -> m.startsWith("computer.")).count();
+    assertThat(stillComputer).isLessThan(blogs.size());
+    // 단어 사전에 맞는 바탕(식물)이 비어 있으면 먼저 그리로, 아니면 동물로 옮긴다
+    assertThat(
+            after.stream()
+                .filter(m -> !m.startsWith("computer."))
+                .map(m -> MascotDesign.parse(m).orElseThrow().base()))
+        .allMatch(m -> m.animal() || m == Mascot.PLANT);
+    assertThat(after).doesNotHaveDuplicates();
+    for (Blog b : blogs) {
+      assertThat(
+              jdbc.queryForObject(
+                  "select concat(cover_scene, ' ', cover_image) from blogs where id = ?",
+                  String.class,
+                  b.getId()))
+          .isEqualTo("desk.day.clear.warm.3.-.~ /uploads/r.png");
+    }
+
+    // 다시 돌려도 바뀌지 않는다
+    assertThat(mascotService.rebalanceMascots()).isZero();
+    assertThat(blogs.stream().map(b -> mascotOf(b.getId())).toList()).isEqualTo(after);
+  }
+
+  @Test
+  void newBlogPrefersLeastUsedMatchingBase() {
+    // D-143: '수영'은 펭귄과 고래에 맞는다. 둘 중 덜 쓰는 바탕을 쓴다
+    Blog crowded = newBlog("이름", List.of());
+    Blog crowded2 = newBlog("이름", List.of());
+    jdbc.update("update blogs set mascot = 'penguin.mint.none.none' where id = ?", crowded.getId());
+    jdbc.update("update blogs set mascot = 'penguin.sky.none.none' where id = ?", crowded2.getId());
+    Integer penguins =
+        jdbc.queryForObject(
+            "select count(*) from blogs where mascot like 'penguin.%' and status <> 'CLOSED'",
+            Integer.class);
+    Integer whales =
+        jdbc.queryForObject(
+            "select count(*) from blogs where mascot like 'whale.%' and status <> 'CLOSED'",
+            Integer.class);
+
+    Blog swim = newBlog("물개", List.of("수영"));
+    Mascot base = mascotService.assign(swim.getId()).base();
+
+    assertThat(base).isIn(Mascot.PENGUIN, Mascot.WHALE);
+    assertThat(base).isEqualTo(whales < penguins ? Mascot.WHALE : Mascot.PENGUIN);
+  }
+
+  private String mascotOf(Long blogId) {
+    return jdbc.queryForObject("select mascot from blogs where id = ?", String.class, blogId);
   }
 
   private String coverOf(Long blogId) {
