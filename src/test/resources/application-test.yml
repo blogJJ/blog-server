@@ -19,3 +19,6 @@ app:
   # 대표 그림도 진짜 API를 부르지 않는다. CoverArtServiceTest가 가짜 클라이언트로 확인한다
   cover-art:
     api-key: ""
+  # 글쓰기 도우미도 진짜 API를 부르지 않는다. ClaudeWritingClientTest가 가짜 서버로 확인한다
+  writing-assist:
+    api-key: ""

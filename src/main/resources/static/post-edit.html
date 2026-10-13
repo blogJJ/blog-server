@@ -6,6 +6,7 @@
     <title>글쓰기 - 블로그</title>
     <link rel="stylesheet" href="/css/common.css" />
     <link rel="stylesheet" href="/css/mascot.css" />
+    <link rel="stylesheet" href="/css/writing-assist.css" />
     <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/vendor/toastui-editor-3.2.2/toastui-editor.css" />
     <link rel="stylesheet" href="/vendor/toastui-editor-3.2.2/toastui-editor-dark.css" />
@@ -15,6 +16,7 @@
     <script src="/js/mascot.js" defer></script>
     <script src="/js/blog-card.js" defer></script>
     <script src="/vendor/toastui-editor-3.2.2/toastui-editor-all.min.js" defer></script>
+    <script src="/js/writing-assist.js" defer></script>
     <script src="/js/post-edit.js" defer></script>
   </head>
   <body>
@@ -39,10 +41,22 @@
         </div>
         <input class="post-edit__title" id="title" type="text" maxlength="30" placeholder="제목 (30자까지)" aria-label="제목" />
         <div id="editor"></div>
-        <p class="field__hint post-edit__count"><span id="count">0</span> / 5,000자 · 이미지는 장당 3MB, 10장까지</p>
+        <div class="assist-bar">
+          <button class="button assist-button" type="button" id="assist-spelling" hidden>맞춤법 검사</button>
+          <p class="field__hint post-edit__count"><span id="count">0</span> / 5,000자 · 이미지는 장당 3MB, 10장까지</p>
+        </div>
+        <!-- 맞춤법 검사 결과. 고칠지는 하나씩 글쓴이가 고른다 (T167) -->
+        <section class="assist-panel" id="assist-spelling-panel" aria-live="polite" hidden></section>
         <div class="field">
-          <label for="tags">태그</label>
+          <div class="assist-label-row">
+            <label for="tags">태그</label>
+            <button class="button button--text assist-button" type="button" id="assist-tags" hidden>태그 추천</button>
+          </div>
           <input id="tags" type="text" placeholder="쉼표로 나눠 10개까지" />
+          <div class="assist-tags" id="assist-tag-box" aria-live="polite" hidden>
+            <p class="field__hint" id="assist-tag-hint"></p>
+            <ul class="chips" id="assist-tag-chips"></ul>
+          </div>
         </div>
         <div class="post-edit__actions">
           <span class="field__hint" id="draft-state"></span>

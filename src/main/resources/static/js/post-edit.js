@@ -184,6 +184,22 @@
     }
     $('post-form').hidden = false;
     $('blog-name').textContent = blog.name;
+    if (window.WritingAssist) {
+      // 태그 추천·맞춤법 검사 (T167). 글쓴이가 고른 것만 글과 태그에 반영한다
+      window.WritingAssist.init({
+        blogId: blog.id,
+        title: function () {
+          return $('title').value;
+        },
+        content: function () {
+          return editor.getMarkdown();
+        },
+        setContent: function (text) {
+          editor.setMarkdown(text, false);
+        },
+        tagsInput: $('tags')
+      });
+    }
     $('cancel').href = postId ? '/blog/' + blog.slug + '/posts/' + postId : '/blog/' + blog.slug;
     draftKey = 'post-draft:' + blog.id + ':' + (postId || 'new');
     lastSaved = snapshot();
