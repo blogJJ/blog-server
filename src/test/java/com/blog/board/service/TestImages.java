@@ -62,6 +62,38 @@ public final class TestImages {
     return out;
   }
 
+  /** PNG의 IHDR 바로 뒤(IDAT 앞)에 조각 하나를 끼워 넣는다. CRC도 맞춘다. */
+  public static byte[] pngWithChunk(byte[] png, String type, byte[] data) {
+    int afterIhdr = 8 + 12 + 13;
+    byte[] chunk = pngChunk(type, data);
+    byte[] out = new byte[png.length + chunk.length];
+    System.arraycopy(png, 0, out, 0, afterIhdr);
+    System.arraycopy(chunk, 0, out, afterIhdr, chunk.length);
+    System.arraycopy(png, afterIhdr, out, afterIhdr + chunk.length, png.length - afterIhdr);
+    return out;
+  }
+
+  /** 조각들을 RIFF/WEBP 머리로 감싼다. */
+  public static byte[] webpFile(byte[]... chunks) {
+    int size = 4;
+    for (byte[] c : chunks) {
+      size += c.length;
+    }
+    ByteBuffer b = ByteBuffer.allocate(8 + size).order(ByteOrder.LITTLE_ENDIAN);
+    b.put("RIFF".getBytes(StandardCharsets.ISO_8859_1));
+    b.putInt(size);
+    b.put("WEBP".getBytes(StandardCharsets.ISO_8859_1));
+    for (byte[] c : chunks) {
+      b.put(c);
+    }
+    return b.array();
+  }
+
+  /** WebP 조각 하나 (홀수 길이면 채움 바이트 포함). */
+  public static byte[] webpChunk(String type, byte[] data) {
+    return chunk(type, data);
+  }
+
   /** VP8X + 가짜 VP8L + EXIF 조각으로 된 WebP 모양 파일. 실제 그림은 아니지만 구조 검사에는 충분하다. */
   public static byte[] webpWithExif(String secret) {
     byte[] vp8x = chunk("VP8X", new byte[] {0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0});

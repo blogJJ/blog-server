@@ -3,8 +3,6 @@ package com.blog.board.service;
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -50,7 +48,8 @@ public final class ImageSanitizer {
 
   static byte[] jpeg(byte[] data) {
     int orientation = orientation(data);
-    if (orientation == 3 || orientation == 6 || orientation == 8) {
+    if (orientation >= 2
+        && orientation <= 8) { // 돌리기(3·6·8)와 뒤집기(2·4·5·7) 모두 ImageOptimizer.orient와 같게
       byte[] rotated = rotateJpeg(data, orientation);
       if (rotated != null) {
         return stripJpeg(rotated); // ImageIO가 새로 쓴 파일에는 JFIF만 있지만 한 번 더 거른다
@@ -115,31 +114,7 @@ public final class ImageSanitizer {
       if (src == null) {
         return null;
       }
-      int w = src.getWidth();
-      int h = src.getHeight();
-      AffineTransform t = new AffineTransform();
-      int nw = w;
-      int nh = h;
-      switch (orientation) {
-        case 3 -> {
-          t.translate(w, h);
-          t.rotate(Math.PI);
-        }
-        case 6 -> {
-          nw = h;
-          nh = w;
-          t.translate(h, 0);
-          t.rotate(Math.PI / 2);
-        }
-        default -> { // 8
-          nw = h;
-          nh = w;
-          t.translate(0, w);
-          t.rotate(-Math.PI / 2);
-        }
-      }
-      BufferedImage dst = new BufferedImage(nw, nh, BufferedImage.TYPE_INT_RGB);
-      new AffineTransformOp(t, AffineTransformOp.TYPE_BICUBIC).filter(toRgb(src), dst);
+      BufferedImage dst = ImageOptimizer.orient(toRgb(src), orientation);
 
       Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
       if (!writers.hasNext()) {

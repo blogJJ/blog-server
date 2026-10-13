@@ -450,17 +450,19 @@ public final class ImageOptimizer {
     if (type != ImageType.PNG) {
       return false;
     }
-    int i = 8;
+    // 조각 길이는 파일이 정하는 값이라 int로 더하면 넘쳐서 음수가 될 수 있다. long으로 더한다
+    long i = 8;
     while (i + 8 <= data.length) {
-      int length = ByteBuffer.wrap(data, i, 4).getInt();
-      String chunk = new String(data, i + 4, 4, StandardCharsets.ISO_8859_1);
+      int at = (int) i;
+      int length = ByteBuffer.wrap(data, at, 4).getInt();
+      String chunk = new String(data, at + 4, 4, StandardCharsets.ISO_8859_1);
       if (chunk.equals("acTL")) {
         return true;
       }
       if (chunk.equals("IDAT") || length < 0) {
         return false;
       }
-      i += 12 + length;
+      i += 12L + length;
     }
     return false;
   }

@@ -15,6 +15,7 @@ import com.blog.blog.repository.BlogManagerPermissionRepository;
 import com.blog.blog.repository.BlogMemberRepository;
 import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.service.BlogCloseService;
+import com.blog.blog.service.TransferService;
 import com.blog.common.error.BusinessException;
 import com.blog.common.error.ErrorCode;
 import com.blog.social.domain.NotificationTargetType;
@@ -58,6 +59,7 @@ public class OwnerSanctionService {
   private final AdminQueryRepository queryRepository;
   private final UserRepository userRepository;
   private final BlogCloseService closeService;
+  private final TransferService transferService;
   private final NotificationService notificationService;
   private final AdminActionLogger actionLogger;
   private final Clock clock;
@@ -70,6 +72,7 @@ public class OwnerSanctionService {
       AdminQueryRepository queryRepository,
       UserRepository userRepository,
       BlogCloseService closeService,
+      TransferService transferService,
       NotificationService notificationService,
       AdminActionLogger actionLogger,
       Clock clock) {
@@ -80,6 +83,7 @@ public class OwnerSanctionService {
     this.queryRepository = queryRepository;
     this.userRepository = userRepository;
     this.closeService = closeService;
+    this.transferService = transferService;
     this.notificationService = notificationService;
     this.actionLogger = actionLogger;
     this.clock = clock;
@@ -136,6 +140,8 @@ public class OwnerSanctionService {
 
   private void demoteNow(Blog blog, Long adminId, String reason, Long reportId) {
     User owner = blog.getOwner();
+    // 박탈된 블로그장이 보낸 위임 요청은 더 수락할 수 없으므로 함께 끝낸다 (D-145)
+    transferService.cancelForDemotedOwner(blog.getId(), adminId);
     BlogMember ownerMember = ownerMembership(blog);
     sanctionRepository.save(
         new OwnerSanction(
