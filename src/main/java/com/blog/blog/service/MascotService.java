@@ -12,8 +12,11 @@ import com.blog.blog.repository.BlogRepository;
 import com.blog.blog.repository.BlogTagRepository;
 import jakarta.annotation.PreDestroy;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,7 +37,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 블로그 마스코트를 만든다 (T148, BLG-14, D-116, D-118). 블로그를 만들거나 이름·태그를 고치면 저장이 끝난 뒤 따로 만들고(블로그 저장은 기다리지
  * 않음), 아직 없는 블로그는 예약 작업이 조금씩 채운다. Claude가 바탕 그림·색·모자·장식을 고르고, 못 고르면 태그 단어 사전으로 바탕을 고른 뒤 나머지는 이름과
  * 태그로 정한다. 다른 블로그나 이 블로그의 지금 그림과 같은 조합이면 다른 조합으로 바꾼다. 대표 이미지가 없을 때 보여 줄 픽셀 장면(BLG-15, D-119)도 같이
- * 고르고, 배치 번호는 저장할 때마다 새로 뽑아 같은 장면이라도 블로그마다·태그를 바꿀 때마다 그림이 달라진다.
+ * 고르고, 배치 번호는 저장할 때마다 새로 뽑아 같은 장면이라도 블로그마다·태그를 바꿀 때마다 그림이 달라진다. 작게 그리면 바탕 모양만 보이므로 주제에 맞는 바탕 후보 중
+ * 쓰는 블로그가 가장 적은 바탕을 쓰고, 이미 한 바탕에 몰린 블로그는 예약 작업이 조금씩 다른 바탕으로 옮긴다 (T169, D-143).
  */
 @Service
 public class MascotService {
@@ -52,6 +56,10 @@ public class MascotService {
   private static final int REFRESH_BATCH = 100;
   // 겹칠 때 다음 조합으로 건너뛰는 폭. 조합 수(288)와 서로소라 모든 조합을 한 번씩 돈다
   private static final int STEP = 115;
+  // 한 바탕에 몰린 마스코트를 옮기는 수(한 번 돌 때). Claude를 부르지 않는다 (D-143)
+  private static final int REBALANCE_BATCH = 50;
+  // 옮길 블로그를 찾을 때 한 바탕에서 읽는 수
+  private static final int REBALANCE_SCAN = 500;
 
   private final BlogRepository blogRepository;
   private final BlogTagRepository blogTagRepository;
@@ -110,6 +118,133 @@ public class MascotService {
     ids.forEach(this::assignSafely);
     refreshLegacyCovers();
     refreshSportCovers();
+    rebalanceMascots();
+  }
+
+  /**
+   * 한 바탕에 몰린 마스코트를 덜 쓰는 바탕으로 옮긴다 (T169, D-143). 바탕마다 쓰는 블로그 수가 {@link #ceiling 고른 몫}(열린 블로그 수 ÷ 바탕
+   * 수, 올림)을 넘으면 넘는 만큼 옮긴다. 옮길 바탕은 태그·이름 단어 사전에 맞는 바탕, 없으면 동물 중 몫보다 적게 쓰는 바탕에서 가장 적게 쓰는 것이다. 몫을 넘는
+   * 바탕에서 몫보다 적은 바탕으로만 옮기므로 몇 번 돌면 더 바뀌지 않는다. 마스코트 칸만 바꾸고(색·모자·장식은 그대로 두되 겹치면 다른 조합) 장면과 대표
+   * 이미지(cover_image)는 그대로 두며 Claude는 부르지 않는다.
+   *
+   * @return 옮긴 블로그 수
+   */
+  public int rebalanceMascots() {
+    Map<Mascot, Long> counts = baseCounts();
+    long open = counts.values().stream().mapToLong(Long::longValue).sum();
+    long ceiling = ceiling(open);
+    int moved = 0;
+    for (Mascot base : Mascot.values()) {
+      if (counts.get(base) <= ceiling) {
+        continue;
+      }
+      for (Long id : blogRepository.findOpenIdsByMascotBase(base.key(), REBALANCE_SCAN)) {
+        if (moved >= REBALANCE_BATCH) {
+          return moved;
+        }
+        if (counts.get(base) <= ceiling) {
+          break;
+        }
+        try {
+          Mascot to = rebalanceOne(id, base, counts, ceiling);
+          if (to != null) {
+            counts.merge(base, -1L, Long::sum);
+            counts.merge(to, 1L, Long::sum);
+            moved++;
+          }
+        } catch (RuntimeException e) {
+          log.warn("블로그 {} 마스코트 바탕을 옮기지 못함: {}", id, e.toString());
+        }
+      }
+    }
+    return moved;
+  }
+
+  private Mascot rebalanceOne(Long blogId, Mascot from, Map<Mascot, Long> counts, long ceiling) {
+    return tx.execute(
+        s ->
+            blogRepository
+                .findById(blogId)
+                .filter(Blog::isOpen)
+                .filter(b -> b.getMascot() != null && b.getMascot().base() == from)
+                .map(
+                    b -> {
+                      Mascot to =
+                          rebalanceTarget(
+                              from,
+                              KeywordMascotPicker.matches(b.getName(), tagNames(b.getId())),
+                              counts,
+                              ceiling);
+                      if (to == null) {
+                        return null;
+                      }
+                      MascotDesign now = b.getMascot();
+                      b.changeMascot(
+                          unique(
+                              new MascotDesign(to, now.tone(), now.hat(), now.charm()),
+                              new HashSet<>(blogRepository.findMascotsInUse(to.key(), blogId))));
+                      return to;
+                    })
+                .orElse(null));
+  }
+
+  /** 바탕마다 쓰는 열린 블로그 수. 아무도 안 쓰는 바탕은 0. */
+  private Map<Mascot, Long> baseCounts() {
+    Map<Mascot, Long> counts = new EnumMap<>(Mascot.class);
+    for (Mascot m : Mascot.values()) {
+      counts.put(m, 0L);
+    }
+    for (Object[] row : blogRepository.countMascotBases()) {
+      Mascot.fromKey(String.valueOf(row[0]))
+          .ifPresent(m -> counts.merge(m, ((Number) row[1]).longValue(), Long::sum));
+    }
+    return counts;
+  }
+
+  /** 바탕마다 고르게 나눴을 때의 몫: 열린 블로그 수 ÷ 바탕 수를 올린 값 (D-143). */
+  static long ceiling(long openBlogs) {
+    long bases = Mascot.values().length;
+    return (openBlogs + bases - 1) / bases;
+  }
+
+  /**
+   * 후보 중 쓰는 블로그가 가장 적은 바탕 (D-143). 수가 같으면 앞 후보. 후보가 없으면 null.
+   *
+   * @param counts 바탕별 쓰는 블로그 수. 없는 바탕은 0
+   */
+  static Mascot leastUsed(List<Mascot> candidates, Map<Mascot, Long> counts) {
+    Mascot best = null;
+    long min = Long.MAX_VALUE;
+    for (Mascot m : candidates) {
+      long n = counts.getOrDefault(m, 0L);
+      if (n < min) {
+        best = m;
+        min = n;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * 몫을 넘는 바탕({@code from})의 블로그를 옮길 바탕 (D-143). 단어 사전에 맞는 바탕 중 몫보다 적게 쓰는 바탕이 있으면 그중 가장 적게 쓰는 것, 없으면
+   * 동물 중에서 같은 방법으로 고른다. 옮길 곳이 없으면 null.
+   */
+  static Mascot rebalanceTarget(
+      Mascot from, List<Mascot> matches, Map<Mascot, Long> counts, long ceiling) {
+    Mascot byWords =
+        leastUsed(
+            matches.stream()
+                .filter(m -> m != from && counts.getOrDefault(m, 0L) < ceiling)
+                .toList(),
+            counts);
+    if (byWords != null) {
+      return byWords;
+    }
+    return leastUsed(
+        Arrays.stream(Mascot.values())
+            .filter(m -> m.animal() && m != from && counts.getOrDefault(m, 0L) < ceiling)
+            .toList(),
+        counts);
   }
 
   /**
@@ -290,9 +425,20 @@ public class MascotService {
     if (info == null) {
       return null;
     }
-    ClaudeMascotClient.Art art =
-        claude.choose(info.name(), info.tags()).orElseGet(() -> fallback(info.name(), info.tags()));
-    MascotDesign wanted = art.mascot();
+    Optional<ClaudeMascotClient.Art> chosen = claude.choose(info.name(), info.tags());
+    // 주제에 맞는 바탕 후보 중 다른 블로그가 가장 적게 쓰는 바탕 (D-143). 이 블로그의 지금 바탕은 세지 않는다
+    List<Mascot> candidates =
+        chosen
+            .map(ClaudeMascotClient.Art::bases)
+            .orElseGet(() -> KeywordMascotPicker.candidates(info.name(), info.tags()));
+    Map<Mascot, Long> counts = tx.execute(s -> baseCounts());
+    if (info.current() != null) {
+      counts.merge(info.current().base(), -1L, Long::sum);
+    }
+    Mascot base = leastUsed(candidates, counts);
+    ClaudeMascotClient.Art art = chosen.orElseGet(() -> fallback(info.name(), info.tags(), base));
+    MascotDesign wanted =
+        new MascotDesign(base, art.mascot().tone(), art.mascot().hat(), art.mascot().charm());
     CoverScene cover =
         withLayers(
             withNewSeed(art.cover(), info.cover()),
@@ -334,8 +480,12 @@ public class MascotService {
    * 고르고, 맞는 단어가 없으면 바탕 그림과 어울리는 장면 몇 개 중 하나를 이름·태그로 고른다 (D-129).
    */
   static ClaudeMascotClient.Art fallback(String name, List<String> tags) {
+    return fallback(name, tags, KeywordMascotPicker.pick(name, tags));
+  }
+
+  /** {@link #fallback(String, List)}와 같되 바탕은 정해 둔 것(D-143에서 고르게 나눈 바탕)을 쓴다. */
+  static ClaudeMascotClient.Art fallback(String name, List<String> tags, Mascot base) {
     int seed = (name == null ? "" : name).hashCode() * 31 + tags.hashCode();
-    Mascot base = KeywordMascotPicker.pick(name, tags);
     CoverScene.Time[] times = CoverScene.Time.values();
     CoverScene.Weather[] weathers = CoverScene.Weather.values();
     CoverScene.Palette[] palettes = CoverScene.Palette.values();
@@ -375,6 +525,19 @@ public class MascotService {
       case RABBIT -> List.of(Scene.GARDEN, Scene.FLOWER_SHOP, Scene.GREENHOUSE, Scene.FARM);
       case HAMSTER ->
           List.of(Scene.NIGHT_CITY, Scene.STREET_MARKET, Scene.WORKSHOP, Scene.CONVENIENCE);
+      // D-143에서 더한 바탕
+      case PANDA -> List.of(Scene.GARDEN, Scene.HANOK, Scene.BEDROOM, Scene.PARK);
+      case KOALA -> List.of(Scene.BEDROOM, Scene.PARK, Scene.ROOFTOP, Scene.GREENHOUSE);
+      case PIG -> List.of(Scene.KITCHEN, Scene.POJANGMACHA, Scene.STREET_MARKET, Scene.CONVENIENCE);
+      case SHEEP -> List.of(Scene.FARM, Scene.MOUNTAIN, Scene.BEDROOM, Scene.ATELIER);
+      case DUCK -> List.of(Scene.RIVERSIDE, Scene.PARK, Scene.POOL, Scene.LAUNDROMAT);
+      case TURTLE -> List.of(Scene.SEA, Scene.AQUARIUM, Scene.RIVERSIDE, Scene.GARDEN);
+      case HEDGEHOG -> List.of(Scene.BEDROOM, Scene.LIBRARY, Scene.GARDEN, Scene.FLOWER_SHOP);
+      case WHALE -> List.of(Scene.SEA, Scene.AQUARIUM, Scene.POOL, Scene.SKY);
+      case LION -> List.of(Scene.GYM, Scene.SOCCER, Scene.OFFICE, Scene.STAGE);
+      case MOUSE -> List.of(Scene.CONVENIENCE, Scene.KITCHEN, Scene.LIBRARY, Scene.SUBWAY);
+      case PENCIL -> List.of(Scene.STUDY, Scene.CLASSROOM, Scene.LIBRARY, Scene.ATELIER);
+      case PLANT -> List.of(Scene.GREENHOUSE, Scene.GARDEN, Scene.FLOWER_SHOP, Scene.ROOFTOP);
     };
   }
 

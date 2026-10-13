@@ -107,6 +107,40 @@ class ClaudeMascotClientTest {
   }
 
   @Test
+  void readsAlternativeBases() throws IOException {
+    // D-143: 바탕과 함께 어울리는 다른 바탕을 최대 2개 받는다. 바탕과 같은 값과 겹치는 값은 뺀다
+    start(
+        200,
+        response(
+            "{\"base\":\"PENCIL\",\"alternatives\":[\"PENCIL\",\"OWL\",\"OWL\",\"HEDGEHOG\",\"CAT\"],"
+                + "\"tone\":\"ORIGINAL\",\"hat\":\"NONE\",\"charm\":\"NONE\","
+                + "\"scene\":\"STUDY\",\"time\":\"DAY\",\"weather\":\"CLEAR\","
+                + "\"palette\":\"WARM\"}",
+            "end_turn"));
+    ClaudeMascotClient.Art art = client().choose("글방", List.of("에세이")).orElseThrow();
+    assertThat(art.mascot().base()).isEqualTo(Mascot.PENCIL);
+    assertThat(art.bases()).containsExactly(Mascot.PENCIL, Mascot.OWL, Mascot.HEDGEHOG);
+    // 고를 수 있는 바탕을 모두 알려 주고, 답 형식에 다른 바탕 칸이 있다
+    for (Mascot m : Mascot.values()) {
+      assertThat(lastBody.get()).contains(m.name());
+    }
+    assertThat(lastBody.get()).contains("alternatives");
+    assertThat(ClaudeMascotClient.SYSTEM).contains("PENCIL").contains("PLANT");
+  }
+
+  @Test
+  void missingAlternativesMeansOnlyBase() throws IOException {
+    start(
+        200,
+        response(
+            "{\"base\":\"CAT\",\"tone\":\"ORIGINAL\",\"hat\":\"NONE\",\"charm\":\"NONE\","
+                + "\"scene\":\"BEDROOM\",\"time\":\"DAY\",\"weather\":\"CLEAR\","
+                + "\"palette\":\"PASTEL\"}",
+            "end_turn"));
+    assertThat(client().choose("방", List.of()).orElseThrow().bases()).containsExactly(Mascot.CAT);
+  }
+
+  @Test
   void missingPropMeansNoTheme() throws IOException {
     start(
         200,
