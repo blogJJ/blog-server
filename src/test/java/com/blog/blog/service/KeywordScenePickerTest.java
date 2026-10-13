@@ -46,6 +46,111 @@ class KeywordScenePickerTest {
   }
 
   @Test
+  void sportWordsPickTheirScene() {
+    // T158 후속: 운동 단어가 모두 눈밭으로 가지 않는다
+    assertThat(KeywordScenePicker.scene("주말", List.of("축구"))).contains(Scene.SOCCER);
+    assertThat(KeywordScenePicker.scene("주말", List.of("풋살"))).contains(Scene.SOCCER);
+    assertThat(KeywordScenePicker.scene("주말", List.of("마라톤"))).contains(Scene.TRACK);
+    assertThat(KeywordScenePicker.scene("주말", List.of("러닝크루"))).contains(Scene.TRACK);
+    assertThat(KeywordScenePicker.scene("주말", List.of("조깅"))).contains(Scene.TRACK);
+    assertThat(KeywordScenePicker.scene("Morning run", List.of())).contains(Scene.TRACK);
+    assertThat(KeywordScenePicker.scene("주말", List.of("수영"))).contains(Scene.POOL);
+    assertThat(KeywordScenePicker.scene("주말", List.of("농구"))).contains(Scene.COURT);
+    assertThat(KeywordScenePicker.scene("주말", List.of("KBO", "야구"))).contains(Scene.BASEBALL);
+    assertThat(KeywordScenePicker.scene("주말", List.of("요가"))).contains(Scene.GYM);
+    assertThat(KeywordScenePicker.scene("주말", List.of("헬스"))).contains(Scene.GYM);
+    // 겨울 운동만 눈밭
+    assertThat(KeywordScenePicker.scene("주말", List.of("스키"))).contains(Scene.SNOWFIELD);
+    assertThat(KeywordScenePicker.scene("주말", List.of("스노보드"))).contains(Scene.SNOWFIELD);
+    assertThat(KeywordScenePicker.scene("주말", List.of("겨울"))).contains(Scene.SNOWFIELD);
+    assertThat(KeywordScenePicker.scene("주말", List.of("스케이트"))).contains(Scene.SNOWFIELD);
+    assertThat(KeywordScenePicker.scene("주말", List.of("겨울바다"))).contains(Scene.SEA);
+    // '운동' 뒤에 종목이 있으면 그 종목
+    assertThat(KeywordScenePicker.scene("주말", List.of("운동", "농구"))).contains(Scene.COURT);
+    assertThat(KeywordScenePicker.scene("주말", List.of("운동", "스키"))).contains(Scene.SNOWFIELD);
+  }
+
+  @Test
+  void genericSportWordsSpreadOverSportScenes() {
+    Set<Scene> seen = EnumSet.noneOf(Scene.class);
+    for (String word : List.of("운동", "스포츠", "sport", "exercise", "건강", "테니스", "골프")) {
+      for (int pick = 0; pick < 30; pick++) {
+        Scene s = KeywordScenePicker.scene("기록", List.of(word), pick).orElseThrow();
+        assertThat(s).isIn(KeywordScenePicker.SPORT_POOL).isNotEqualTo(Scene.SNOWFIELD);
+        seen.add(s);
+      }
+    }
+    assertThat(seen).containsExactlyInAnyOrderElementsOf(KeywordScenePicker.SPORT_POOL);
+    assertThat(KeywordScenePicker.possibleScenes("기록", List.of("운동")))
+        .containsExactlyInAnyOrderElementsOf(KeywordScenePicker.SPORT_POOL);
+    // 다른 블로그는 다른 장면이 나온다(이름·태그로 정한 수)
+    Set<Scene> byName = EnumSet.noneOf(Scene.class);
+    for (int i = 0; i < 40; i++) {
+      byName.add(KeywordScenePicker.scene("운동 일지 " + i, List.of("운동")).orElseThrow());
+    }
+    assertThat(byName).hasSizeGreaterThan(3);
+  }
+
+  @Test
+  void sportWordsInsideOtherWordsDoNotCount() {
+    assertThat(KeywordScenePicker.scene("공부", List.of("머신러닝"))).contains(Scene.DESK);
+    assertThat(KeywordScenePicker.scene("공부", List.of("딥러닝"))).contains(Scene.DESK);
+    assertThat(KeywordScenePicker.scene("공부", List.of("이러닝"))).contains(Scene.CLASSROOM);
+    assertThat(KeywordScenePicker.scene("집", List.of("러닝머신"))).contains(Scene.GYM);
+    assertThat(KeywordScenePicker.scene("밤", List.of("위스키"))).isEmpty();
+    assertThat(KeywordScenePicker.scene("옷", List.of("스키니진"))).isEmpty();
+    assertThat(KeywordScenePicker.scene("길", List.of("스케이트보드"))).isEmpty();
+    assertThat(KeywordScenePicker.scene("동네", List.of("수영구"))).isEmpty();
+    assertThat(KeywordScenePicker.scene("기록", List.of("독립운동"))).contains(Scene.HANOK);
+    assertThat(KeywordScenePicker.scene("사운드트랙", List.of())).isEmpty();
+    assertThat(KeywordScenePicker.scene("Brunch", List.of())).isEmpty();
+    assertThat(KeywordScenePicker.scene("밥", List.of("건강식"))).contains(Scene.KITCHEN);
+    assertThat(KeywordScenePicker.prop("공부", List.of("머신러닝"))).contains(Prop.CODE);
+    assertThat(KeywordScenePicker.hasSportWord(List.of("머신러닝", "위스키"))).isFalse();
+    assertThat(KeywordScenePicker.hasSportWord(List.of("일상", "테니스"))).isTrue();
+    assertThat(KeywordScenePicker.hasWinterWord(List.of("스키니"))).isFalse();
+    assertThat(KeywordScenePicker.hasWinterWord(List.of("스키장"))).isTrue();
+  }
+
+  @Test
+  void sportCoverRepicksOnlyWhatTheMappingWouldNotChoose() {
+    Random random = new Random(7);
+    CoverScene snow =
+        new CoverScene(
+                Scene.SNOWFIELD,
+                CoverScene.Time.DAY,
+                CoverScene.Weather.CLEAR,
+                CoverScene.Palette.MINT,
+                12)
+            .withLayers(Backdrop.SEA, Event.BLOOM);
+    // 겨울 단어가 있는 눈밭은 그대로
+    assertThat(MascotService.sportCover("기록", List.of("스키", "운동"), snow, random)).isNull();
+    // 축구 블로그의 눈밭은 축구장. 장면 칸만 바뀐다
+    CoverScene soccer = MascotService.sportCover("기록", List.of("축구"), snow, random);
+    assertThat(soccer.value()).isEqualTo("soccer.day.clear.mint.12.-.sea~bloom");
+    assertThat(MascotService.sportCover("기록", List.of("축구"), soccer, random)).isNull();
+    // 운동 단어가 없는 눈밭은 운동 장면 중 하나
+    CoverScene plain = MascotService.sportCover("기록", List.of(), snow, random);
+    assertThat(plain.scene()).isIn(KeywordScenePicker.SPORT_POOL);
+    assertThat(MascotService.sportCover("기록", List.of(), plain, random)).isNull();
+    // '운동' 블로그가 이미 운동 장면이면 그대로, 아니면 운동 장면으로
+    assertThat(MascotService.sportCover("기록", List.of("운동"), snow.withScene(Scene.PARK), random))
+        .isNull();
+    assertThat(
+            MascotService.sportCover("기록", List.of("운동"), snow.withScene(Scene.LIBRARY), random)
+                .scene())
+        .isIn(KeywordScenePicker.SPORT_POOL);
+    // 운동 단어가 없고 눈밭도 아니면 건드리지 않는다
+    assertThat(MascotService.sportCover("기록", List.of("독서"), snow.withScene(Scene.CAFE), random))
+        .isNull();
+    // 스키 블로그가 다른 장면이면 눈밭으로
+    assertThat(
+            MascotService.sportCover("기록", List.of("스키"), snow.withScene(Scene.CAFE), random)
+                .scene())
+        .isEqualTo(Scene.SNOWFIELD);
+  }
+
+  @Test
   void tagsSteerBackdropAndEvent() {
     assertThat(KeywordScenePicker.backdrop("기록", List.of("여행"))).contains(Backdrop.HARBOR);
     assertThat(KeywordScenePicker.backdrop("기록", List.of("벚꽃"))).contains(Backdrop.SAKURA);

@@ -174,6 +174,75 @@ class MascotServiceTest {
     assertThat(cover.prop()).isEqualTo(CoverScene.Prop.FOOD);
   }
 
+  @Test
+  void sportBlogsAreRepickedOnceWithNewSportScenes() {
+    // T158 후속: 운동 태그가 있는 블로그와 겨울 단어 없는 눈밭을 한 번 다시 고른다. 마스코트와 대표 이미지는 그대로다
+    Blog soccer = newBlog("이름", List.of("축구"));
+    Blog generic = newBlog("이름", List.of("운동", "일상"));
+    Blog gym = newBlog("이름", List.of("헬스"));
+    Blog ski = newBlog("이름", List.of("스키", "운동"));
+    Blog plainSnow = newBlog("이름", List.of());
+    Blog other = newBlog("이름", List.of("요리"));
+    Blog closed = newBlog("이름", List.of("수영"));
+    Blog mlBlog = newBlog("이름", List.of("머신러닝"));
+    jdbc.update(
+        "update blogs set mascot = 'cat.mint.beret.heart', cover_image = '/uploads/s.png',"
+            + " cover_scene = 'snowfield.day.clear.mint.12.-.sea~bloom' where id = ?",
+        soccer.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'library.night.clear.warm.7.-.city~' where id = ?",
+        generic.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'gym.day.clear.warm.3.-.~' where id = ?", gym.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'snowfield.day.snow.mint.5.-.snow~frost' where id = ?",
+        ski.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'snowfield.dawn.clear.ocean.9.-.~' where id = ?",
+        plainSnow.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'kitchen.day.clear.warm.1.-.~' where id = ?",
+        other.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'snowfield.day.clear.warm.1.-.~', status = 'CLOSED'"
+            + " where id = ?",
+        closed.getId());
+    jdbc.update(
+        "update blogs set cover_scene = 'desk.day.clear.warm.2.-.~' where id = ?", mlBlog.getId());
+
+    assertThat(mascotService.refreshSportCovers()).isGreaterThanOrEqualTo(3);
+
+    assertThat(coverOf(soccer.getId())).isEqualTo("soccer.day.clear.mint.12.-.sea~bloom");
+    assertThat(
+            jdbc.queryForObject(
+                "select concat(mascot, ' ', cover_image) from blogs where id = ?",
+                String.class,
+                soccer.getId()))
+        .isEqualTo("cat.mint.beret.heart /uploads/s.png");
+    CoverScene g = CoverScene.parse(coverOf(generic.getId())).orElseThrow();
+    assertThat(g.scene()).isIn(KeywordScenePicker.SPORT_POOL);
+    assertThat(g.value()).endsWith(".night.clear.warm.7.-.city~");
+    assertThat(coverOf(gym.getId())).isEqualTo("gym.day.clear.warm.3.-.~");
+    assertThat(coverOf(ski.getId())).isEqualTo("snowfield.day.snow.mint.5.-.snow~frost");
+    assertThat(CoverScene.parse(coverOf(plainSnow.getId())).orElseThrow().scene())
+        .isIn(KeywordScenePicker.SPORT_POOL);
+    assertThat(coverOf(other.getId())).isEqualTo("kitchen.day.clear.warm.1.-.~");
+    assertThat(coverOf(closed.getId())).isEqualTo("snowfield.day.clear.warm.1.-.~");
+    assertThat(coverOf(mlBlog.getId())).isEqualTo("desk.day.clear.warm.2.-.~");
+
+    // 한 번 바꾼 값은 다시 고르지 않는다
+    List<String> before =
+        List.of(soccer, generic, gym, ski, plainSnow, other, closed, mlBlog).stream()
+            .map(b -> coverOf(b.getId()))
+            .toList();
+    mascotService.refreshSportCovers();
+    assertThat(
+            List.of(soccer, generic, gym, ski, plainSnow, other, closed, mlBlog).stream()
+                .map(b -> coverOf(b.getId()))
+                .toList())
+        .isEqualTo(before);
+  }
+
   private String coverOf(Long blogId) {
     return jdbc.queryForObject("select cover_scene from blogs where id = ?", String.class, blogId);
   }

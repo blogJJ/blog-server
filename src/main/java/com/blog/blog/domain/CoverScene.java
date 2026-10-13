@@ -67,7 +67,13 @@ public record CoverScene(
     HANOK,
     FARM,
     SPACE_STATION,
-    POJANGMACHA
+    POJANGMACHA,
+    // 운동 장면(T158 후속). 운동 태그가 모두 눈밭으로 가던 것을 종목별로 나눈다
+    SOCCER,
+    TRACK,
+    POOL,
+    COURT,
+    BASEBALL
   }
 
   public enum Time {
@@ -199,6 +205,11 @@ public record CoverScene(
   }
 
   public CoverScene withSeed(int seed) {
+    return new CoverScene(scene, time, weather, palette, seed, prop, backdrop, event, mixed);
+  }
+
+  /** 장면만 바꾸고 시간·날씨·색·배치 번호·주제·배경·계절은 그대로 둔다. */
+  public CoverScene withScene(Scene scene) {
     return new CoverScene(scene, time, weather, palette, seed, prop, backdrop, event, mixed);
   }
 

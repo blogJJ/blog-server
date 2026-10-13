@@ -5,11 +5,15 @@ import com.blog.blog.domain.CoverScene.Backdrop;
 import com.blog.blog.domain.CoverScene.Event;
 import com.blog.blog.domain.CoverScene.Prop;
 import com.blog.blog.domain.CoverScene.Scene;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 태그 단어 사전으로 대표 픽셀 장면과 소품 주제, 섞기 모드의 배경과 계절·행사를 고른다 (BLG-15, D-129). 장면·주제는 Claude가 못 고를 때 쓴다. 태그를
@@ -22,9 +26,69 @@ public final class KeywordScenePicker {
   private static final Map<Prop, List<String>> PROPS = new LinkedHashMap<>();
   private static final Map<Backdrop, List<String>> BACKDROPS = new LinkedHashMap<>();
   private static final Map<Event, List<String>> EVENTS = new LinkedHashMap<>();
+  private static final List<String> GENERIC_SPORT = new ArrayList<>();
+  private static final Map<String, String> REWRITE = new LinkedHashMap<>();
+
+  /** 종목이 드러나지 않는 운동 단어('운동', '스포츠')가 고르는 장면들. 블로그마다 무작위로 하나 (T158 후속). */
+  public static final List<Scene> SPORT_POOL =
+      List.of(
+          Scene.GYM,
+          Scene.SOCCER,
+          Scene.TRACK,
+          Scene.POOL,
+          Scene.COURT,
+          Scene.BASEBALL,
+          Scene.PARK,
+          Scene.RIVERSIDE,
+          Scene.MOUNTAIN);
+
+  // '운동' 뒤에 종목 단어가 오면 그 종목을 따른다('운동, 축구'는 축구장)
+  private static final Set<Scene> SPORT_SCENES =
+      EnumSet.of(
+          Scene.GYM,
+          Scene.SOCCER,
+          Scene.TRACK,
+          Scene.POOL,
+          Scene.COURT,
+          Scene.BASEBALL,
+          Scene.SNOWFIELD,
+          Scene.MOUNTAIN,
+          Scene.RIVERSIDE);
+
+  // 다시 고르기 대상인 운동 태그(T158 후속): 운동 종목·헬스·겨울 운동 장면의 단어와 종목 없는 운동 단어
+  private static final Set<Scene> SPORT_WORD_SCENES =
+      EnumSet.of(
+          Scene.GYM,
+          Scene.SOCCER,
+          Scene.TRACK,
+          Scene.POOL,
+          Scene.COURT,
+          Scene.BASEBALL,
+          Scene.SNOWFIELD);
 
   static {
     // 뜻이 좁은 장면을 먼저 본다. '독서모임'은 서재보다 도서관, '꽃집'은 정원보다 꽃집
+    // 운동 종목(T158 후속). 종목이 드러나는 단어라 가장 먼저 본다. '트랙'은 사운드트랙, '수영'은 수영구(REWRITE)에도 있어 넣지 않거나 바꿔 본다
+    SCENES.put(
+        Scene.SOCCER,
+        List.of("축구", "풋살", "월드컵", "k리그", "프리미어리그", "soccer", "football", "futsal", "epl"));
+    SCENES.put(Scene.BASEBALL, List.of("야구", "kbo", "mlb", "baseball"));
+    SCENES.put(Scene.COURT, List.of("농구", "nba", "kbl", "basketball"));
+    SCENES.put(Scene.POOL, List.of("수영", "swim", "swimming"));
+    SCENES.put(
+        Scene.TRACK,
+        List.of(
+            "러닝",
+            "런닝",
+            "마라톤",
+            "조깅",
+            "달리기",
+            "육상",
+            "running",
+            "marathon",
+            "jogging",
+            "run",
+            "runner"));
     // D-129 뒤에 더한 장면. 뜻이 좁아 앞에서 본다
     SCENES.put(
         Scene.SPACE_STATION, List.of("우주정거장", "우주여행", "로켓", "nasa", "sf", "scifi", "rocket"));
@@ -39,8 +103,8 @@ public final class KeywordScenePicker {
     SCENES.put(
         Scene.GYM,
         List.of(
-            "헬스", "피트니스", "웨이트", "필라테스", "요가", "크로스핏", "다이어트", "gym", "fitness", "yoga",
-            "workout"));
+            "헬스", "피트니스", "웨이트", "필라테스", "요가", "크로스핏", "다이어트", "홈트", "바디프로필", "gym", "fitness",
+            "yoga", "workout", "pilates"));
     SCENES.put(
         Scene.OFFICE,
         List.of("직장", "회사", "업무", "마케팅", "커리어", "취업", "이직", "기획", "office", "career", "work"));
@@ -89,11 +153,26 @@ public final class KeywordScenePicker {
     SCENES.put(Scene.STAGE, List.of("음악", "노래", "밴드", "기타", "피아노", "버스킹", "music", "song"));
     SCENES.put(Scene.BAKERY, List.of("베이킹", "빵", "디저트", "케이크", "baking", "dessert"));
     SCENES.put(Scene.CAFE, List.of("카페", "커피", "coffee", "cafe"));
-    SCENES.put(Scene.KITCHEN, List.of("요리", "레시피", "집밥", "음식", "맛집", "food", "cook", "recipe"));
+    SCENES.put(
+        Scene.KITCHEN, List.of("요리", "레시피", "집밥", "음식", "맛집", "건강식", "food", "cook", "recipe"));
     SCENES.put(Scene.SEA, List.of("바다", "해외", "해변", "서핑", "섬", "beach", "sea"));
     SCENES.put(Scene.SKY, List.of("비행", "항공", "여행", "travel", "trip", "flight"));
     SCENES.put(Scene.STUDY, List.of("공부", "스터디", "자격증", "시험", "독서", "책", "글쓰기", "study", "book"));
-    SCENES.put(Scene.SNOWFIELD, List.of("운동", "스키", "겨울", "러닝", "스노보드", "sport", "ski"));
+    // 겨울 운동만 눈밭이다. 예전처럼 바다 뒤에서 본다('겨울바다'는 바다)
+    SCENES.put(
+        Scene.SNOWFIELD,
+        List.of(
+            "스키",
+            "스노보드",
+            "겨울",
+            "스케이트",
+            "스케이팅",
+            "썰매",
+            "ski",
+            "skiing",
+            "snowboard",
+            "winter",
+            "skating"));
     SCENES.put(Scene.PARK, List.of("산책", "반려", "강아지", "펫", "dog", "pet", "walk"));
     SCENES.put(Scene.GARDEN, List.of("일상", "일기", "감성", "고양이", "daily", "diary"));
     SCENES.put(Scene.NIGHT_CITY, List.of("재테크", "주식", "경제", "도시", "city"));
@@ -110,7 +189,56 @@ public final class KeywordScenePicker {
     PROPS.put(Prop.BOOK, List.of("책", "독서", "서평", "소설", "공부", "book", "novel"));
     PROPS.put(Prop.COFFEE, List.of("커피", "카페", "홍차", "녹차", "티타임", "coffee", "tea"));
     PROPS.put(Prop.FOOD, List.of("요리", "맛집", "음식", "레시피", "먹방", "베이킹", "food", "recipe"));
-    PROPS.put(Prop.SPORT, List.of("운동", "헬스", "러닝", "축구", "야구", "수영", "등산", "sport", "fitness"));
+    PROPS.put(
+        Prop.SPORT,
+        List.of(
+            "운동", "헬스", "러닝", "축구", "야구", "수영", "농구", "마라톤", "테니스", "스포츠", "등산", "sport", "sports",
+            "fitness"));
+
+    // 어느 종목인지 드러나지 않는 운동 단어. 운동 장면 몇 개(SPORT_POOL) 중 하나를 블로그마다 무작위로 고른다
+    GENERIC_SPORT.addAll(
+        List.of(
+            "운동",
+            "스포츠",
+            "체육",
+            "건강",
+            "테니스",
+            "배드민턴",
+            "배구",
+            "탁구",
+            "골프",
+            "볼링",
+            "클라이밍",
+            "복싱",
+            "태권도",
+            "주짓수",
+            "격투기",
+            "스쿼시",
+            "sport",
+            "sports",
+            "exercise",
+            "health",
+            "tennis",
+            "golf",
+            "badminton",
+            "volleyball",
+            "climbing",
+            "boxing"));
+
+    // 운동 단어가 들어 있지만 뜻이 다른 말. 맞추기 전에 바꿔 둔다('머신러닝'은 러닝이 아니다)
+    REWRITE.put("머신러닝", "개발");
+    REWRITE.put("딥러닝", "개발");
+    REWRITE.put("e러닝", "교육");
+    REWRITE.put("이러닝", "교육");
+    REWRITE.put("러닝머신", "헬스");
+    REWRITE.put("위스키", "술");
+    REWRITE.put("스키니", "패션");
+    REWRITE.put("스케이트보드", "보드");
+    REWRITE.put("수영구", "부산");
+    REWRITE.put("독립운동", "역사");
+    REWRITE.put("민주화운동", "역사");
+    REWRITE.put("학생운동", "역사");
+    REWRITE.put("사회운동", "사회");
     PROPS.put(Prop.STAR, List.of("별자리", "천문", "우주", "밤하늘", "space"));
     PROPS.put(Prop.TRAVEL, List.of("여행", "해외", "캠핑", "기차", "travel", "trip"));
 
@@ -172,9 +300,76 @@ public final class KeywordScenePicker {
 
   private KeywordScenePicker() {}
 
-  /** 태그(다음으로 블로그 이름)에 맞는 장면. */
+  /** 태그(다음으로 블로그 이름)에 맞는 장면. 종목 없는 운동 단어는 이름·태그로 정한 수로 운동 장면 하나를 고른다. */
   public static Optional<Scene> scene(String name, List<String> tags) {
-    return byWords(SCENES, name, tags);
+    return scene(name, tags, Objects.hash(name, tags));
+  }
+
+  /**
+   * 태그(다음으로 블로그 이름)에 맞는 장면. 태그를 앞에서부터 보고 사전 단어가 있으면 그 장면이다. 종목 없는 운동 단어('운동', '스포츠')면 뒤 태그에 종목 단어가
+   * 있을 때 그 종목, 없으면 {@code pick}으로 {@link #SPORT_POOL}에서 하나를 고른다 (T158 후속).
+   *
+   * @param pick 블로그의 무작위 수. 같은 수면 같은 장면
+   */
+  public static Optional<Scene> scene(String name, List<String> tags, int pick) {
+    List<String> texts = new ArrayList<>(tags);
+    texts.add(name);
+    for (int i = 0; i < texts.size(); i++) {
+      Optional<Scene> m = match(SCENES, texts.get(i));
+      if (m.isPresent()) {
+        return m;
+      }
+      if (hasAny(GENERIC_SPORT, texts.get(i))) {
+        for (String later : texts.subList(i + 1, texts.size())) {
+          Optional<Scene> s = match(SCENES, later).filter(SPORT_SCENES::contains);
+          if (s.isPresent()) {
+            return s;
+          }
+        }
+        return Optional.of(SPORT_POOL.get(Math.floorMod(pick, SPORT_POOL.size())));
+      }
+    }
+    return Optional.empty();
+  }
+
+  /** 이 이름·태그로 {@link #scene(String, List, int)}이 고를 수 있는 장면 모두. 맞는 단어가 없으면 빈 집합. */
+  public static Set<Scene> possibleScenes(String name, List<String> tags) {
+    Set<Scene> out = EnumSet.noneOf(Scene.class);
+    for (int pick = 0; pick < SPORT_POOL.size(); pick++) {
+      scene(name, tags, pick).ifPresent(out::add);
+    }
+    return out;
+  }
+
+  /** 태그에 운동 단어(종목, 헬스·요가, 겨울 운동, '운동'·'스포츠')가 있다. */
+  public static boolean hasSportWord(List<String> tags) {
+    for (String tag : tags) {
+      if (hasAny(GENERIC_SPORT, tag)
+          || match(SCENES, tag).filter(SPORT_WORD_SCENES::contains).isPresent()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 태그에 겨울 운동 단어(스키, 스노보드, 겨울, 스케이트)가 있다. */
+  public static boolean hasWinterWord(List<String> tags) {
+    for (String tag : tags) {
+      if (hasAny(SCENES.get(Scene.SNOWFIELD), tag)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * DB에서 운동 태그가 있는 블로그를 먼저 거를 때 쓰는 MySQL 정규식. 영어 낱말 단위나 '머신러닝' 같은 예외는 거르지 않으니 {@link
+   * #hasSportWord}로 다시 본다.
+   */
+  public static String sportPattern() {
+    List<String> words = new ArrayList<>(GENERIC_SPORT);
+    SPORT_WORD_SCENES.forEach(s -> words.addAll(SCENES.get(s)));
+    return String.join("|", words);
   }
 
   /** 태그(다음으로 블로그 이름)에 맞는 소품 주제. */
@@ -212,17 +407,37 @@ public final class KeywordScenePicker {
     if (text == null || text.isBlank()) {
       return Optional.empty();
     }
-    String t = text.toLowerCase(Locale.ROOT);
+    String t = normalize(text);
     List<String> words = List.of(t.split("[^a-z0-9]+"));
     for (Map.Entry<E, List<String>> e : dict.entrySet()) {
       for (String w : e.getValue()) {
-        // 영어 단어는 낱말 단위로만 맞춘다(KeywordMascotPicker와 같은 규칙)
-        boolean hit = w.chars().allMatch(c -> c < 128) ? words.contains(w) : t.contains(w);
-        if (hit) {
+        if (hit(t, words, w)) {
           return Optional.of(e.getKey());
         }
       }
     }
     return Optional.empty();
+  }
+
+  private static boolean hasAny(List<String> dict, String text) {
+    if (text == null || text.isBlank()) {
+      return false;
+    }
+    String t = normalize(text);
+    List<String> words = List.of(t.split("[^a-z0-9]+"));
+    return dict.stream().anyMatch(w -> hit(t, words, w));
+  }
+
+  private static String normalize(String text) {
+    String t = text.toLowerCase(Locale.ROOT);
+    for (Map.Entry<String, String> r : REWRITE.entrySet()) {
+      t = t.replace(r.getKey(), r.getValue());
+    }
+    return t;
+  }
+
+  // 영어 단어는 낱말 단위로만 맞춘다(KeywordMascotPicker와 같은 규칙)
+  private static boolean hit(String t, List<String> words, String w) {
+    return w.chars().allMatch(c -> c < 128) ? words.contains(w) : t.contains(w);
   }
 }
