@@ -22,6 +22,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          # SonarQube가 새로 바뀐 코드를 가려내려면 전체 이력이 필요하다
+          fetch-depth: 0
 
       - uses: actions/setup-java@v6
         with:
@@ -33,6 +36,18 @@ jobs:
 
       - name: Build
         run: ./gradlew build
+
+      # SonarQube 분석 (jj-blog). main·develop 푸시 때만, SONAR_TOKEN 시크릿이 있을 때만 돈다
+      - name: Check SonarQube token
+        id: sonar
+        run: echo "enabled=${{ secrets.SONAR_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: SonarQube
+        if: github.event_name == 'push' && steps.sonar.outputs.enabled == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: ./gradlew sonar
 
   # 이미 merge된 Flyway 파일을 고치지 않았는지, 파일 이름과 번호가 맞는지 (T143, OPS-08, D-108)
   migrations:

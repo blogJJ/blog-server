@@ -39,7 +39,8 @@ class HashUtilTest {
 
   @Test
   void refusesShortSecret() {
-    assertThatThrownBy(() -> new HashUtil(new HashProperties("short")))
+    HashProperties shortSecret = new HashProperties("short");
+    assertThatThrownBy(() -> new HashUtil(shortSecret))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("HASH_SECRET");
   }

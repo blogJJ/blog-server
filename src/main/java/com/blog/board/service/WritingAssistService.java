@@ -172,32 +172,35 @@ public class WritingAssistService {
       if (out.size() >= MAX_FIXES) {
         break;
       }
-      if (f == null || f.original() == null || f.suggestion() == null) {
-        continue;
+      int at = worthFixing(f) ? findAfterOrAnywhere(text, f.original(), cursor, taken) : -1;
+      if (at >= 0) {
+        int end = at + f.original().length();
+        taken.add(new int[] {at, end});
+        cursor = end;
+        String reason = f.reason() == null ? "" : AssistText.head(f.reason().strip(), 120);
+        out.add(new Fix(at, end, f.original(), f.suggestion(), reason));
       }
-      String original = f.original();
-      String suggestion = f.suggestion();
-      if (original.isBlank()
-          || original.equals(suggestion)
-          || original.length() > FIX_MAX
-          || suggestion.length() > FIX_MAX * 2) {
-        continue;
-      }
-      int at = find(text, original, cursor, taken);
-      if (at < 0) {
-        at = find(text, original, 0, taken);
-      }
-      if (at < 0) {
-        continue;
-      }
-      int end = at + original.length();
-      taken.add(new int[] {at, end});
-      cursor = end;
-      String reason = f.reason() == null ? "" : AssistText.head(f.reason().strip(), 120);
-      out.add(new Fix(at, end, original, suggestion, reason));
     }
     out.sort((a, b) -> Integer.compare(a.start(), b.start()));
     return out;
+  }
+
+  /** 비어 있지 않고, 실제로 바꾸며, 너무 길지 않은 후보인지 */
+  private static boolean worthFixing(SpellingFix f) {
+    return f != null
+        && f.original() != null
+        && f.suggestion() != null
+        && !f.original().isBlank()
+        && !f.original().equals(f.suggestion())
+        && f.original().length() <= FIX_MAX
+        && f.suggestion().length() <= FIX_MAX * 2;
+  }
+
+  /** 앞 후보 뒤에서 먼저 찾고, 없으면 처음부터 찾는다 */
+  private static int findAfterOrAnywhere(
+      String text, String needle, int cursor, List<int[]> taken) {
+    int at = find(text, needle, cursor, taken);
+    return at >= 0 ? at : find(text, needle, 0, taken);
   }
 
   private static int find(String text, String needle, int from, List<int[]> taken) {

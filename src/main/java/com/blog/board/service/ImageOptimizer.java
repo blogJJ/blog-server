@@ -2,6 +2,7 @@ package com.blog.board.service;
 
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.exif.ExifDirectoryBase;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.luciad.imageio.webp.CompressionType;
 import com.luciad.imageio.webp.WebPImageReaderSpi;
@@ -78,6 +79,8 @@ public final class ImageOptimizer {
   static final int CONCURRENCY = 2;
   private static final Semaphore SLOTS = new Semaphore(CONCURRENCY);
   private static final long SLOT_WAIT_SECONDS = 20;
+
+  private static final String BROKEN_WEBP = "Broken WebP";
 
   private static final boolean WEBP_AVAILABLE = initWebp();
 
@@ -185,43 +188,44 @@ public final class ImageOptimizer {
     }
     image = orient(image, orientation);
 
-    byte[] out;
-    ImageType outType;
-    if (WEBP_AVAILABLE && Math.max(image.getWidth(), image.getHeight()) <= WEBP_MAX_DIMENSION) {
-      outType = ImageType.WEBP;
-      // 원래 PNG가 화소당 1바이트를 넘으면 사진 같은 그림이다. 무손실은 느리고 크게 나오므로 바로 손실 압축한다
-      boolean photoLike =
-          (double) data.length / ((long) width * height) > LOSSLESS_MAX_BYTES_PER_PIXEL;
-      if (type == ImageType.PNG && photoLike) {
-        out = webp(image, false, GRAPHIC_LOSSY_QUALITY);
-      } else if (type == ImageType.PNG) {
-        out = webp(image, true, 1f);
-        double perPixel = (double) out.length / ((long) image.getWidth() * image.getHeight());
-        if (perPixel > LOSSLESS_MAX_BYTES_PER_PIXEL) {
-          byte[] lossy = webp(image, false, GRAPHIC_LOSSY_QUALITY);
-          if (lossy.length < out.length) {
-            out = lossy;
-          }
-        }
-      } else {
-        out = webp(image, false, PHOTO_QUALITY);
-      }
-    } else if (type == ImageType.PNG) {
-      outType = ImageType.PNG;
-      out = png(image);
-    } else {
-      outType = ImageType.JPEG;
-      out = jpeg(image, 0.85f);
-    }
+    Result encoded = encode(image, data, type, width, height);
 
     if (!resized && orientation == 1) {
       // 돌릴 필요가 없으면 메타데이터 지우기는 조각만 빼므로 싸다
       byte[] sanitized = ImageSanitizer.sanitize(data, type);
-      if (out.length >= sanitized.length * MIN_SAVING_RATIO) {
+      if (encoded.data().length >= sanitized.length * MIN_SAVING_RATIO) {
         return new Result(type, sanitized);
       }
     }
-    return new Result(outType, out);
+    return encoded;
+  }
+
+  /** 줄이고 돌린 그림을 저장할 형식으로 쓴다. WebP를 쓸 수 있으면 WebP, 아니면 원래 형식(PNG 또는 JPEG) */
+  private static Result encode(
+      BufferedImage image, byte[] data, ImageType type, int width, int height) throws IOException {
+    if (!WEBP_AVAILABLE || Math.max(image.getWidth(), image.getHeight()) > WEBP_MAX_DIMENSION) {
+      return type == ImageType.PNG
+          ? new Result(ImageType.PNG, png(image))
+          : new Result(ImageType.JPEG, jpeg(image, 0.85f));
+    }
+    if (type != ImageType.PNG) {
+      return new Result(ImageType.WEBP, webp(image, false, PHOTO_QUALITY));
+    }
+    // 원래 PNG가 화소당 1바이트를 넘으면 사진 같은 그림이다. 무손실은 느리고 크게 나오므로 바로 손실 압축한다
+    boolean photoLike =
+        (double) data.length / ((long) width * height) > LOSSLESS_MAX_BYTES_PER_PIXEL;
+    if (photoLike) {
+      return new Result(ImageType.WEBP, webp(image, false, GRAPHIC_LOSSY_QUALITY));
+    }
+    byte[] out = webp(image, true, 1f);
+    double perPixel = (double) out.length / ((long) image.getWidth() * image.getHeight());
+    if (perPixel > LOSSLESS_MAX_BYTES_PER_PIXEL) {
+      byte[] lossy = webp(image, false, GRAPHIC_LOSSY_QUALITY);
+      if (lossy.length < out.length) {
+        out = lossy;
+      }
+    }
+    return new Result(ImageType.WEBP, out);
   }
 
   private static BufferedImage decode(
@@ -420,7 +424,7 @@ public final class ImageOptimizer {
 
   static long[] webpDimensions(byte[] d) {
     if (d.length < 30) {
-      throw new IllegalArgumentException("Broken WebP");
+      throw new IllegalArgumentException(BROKEN_WEBP);
     }
     String chunk = new String(d, 12, 4, StandardCharsets.ISO_8859_1);
     switch (chunk) {
@@ -430,18 +434,18 @@ public final class ImageOptimizer {
       case "VP8 " -> {
         // 프레임 머리 3바이트 + 시작 코드 9d 01 2a 다음에 14비트 가로·세로
         if ((d[23] & 0xFF) != 0x9D || (d[24] & 0xFF) != 0x01 || (d[25] & 0xFF) != 0x2A) {
-          throw new IllegalArgumentException("Broken WebP");
+          throw new IllegalArgumentException(BROKEN_WEBP);
         }
         return new long[] {u16le(d, 26) & 0x3FFF, u16le(d, 28) & 0x3FFF};
       }
       case "VP8L" -> {
         if ((d[20] & 0xFF) != 0x2F) {
-          throw new IllegalArgumentException("Broken WebP");
+          throw new IllegalArgumentException(BROKEN_WEBP);
         }
         long bits = ByteBuffer.wrap(d, 21, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xFFFFFFFFL;
         return new long[] {(bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1};
       }
-      default -> throw new IllegalArgumentException("Broken WebP");
+      default -> throw new IllegalArgumentException(BROKEN_WEBP);
     }
   }
 
@@ -471,8 +475,8 @@ public final class ImageOptimizer {
     try {
       Metadata metadata = ImageMetadataReader.readMetadata(new ByteArrayInputStream(data));
       ExifIFD0Directory dir = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-      if (dir != null && dir.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
-        return dir.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+      if (dir != null && dir.containsTag(ExifDirectoryBase.TAG_ORIENTATION)) {
+        return dir.getInt(ExifDirectoryBase.TAG_ORIENTATION);
       }
     } catch (Exception e) {
       // 읽지 못하면 돌리지 않는다
@@ -496,7 +500,7 @@ public final class ImageOptimizer {
         throw new IOException("Unexpected WebP output");
       }
       return true;
-    } catch (Throwable e) { // UnsatisfiedLinkError 등: 이 OS·CPU용 libwebp가 없다
+    } catch (Exception | LinkageError e) { // UnsatisfiedLinkError 등: 이 OS·CPU용 libwebp가 없다
       log.warn("WebP encoder unavailable, falling back to JPEG/PNG: {}", e.toString());
       return false;
     }

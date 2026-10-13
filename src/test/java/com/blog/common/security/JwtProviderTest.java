@@ -66,8 +66,9 @@ class JwtProviderTest {
 
   @Test
   void shortSecretFailsAtStartup() {
-    assertThatThrownBy(
-            () -> new JwtProvider(new JwtProperties("short", null), Clock.systemDefaultZone()))
+    JwtProperties shortSecret = new JwtProperties("short", null);
+    Clock clock = Clock.systemDefaultZone();
+    assertThatThrownBy(() -> new JwtProvider(shortSecret, clock))
         .isInstanceOf(IllegalStateException.class);
   }
 

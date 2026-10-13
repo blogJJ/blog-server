@@ -2,6 +2,7 @@ package com.blog.board.service;
 
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.exif.ExifDirectoryBase;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -32,6 +33,7 @@ import javax.imageio.stream.ImageOutputStream;
 public final class ImageSanitizer {
 
   private static final Set<String> PNG_DROP = Set.of("eXIf", "tEXt", "zTXt", "iTXt", "tIME");
+  private static final String BROKEN_JPEG = "Broken JPEG";
 
   private ImageSanitizer() {}
 
@@ -65,41 +67,39 @@ public final class ImageSanitizer {
     int i = 2;
     while (i + 4 <= data.length) {
       if ((data[i] & 0xFF) != 0xFF) {
-        throw new IllegalArgumentException("Broken JPEG");
+        throw new IllegalArgumentException(BROKEN_JPEG);
       }
       int marker = data[i + 1] & 0xFF;
-      if (marker == 0xFF) { // 채움 바이트
-        i++;
-        continue;
-      }
       if (marker == 0xDA) { // 영상 데이터 시작: 나머지는 그대로
         out.write(data, i, data.length - i);
         return out.toByteArray();
       }
-      if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
+      if (marker == 0xFF) { // 채움 바이트
+        i++;
+      } else if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { // 길이 없는 표시
         out.write(data, i, 2);
         i += 2;
-        continue;
+      } else {
+        int length = ((data[i + 2] & 0xFF) << 8) | (data[i + 3] & 0xFF);
+        if (length < 2 || i + 2 + length > data.length) {
+          throw new IllegalArgumentException(BROKEN_JPEG);
+        }
+        boolean drop = marker == 0xE1 || marker == 0xED;
+        if (!drop) {
+          out.write(data, i, 2 + length);
+        }
+        i += 2 + length;
       }
-      int length = ((data[i + 2] & 0xFF) << 8) | (data[i + 3] & 0xFF);
-      if (length < 2 || i + 2 + length > data.length) {
-        throw new IllegalArgumentException("Broken JPEG");
-      }
-      boolean drop = marker == 0xE1 || marker == 0xED;
-      if (!drop) {
-        out.write(data, i, 2 + length);
-      }
-      i += 2 + length;
     }
-    throw new IllegalArgumentException("Broken JPEG");
+    throw new IllegalArgumentException(BROKEN_JPEG);
   }
 
   private static int orientation(byte[] data) {
     try {
       Metadata metadata = ImageMetadataReader.readMetadata(new ByteArrayInputStream(data));
       ExifIFD0Directory dir = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-      if (dir != null && dir.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
-        return dir.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+      if (dir != null && dir.containsTag(ExifDirectoryBase.TAG_ORIENTATION)) {
+        return dir.getInt(ExifDirectoryBase.TAG_ORIENTATION);
       }
     } catch (Exception e) {
       // 읽지 못하면 회전 없이 메타데이터만 지운다

@@ -63,9 +63,11 @@ class LocalDiskFileStorageTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> storage.delete("/etc/passwd"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> storage.store(bytes("x"), "../sh"))
+    InputStream escaping = bytes("x");
+    assertThatThrownBy(() -> storage.store(escaping, "../sh"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> storage.store(bytes("x"), "toolong"))
+    InputStream badExtension = bytes("x");
+    assertThatThrownBy(() -> storage.store(badExtension, "toolong"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

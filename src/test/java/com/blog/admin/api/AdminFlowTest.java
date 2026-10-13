@@ -103,8 +103,9 @@ class AdminFlowTest {
 
     Map<String, Object> blog =
         jdbc.queryForMap("select status, close_reason from blogs where id = ?", blogId);
-    assertThat(blog.get("status")).isEqualTo("CLOSING");
-    assertThat(blog.get("close_reason")).isEqualTo("OWNER_DEMOTED");
+    assertThat(blog)
+        .containsEntry("status", "CLOSING")
+        .containsEntry("close_reason", "OWNER_DEMOTED");
     assertThat(role(blogId, owner)).isEqualTo("MEMBER");
     call(admin, post(adminBlogs(blogId) + "/owner/demote"), reason("또"))
         .andExpect(status().isConflict());
@@ -192,7 +193,7 @@ class AdminFlowTest {
     resolve(admin, reportId, "PROFILE_RESET", null, "부적절한 닉네임").andExpect(status().isNoContent());
     Map<String, Object> row =
         jdbc.queryForMap("select nickname, bio from users where id = ?", target.getId());
-    assertThat(row.get("nickname")).isEqualTo("회원" + target.getId());
+    assertThat(row).containsEntry("nickname", "회원" + target.getId());
     assertThat(row.get("bio")).isNull();
     assertThat(
             jdbc.queryForObject(
@@ -294,8 +295,7 @@ class AdminFlowTest {
     Map<String, Object> blog =
         jdbc.queryForMap(
             "select status, close_reason, close_scheduled_at from blogs where id = ?", blogId);
-    assertThat(blog.get("status")).isEqualTo("CLOSING");
-    assertThat(blog.get("close_reason")).isEqualTo("ADMIN");
+    assertThat(blog).containsEntry("status", "CLOSING").containsEntry("close_reason", "ADMIN");
     assertThat(blog.get("close_scheduled_at").toString()).contains("04:00");
 
     call(admin, get("/api/admin/blogs?q=" + slug), null)

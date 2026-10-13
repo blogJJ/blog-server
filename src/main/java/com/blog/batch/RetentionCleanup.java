@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class RetentionCleanup {
     List<Long> ids =
         jdbc.queryForList(
             "select id from posts where status = 'DELETED' and deleted_at < :cutoff",
-            Map.of("cutoff", cutoff),
+            cutoffParam(cutoff),
             Long.class);
     int count = 0;
     for (List<Long> chunk : chunks(ids)) {
@@ -84,7 +85,7 @@ public class RetentionCleanup {
   int purgeDeletedComments(LocalDateTime cutoff) {
     return inTx(
         () -> {
-          Map<String, Object> p = Map.of("cutoff", cutoff);
+          Map<String, Object> p = cutoffParam(cutoff);
           int replies =
               jdbc.update(
                   "delete from comments where status = 'DELETED' and deleted_at < :cutoff"
@@ -102,7 +103,7 @@ public class RetentionCleanup {
 
   /** ④ 지운 지 30일 지난 사진 (글은 남아 있고 사진만 뺀 경우) */
   int purgeDeletedImages(LocalDateTime cutoff) {
-    Map<String, Object> p = Map.of("cutoff", cutoff);
+    Map<String, Object> p = cutoffParam(cutoff);
     List<String> files =
         inTx(
             () -> {
@@ -124,7 +125,7 @@ public class RetentionCleanup {
         jdbc.queryForList(
             "select id from blogs where status = 'CLOSED' and closed_at < :cutoff"
                 + " and slug is not null order by id",
-            Map.of("cutoff", cutoff),
+            cutoffParam(cutoff),
             Long.class);
     int count = 0;
     for (Long blogId : blogIds) {
@@ -141,7 +142,7 @@ public class RetentionCleanup {
 
   /** ⑤ 탈퇴한 지 30일 지난 회원의 개인정보. 행과 글은 남기고 글은 "탈퇴한 회원"으로 보인다. */
   int anonymizeWithdrawnUsers(LocalDateTime cutoff) {
-    Map<String, Object> p = Map.of("cutoff", cutoff);
+    Map<String, Object> p = cutoffParam(cutoff);
     String target =
         " from users where status = 'WITHDRAWN' and withdrawn_at < :cutoff"
             + " and (name is not null or nickname is not null or phone is not null"
@@ -186,7 +187,7 @@ public class RetentionCleanup {
   int purgeOldLogs(LocalDateTime cutoff) {
     return inTx(
         () -> {
-          Map<String, Object> p = Map.of("cutoff", cutoff);
+          Map<String, Object> p = cutoffParam(cutoff);
           return jdbc.update("delete from member_sanctions where created_at < :cutoff", p)
               + jdbc.update("delete from owner_sanctions where created_at < :cutoff", p)
               + jdbc.update("delete from user_sanctions where created_at < :cutoff", p)
@@ -245,15 +246,20 @@ public class RetentionCleanup {
     return files;
   }
 
-  private void step(String name, Supplier<Integer> work) {
+  private void step(String name, IntSupplier work) {
     try {
-      int n = work.get();
+      int n = work.getAsInt();
       if (n > 0) {
         log.info("retention {}: {}", name, n);
       }
     } catch (RuntimeException e) {
       log.error("retention step failed: {}", name, e);
     }
+  }
+
+  /** SQL의 :cutoff 자리에 넣을 값 */
+  private static Map<String, Object> cutoffParam(LocalDateTime cutoff) {
+    return Map.of("cutoff", cutoff);
   }
 
   private <T> T inTx(Supplier<T> work) {

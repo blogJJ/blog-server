@@ -85,10 +85,9 @@ class NotificationServiceTest {
 
   @Test
   void requiredTypesCannotBeTurnedOffAndAreAlwaysCreated() {
+    long writerId = writer.getId();
     assertThatThrownBy(
-            () ->
-                notificationService.setEnabled(
-                    writer.getId(), NotificationType.BLOG_CLOSING, false))
+            () -> notificationService.setEnabled(writerId, NotificationType.BLOG_CLOSING, false))
         .isInstanceOf(IllegalArgumentException.class);
     // 혹시 DB에 꺼진 행이 있어도 끌 수 없는 종류는 만든다
     jdbc.update(

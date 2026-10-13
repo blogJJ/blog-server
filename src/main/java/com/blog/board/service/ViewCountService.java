@@ -48,7 +48,7 @@ public class ViewCountService {
    * @return 오늘 처음 본 것이라 조회수가 올랐으면 true
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public boolean record(Long postId, String viewerKey) {
+  public boolean recordView(Long postId, String viewerKey) {
     int inserted =
         jdbc.update(
             "insert ignore into post_views (post_id, viewer_key, view_date) values (?, ?, ?)",

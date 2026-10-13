@@ -172,7 +172,7 @@ class AdminReportFlowTest {
             "select suspend_days, ends_at, released_at from user_sanctions"
                 + " where user_id = ? and type = 'SUSPENSION'",
             target.getId());
-    assertThat(sanction.get("suspend_days")).isEqualTo(30);
+    assertThat(sanction).containsEntry("suspend_days", 30);
     assertThat(sanction.get("released_at")).isNull();
     assertThat(lastNotification(target, "ACCOUNT_SANCTION")).contains("까지)").doesNotContain("영구");
 
@@ -265,8 +265,7 @@ class AdminReportFlowTest {
     assertThat(reportStatus(closeReport)).isEqualTo("BLOG_CLOSED");
     Map<String, Object> blog =
         jdbc.queryForMap("select status, close_reason from blogs where id = ?", blogId);
-    assertThat(blog.get("status")).isEqualTo("CLOSING");
-    assertThat(blog.get("close_reason")).isEqualTo("ADMIN");
+    assertThat(blog).containsEntry("status", "CLOSING").containsEntry("close_reason", "ADMIN");
     assertThat(logs(admin, "CLOSE_BLOG")).isEqualTo(1);
     assertThat(lastNotification(reporter, "REPORT_RESULT")).endsWith("경고");
 

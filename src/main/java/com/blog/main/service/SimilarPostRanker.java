@@ -77,10 +77,9 @@ public final class SimilarPostRanker {
       double topical =
           tagScore(tagsByPost.getOrDefault(c.postId(), Set.of()), tagFrequency, sampleSize)
               + TITLE_WEIGHT * dice(sourceGrams, bigrams(c.title()));
-      if (topical < MIN_TOPICAL) {
-        continue;
+      if (topical >= MIN_TOPICAL) {
+        scored.add(new Ranked(c, topical + freshness(c.createdAt(), now) + popularity(c)));
       }
-      scored.add(new Ranked(c, topical + freshness(c.createdAt(), now) + popularity(c)));
     }
     scored.sort(
         Comparator.comparingDouble(Ranked::score)
@@ -109,7 +108,7 @@ public final class SimilarPostRanker {
   static double tagScore(Set<Long> shared, Map<Long, Integer> tagFrequency, int sampleSize) {
     double score = 0;
     for (Long tag : shared) {
-      int df = Math.max(1, Math.min(sampleSize, tagFrequency.getOrDefault(tag, sampleSize)));
+      int df = Math.clamp(tagFrequency.getOrDefault(tag, sampleSize), 1, sampleSize);
       score += 1 + Math.log((double) sampleSize / df) / 2;
     }
     return score;

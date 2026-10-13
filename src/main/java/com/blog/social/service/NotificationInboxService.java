@@ -207,12 +207,11 @@ public class NotificationInboxService {
         if (slug == null) {
           yield null;
         }
+        String home = "/blog/" + slug;
         if (n.getType() == NotificationType.COMMENT_REVIEW) {
-          yield "/blog/" + slug + "/admin#comments"; // 블로그 관리의 댓글 확인 탭 (T166)
+          yield home + "/admin#comments"; // 블로그 관리의 댓글 확인 탭 (T166)
         }
-        yield n.getType() == NotificationType.JOIN_REQUEST
-            ? "/blog/" + slug + "/admin"
-            : "/blog/" + slug;
+        yield n.getType() == NotificationType.JOIN_REQUEST ? home + "/admin" : home;
       }
       case USER -> "/profile.html?id=" + n.getTargetId(); // 새 팔로워·블로그 구독은 그 회원의 프로필 (SOC-03)
       default -> null;

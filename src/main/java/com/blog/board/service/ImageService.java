@@ -139,7 +139,8 @@ public class ImageService {
     ImageType byExt =
         ImageType.byExtension(dot < 0 ? "" : name.substring(dot + 1))
             .orElseThrow(ImageService::notAllowed);
-    String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+    String contentType = file.getContentType();
+    String mime = contentType == null ? "" : contentType.toLowerCase();
     if (!mime.equals(byExt.mimeType()) && !(byExt == ImageType.JPEG && mime.equals("image/jpg"))) {
       throw notAllowed();
     }
@@ -176,7 +177,8 @@ public class ImageService {
   }
 
   private static String originalName(MultipartFile file) {
-    String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+    String original = file.getOriginalFilename();
+    String name = original == null ? "" : original;
     // 경로가 붙어 오는 브라우저가 있어 마지막 부분만 쓴다
     name = name.substring(Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1);
     if (name.isBlank()) {

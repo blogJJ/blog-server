@@ -19,35 +19,43 @@ public final class SecurityEventLogger {
 
   /** 권한 거부: 회원 번호(비회원은 -), 메서드, 주소. 쿼리 문자열은 남기지 않는다. */
   public static void accessDenied(HttpServletRequest request) {
-    log.warn(
-        "access denied user={} {} {}",
-        currentUserId(),
-        request.getMethod(),
-        sanitize(request.getRequestURI()));
+    if (log.isWarnEnabled()) {
+      log.warn(
+          "access denied user={} {} {}",
+          currentUserId(),
+          request.getMethod(),
+          sanitize(request.getRequestURI()));
+    }
   }
 
   /** 요청 제한 초과: IP, 제한 이름, 메서드, 주소 (T022). */
   public static void rateLimited(String ip, String limitName, HttpServletRequest request) {
-    log.warn(
-        "rate limited ip={} limit={} {} {}",
-        sanitize(ip),
-        sanitize(limitName),
-        request.getMethod(),
-        sanitize(request.getRequestURI()));
+    if (log.isWarnEnabled()) {
+      log.warn(
+          "rate limited ip={} limit={} {} {}",
+          sanitize(ip),
+          sanitize(limitName),
+          request.getMethod(),
+          sanitize(request.getRequestURI()));
+    }
   }
 
   /** 로그인 실패: 가린 이메일(4.4), IP. 비밀번호는 넘기지 않는다 (T034). */
   public static void loginFailed(String email, String ip) {
-    log.warn("login failed email={} ip={}", sanitize(Masking.email(email)), sanitize(ip));
+    if (log.isWarnEnabled()) {
+      log.warn("login failed email={} ip={}", sanitize(Masking.email(email)), sanitize(ip));
+    }
   }
 
   /** 소셜 로그인 실패: 제공자, 까닭(social_error 값 또는 OAuth2 오류 코드), IP. 토큰·제공자 회원 번호·이메일은 남기지 않는다 (T157). */
   public static void socialLoginFailed(String provider, String reason, String ip) {
-    log.warn(
-        "social login failed provider={} reason={} ip={}",
-        sanitize(provider),
-        sanitize(reason),
-        sanitize(ip));
+    if (log.isWarnEnabled()) {
+      log.warn(
+          "social login failed provider={} reason={} ip={}",
+          sanitize(provider),
+          sanitize(reason),
+          sanitize(ip));
+    }
   }
 
   private static String currentUserId() {

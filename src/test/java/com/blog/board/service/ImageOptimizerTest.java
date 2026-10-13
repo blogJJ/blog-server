@@ -285,8 +285,8 @@ class ImageOptimizerTest {
   @DisplayName("머리가 깨졌거나 가로·세로가 0인 파일은 '손상'(IllegalArgumentException)으로 막는다")
   void brokenHeadersAreRejectedAsBroken() {
     byte[] gif = TestImages.animatedGif();
-    assertThatThrownBy(
-            () -> ImageOptimizer.optimize(Arrays.copyOf(gif, 8), ImageType.GIF, Limit.POST))
+    byte[] cutGif = Arrays.copyOf(gif, 8);
+    assertThatThrownBy(() -> ImageOptimizer.optimize(cutGif, ImageType.GIF, Limit.POST))
         .isInstanceOf(IllegalArgumentException.class);
     byte[] zeroWidth = gif.clone();
     zeroWidth[6] = zeroWidth[7] = 0;
@@ -294,8 +294,8 @@ class ImageOptimizerTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Broken image");
     byte[] jpeg = TestImages.jpeg();
-    assertThatThrownBy(
-            () -> ImageOptimizer.optimize(Arrays.copyOf(jpeg, 20), ImageType.JPEG, Limit.POST))
+    byte[] cutJpeg = Arrays.copyOf(jpeg, 20);
+    assertThatThrownBy(() -> ImageOptimizer.optimize(cutJpeg, ImageType.JPEG, Limit.POST))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Broken image");
   }

@@ -12,8 +12,14 @@ class WritingAssistTextTest {
   @Test
   void plainStripsMarkdownHtmlCodeAndUrls() {
     String md =
-        "# 제목\n**굵게** [링크 글](https://a.com) ![그림](/api/images/1)\n"
-            + "```java\nclass A {}\n```\n<b>태그</b> `code` https://b.com/x &amp; 끝";
+        """
+        # 제목
+        **굵게** [링크 글](https://a.com) ![그림](/api/images/1)
+        ```java
+        class A {}
+        ```
+        <b>태그</b> `code` https://b.com/x &amp; 끝\
+        """;
     assertThat(AssistText.plain(md)).isEqualTo("제목 굵게 링크 글 태그 끝");
     assertThat(AssistText.plain(null)).isEmpty();
   }

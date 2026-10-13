@@ -214,7 +214,8 @@ class BlogAuthzTest {
     loginAs(owner);
     assertThat(guardedService.closeBlog(blogA.getId())).isEqualTo("closed");
 
-    assertThatThrownBy(() -> guardedService.closeBlog(blogB.getId()))
+    long otherBlogId = blogB.getId();
+    assertThatThrownBy(() -> guardedService.closeBlog(otherBlogId))
         .isInstanceOf(AccessDeniedException.class);
   }
 

@@ -90,7 +90,7 @@ public class BlogAccessService {
             ? Optional.empty()
             : memberRepository.findByBlogIdAndUserId(blog.getId(), viewerId);
     LocalDateTime now = LocalDateTime.now(clock);
-    membership.filter(m -> m.isSuspendedAt(now)).ifPresent(m -> rejectSuspended(m));
+    membership.filter(m -> m.isSuspendedAt(now)).ifPresent(this::rejectSuspended);
 
     boolean member = membership.isPresent();
     boolean viaLink = ShareLinkService.matches(blog, shareKey);

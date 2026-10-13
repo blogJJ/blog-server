@@ -23,12 +23,16 @@ class NoopAuthorizedClientRepository implements OAuth2AuthorizedClientRepository
       OAuth2AuthorizedClient authorizedClient,
       Authentication principal,
       HttpServletRequest request,
-      HttpServletResponse response) {}
+      HttpServletResponse response) {
+    // 제공자 토큰은 보관하지 않는다
+  }
 
   @Override
   public void removeAuthorizedClient(
       String clientRegistrationId,
       Authentication principal,
       HttpServletRequest request,
-      HttpServletResponse response) {}
+      HttpServletResponse response) {
+    // 보관하지 않으므로 지울 것도 없다
+  }
 }

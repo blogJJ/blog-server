@@ -17,10 +17,10 @@ import java.util.regex.Pattern;
 public record ReleaseNote(
     String version, LocalDate date, List<String> titles, List<String> changes, List<Integer> prs) {
 
-  public static final Pattern VERSION = Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)");
+  public static final Pattern VERSION_FORMAT = Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)");
 
   public ReleaseNote {
-    if (version == null || !VERSION.matcher(version).matches()) {
+    if (version == null || !VERSION_FORMAT.matcher(version).matches()) {
       throw new IllegalArgumentException("버전은 v1.0.0 꼴이어야 해요: " + version);
     }
     if (date == null) {
@@ -44,7 +44,7 @@ public record ReleaseNote(
 
   /** 버전 비교용 숫자 [major, minor, patch] */
   public int[] versionNumbers() {
-    Matcher m = VERSION.matcher(version);
+    Matcher m = VERSION_FORMAT.matcher(version);
     m.matches();
     return new int[] {
       Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3))

@@ -70,7 +70,7 @@ public class JsonSecurityErrorHandler implements AuthenticationEntryPoint, Acces
   private static boolean isAdminPage(HttpServletRequest request) {
     String path = request.getRequestURI().substring(request.getContextPath().length());
     return "GET".equals(request.getMethod())
-        && (path.equals("/admin") || path.startsWith("/admin/"));
+        && (path.equals("/admin") || path.startsWith(ADMIN_HOME));
   }
 
   private void write(HttpServletResponse response, ErrorCode code) throws IOException {

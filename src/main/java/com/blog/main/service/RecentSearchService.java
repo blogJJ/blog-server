@@ -32,7 +32,7 @@ public class RecentSearchService {
    * <p>searched_at은 초 단위라 같은 초에 여러 번 찾으면 시각이 같다. 같은 검색어는 지우고 다시 넣어 번호로도 가장 최근이 되게 한다.
    */
   @Transactional
-  public void record(Long userId, String keyword) {
+  public void add(Long userId, String keyword) {
     repository.deleteKeyword(userId, keyword);
     repository.upsert(userId, keyword, LocalDateTime.now(clock));
     List<RecentSearch> all = repository.findByUserIdOrderBySearchedAtDescIdDesc(userId);

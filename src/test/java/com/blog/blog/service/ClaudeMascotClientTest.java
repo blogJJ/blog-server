@@ -89,8 +89,9 @@ class ClaudeMascotClientTest {
                     CoverScene.Prop.STAR)
                 .withLayers(null, null));
     // 고를 수 있는 장면·색·소품 주제를 모두 알려 준다
+    String system = ClaudeMascotClient.SYSTEM;
     for (CoverScene.Scene scene : CoverScene.Scene.values()) {
-      assertThat(ClaudeMascotClient.SYSTEM).contains(scene.name());
+      assertThat(system).contains(scene.name());
       assertThat(lastBody.get()).contains(scene.name());
     }
     for (CoverScene.Prop prop : CoverScene.Prop.values()) {
