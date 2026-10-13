@@ -170,4 +170,24 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
               + " and id <> :blogId and status <> 'CLOSED'",
       nativeQuery = true)
   List<String> findMascotsInUse(@Param("base") String base, @Param("blogId") Long blogId);
+
+  /**
+   * 폐쇄되지 않은 블로그가 쓰는 마스코트 바탕별 블로그 수 (D-143). 행마다 [바탕 이름(소문자), 수]. 바탕 이름만 있는 예전 값(bear)도 센다. 마스코트가 없는
+   * 블로그는 뺀다.
+   */
+  @Query(
+      value =
+          "select substring_index(mascot, '.', 1) as base, count(*) as cnt from blogs"
+              + " where mascot is not null and status <> 'CLOSED'"
+              + " group by substring_index(mascot, '.', 1)",
+      nativeQuery = true)
+  List<Object[]> countMascotBases();
+
+  /** 이 바탕 그림을 쓰는 폐쇄되지 않은 블로그를 번호 순서로 (D-143 바탕 고르게 나누기). */
+  @Query(
+      value =
+          "select id from blogs where (mascot = :base or mascot like concat(:base, '.%'))"
+              + " and status <> 'CLOSED' order by id limit :limit",
+      nativeQuery = true)
+  List<Long> findOpenIdsByMascotBase(@Param("base") String base, @Param("limit") int limit);
 }

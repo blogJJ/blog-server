@@ -292,6 +292,16 @@
       frog: '개구리',
       hamster: '햄스터',
       owl: '부엉이',
+      panda: '판다',
+      koala: '코알라',
+      pig: '돼지',
+      sheep: '양',
+      duck: '오리',
+      turtle: '거북이',
+      hedgehog: '고슴도치',
+      whale: '고래',
+      lion: '사자',
+      mouse: '생쥐',
       computer: '컴퓨터',
       camera: '카메라',
       book: '책',
@@ -299,7 +309,9 @@
       headphones: '헤드폰',
       gamepad: '게임패드',
       coffee: '커피',
-      cake: '케이크'
+      cake: '케이크',
+      pencil: '연필',
+      plant: '화분'
     }
   };
   var SCENES = Object.keys(LABELS.scene);
@@ -313,7 +325,10 @@
   // 처음 14개 장면과 5개 색. 저장값이 없는 블로그는 주소로 장면을 정하는데(specFor), 목록이 늘어도 그 그림이 바뀌지 않게 이 목록에서만 고른다
   var LEGACY_SCENES = SCENES.slice(0, 14);
   var LEGACY_PALETTES = PALETTES.slice(0, 5);
+  // 값이 없는 블로그의 무작위 장면에 넣는 동물. 예전 그림이 바뀌지 않게 D-143에서 더한 동물은 넣지 않는다
   var ANIMALS = ['bear', 'cat', 'dog', 'rabbit', 'fox', 'penguin', 'bird', 'frog', 'hamster', 'owl'];
+  // 장면 안에 그릴 수 있는 블로그 마스코트(동물). 사물 바탕은 장면에 그리지 않는다
+  var SCENE_ANIMALS = ANIMALS.concat(['panda', 'koala', 'pig', 'sheep', 'duck', 'turtle', 'hedgehog', 'whale', 'lion', 'mouse']);
 
   var PAL = {
     warm: {
@@ -1633,6 +1648,176 @@
         '..okkooookko..'
       ],
       c: { o: '#3e2c22', b: '#8f6c4f', d: '#a8875f', l: '#ecd9b6', w: '#fff8e6', e: '#1e1614', k: '#f0a23a' }
+    },
+    // D-143에서 더한 동물. 판다는 눈이 검은 무늬 안에 있어 감아도 티가 나지 않는다
+    panda: {
+      rows: [
+        '.ooo.....ooo.',
+        'obbbooooobbbo',
+        'obblllllllbbo',
+        'olllllllllllo',
+        'olbblllllbblo',
+        'olbElllllEblo',
+        'olbellnlleblo',
+        'olclllllllclo',
+        '.olllllllllo.',
+        'obbblllllbbbo',
+        'obblllllllbbo',
+        'obbblllllbbbo',
+        '.ooooooooooo.'
+      ],
+      c: { o: '#24222a', b: '#3a3842', l: '#f6f4ee', e: '#121016', n: '#24222a', c: '#f4a3b0' }
+    },
+    koala: {
+      rows: [
+        '.ooo.....ooo.',
+        'oiibo...obiio',
+        'oiibbooobbiio',
+        '.obbbbbbbbbo.',
+        '.obEbbbbbEbo.',
+        '.obebnnnbebo.',
+        '.ocbbnnnbbco.',
+        '..obbbnbbbo..',
+        '.obblllllbbo.',
+        'obblllllllbbo',
+        'obblllllllbbo',
+        '.ooooooooooo.'
+      ],
+      c: { o: '#4a4f5c', b: '#a3abb8', i: '#f2d4da', l: '#eef0f2', e: '#1c1e24', n: '#2c2e36', c: '#f4a8b4' }
+    },
+    pig: {
+      rows: [
+        '.oo.......oo.',
+        '.oio.....oio.',
+        'obibooooobibo',
+        'obbbbbbbbbbbo',
+        'obEbbbbbbbEbo',
+        'obebbooobbebo',
+        'obcolnlnlocbo',
+        'obbbbooobbbbo',
+        '.obbbbbbbbbo.',
+        'obbllllllllbo',
+        'obbllllllllbo',
+        '.ooooooooooo.'
+      ],
+      c: { o: '#8a4558', b: '#f7a9bd', i: '#e57e9b', l: '#fcd0dc', n: '#c4577a', e: '#2a1a20', c: '#ef8aa6' }
+    },
+    sheep: {
+      rows: [
+        '..oo.ooo.oo..',
+        '.ollolllollo.',
+        'olllllllllllo',
+        'olllbbbbblllo',
+        'obbbEbbbEbbbo',
+        'ollbebnbebllo',
+        'ollcbbbbbcllo',
+        'ollllbbbllllo',
+        'olllllllllllo',
+        'olllllllllllo',
+        '.ollooloollo.',
+        '..odo...odo..',
+        '..ooo...ooo..'
+      ],
+      c: { o: '#5a4a44', l: '#fbf8f1', b: '#f1d2b8', d: '#6e5a52', e: '#2a2020', n: '#c98a7a', c: '#f4a8a0' }
+    },
+    duck: {
+      rows: [
+        '....oooo....',
+        '...obbbbo...',
+        '..obbbEbbo..',
+        '..obbbebbkko',
+        '..obcbbbkkko',
+        'o..obbbbooo.',
+        'oboobbbbbbo.',
+        'obbbbbbbbbbo',
+        'obbbddddbbbo',
+        'obbbbdddbbbo',
+        '.obbbbbbbbo.',
+        '..oooooooo..'
+      ],
+      c: { o: '#8a6a1a', b: '#ffd84a', d: '#f2b829', k: '#f6913a', e: '#2a2018', c: '#ffa98a' }
+    },
+    turtle: {
+      rows: [
+        '...ooooo......',
+        '..odldldo.ooo.',
+        '.oddldlddoobEo',
+        'odldddddldobeo',
+        'oddldldldddbbo',
+        'okkkkkkkkkkoo.',
+        '.oooooooooooo.',
+        '.obo.....obo..',
+        '.ooo.....ooo..'
+      ],
+      c: { o: '#3a3a20', b: '#8fce6a', d: '#a8743f', l: '#d9a55e', k: '#f3e2a4', e: '#1a2418' }
+    },
+    hedgehog: {
+      rows: [
+        '..o.o.o.o.o..',
+        '.odddddddddo.',
+        'oddDdDdDdDddo',
+        'oddbbbbbbbddo',
+        'odbEbbbbbEbdo',
+        'odbebbnbbebdo',
+        'odcbbbbbbbcdo',
+        'oddbbbbbbbddo',
+        '.oddbbbbbddo.',
+        'odddbbbbbdddo',
+        'oddbbbbbbbddo',
+        '.ooooooooooo.'
+      ],
+      c: { o: '#4a2e1e', d: '#8a5a3c', D: '#b9825a', b: '#f4ddc0', e: '#24181a', n: '#2a1a1a', c: '#f4a0a0' }
+    },
+    whale: {
+      rows: [
+        '..k..k........',
+        '...kk.....o..o',
+        '...ooooo..obbo',
+        '..obbbbbo.obo.',
+        '.obbbbbbbooboo',
+        'obEbbbbbbbbbo.',
+        'obebbbbbbbbbo.',
+        'ocbbbbbbbbbbo.',
+        'olllbbbbbbbo..',
+        '.ollllllloo...',
+        '..ooooooo.....'
+      ],
+      c: { o: '#24406a', b: '#5b8fd6', l: '#cfe6fb', k: '#9fd3f5', e: '#10182a', c: '#f4a8c0' }
+    },
+    lion: {
+      rows: [
+        '...ooooooo...',
+        '.oodddddddoo.',
+        'odddddddddddo',
+        'oddbbbbbbbddo',
+        'odbEbbbbbEbdo',
+        'odbebbnbbebdo',
+        'odcblllllbcdo',
+        'oddbbbbbbbddo',
+        '.odddddddddo.',
+        '..ooooooooo..',
+        '..obbbbbbbo..',
+        '..obbbbbbbo..',
+        '..ooo...ooo..'
+      ],
+      c: { o: '#5a2e14', d: '#d4742c', b: '#f6c65a', l: '#fdf0d0', e: '#24181a', n: '#5a2e14', c: '#f4a0a0' }
+    },
+    mouse: {
+      rows: [
+        '.ooo.....ooo.',
+        'oiiio...oiiio',
+        'oiiibooobiiio',
+        '.oobbbbbbboo.',
+        '..obEbbbEbo..',
+        '..obebbbebo..',
+        '..ocbbnbbco..',
+        '...obbbbbo...',
+        '..obblllbbo..',
+        '..obblllbbo.k',
+        '..obbbbbbbo.k',
+        '...ooooooo.k.'
+      ],
+      c: { o: '#4a4e5a', b: '#b4b8c4', i: '#f6b3c4', l: '#eef0f2', e: '#1c1e24', n: '#f08aa0', c: '#f6a8b8', k: '#f6b3c4' }
     }
   };
   var ZGLYPH = ['####', '..#.', '.#..', '####'];
@@ -10970,7 +11155,7 @@
       delete spec.mascot;
     }
     var base = typeof mascot === 'string' ? mascot.split('.')[0] : null;
-    if (ANIMALS.indexOf(base) >= 0) spec.mascot = base;
+    if (SCENE_ANIMALS.indexOf(base) >= 0) spec.mascot = base;
     return spec;
   }
 
