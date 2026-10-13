@@ -164,6 +164,15 @@ app:
     enabled: true
     max-tokens: 16000
     timeout: 3m
+  # 글쓰기 화면의 태그 추천·맞춤법 검사 (T167). 키·모델은 mascot 값을 같이 쓴다. 키가 비면 태그는 단어 세기로 고르고 맞춤법 버튼은 숨긴다
+  # 회원별 횟수 제한으로 비용을 묶는다. nginx가 60초에 끊으므로 기다리는 시간은 그보다 짧게
+  writing-assist:
+    tags-per-minute: 5
+    tags-per-day: 60
+    spelling-per-minute: 3
+    spelling-per-day: 20
+    tag-timeout: 20s
+    spelling-timeout: 50s
   # 새 댓글 자동 검사 (T166, D-133). 키·모델은 mascot 값을 같이 쓴다. 키가 비어 있거나 실패하면 검사하지 않고 댓글을 그대로 둔다
   comment-filter:
     enabled: true
