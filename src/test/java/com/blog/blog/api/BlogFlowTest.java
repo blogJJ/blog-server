@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -457,7 +458,11 @@ class BlogFlowTest {
 
   @Test
   void blogAddressShowsBlogPage() throws Exception {
-    mockMvc.perform(get("/blog/some-blog")).andExpect(forwardedUrl("/blog.html"));
+    // 블로그 첫 화면은 공유 미리보기 태그를 넣은 blog.html을 바로 준다 (T161)
+    mockMvc
+        .perform(get("/blog/some-blog"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("src=\"/js/blog.js\"")));
     mockMvc.perform(get("/blog/some-blog/admin")).andExpect(forwardedUrl("/blog-admin.html"));
   }
 

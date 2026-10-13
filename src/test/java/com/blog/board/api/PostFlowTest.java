@@ -2,7 +2,6 @@ package com.blog.board.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -40,7 +39,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 글 쓰기·읽기·이미지를 실제 API로 확인한다 (T062~T065, T069, BRD-01~05, BRD-07, BRD-11, SC-007). */
+/**
+ * 글 쓰기·읽기·이미지를 실제 API로 확인한다 (T062~T065, BRD-01~05, BRD-11, SC-007). 공유 미리보기는 SharePreviewFlowTest.
+ */
 @IntegrationTest
 class PostFlowTest {
 
@@ -440,39 +441,6 @@ class PostFlowTest {
     assertThat(cover).startsWith("/api/images/");
     call(null, get("/api/blogs/by-slug/" + slugOf(blogId)), null)
         .andExpect(jsonPath("$.coverImage").value(cover));
-  }
-
-  // ---------- 공유 미리보기 (T069) ----------
-
-  @Test
-  void postPageFillsOgTagsOnlyForPublicPosts() throws Exception {
-    User owner = newUser();
-    long blogId = createBlog(owner, "PUBLIC");
-    long postId = writePost(owner, blogId, "공유할 <글>", "첫 문단이에요", List.of(), false);
-    long privateBlog = createBlog(owner, "PRIVATE");
-    long secret = writePost(owner, privateBlog, "비밀 제목", "본문", List.of(), false);
-
-    mockMvc
-        .perform(get("/blog/" + slugOf(blogId) + "/posts/" + postId))
-        .andExpect(status().isOk())
-        .andExpect(
-            content().string(containsString("property=\"og:title\" content=\"공유할 &lt;글&gt;\"")))
-        .andExpect(content().string(containsString("og:description\" content=\"첫 문단이에요\"")))
-        // 사이트 주소를 정하지 않은 test 프로필은 요청 주소로 만든다 (T160)
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "og:url\" content=\"http://localhost/blog/"
-                            + slugOf(blogId)
-                            + "/posts/"
-                            + postId
-                            + "\"")));
-    mockMvc
-        .perform(get("/blog/" + slugOf(privateBlog) + "/posts/" + secret))
-        .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("비밀 제목"))))
-        .andExpect(content().string(not(containsString("og:title"))));
   }
 
   // ---------- 도우미 ----------

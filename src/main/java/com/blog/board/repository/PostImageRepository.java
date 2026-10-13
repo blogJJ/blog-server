@@ -21,4 +21,10 @@ public interface PostImageRepository extends JpaRepository<PostImage, Long> {
       "select i from PostImage i where i.post.id in :postIds and i.sortOrder = 0"
           + " and i.deletedAt is null")
   List<PostImage> findFirstImages(@Param("postIds") Collection<Long> postIds);
+
+  /** 공유 미리보기용. 글에 붙은 이미지를 본문 순서대로 (T161). */
+  @Query(
+      "select i from PostImage i where i.post.id = :postId and i.deletedAt is null"
+          + " order by i.sortOrder")
+  List<PostImage> findAttached(@Param("postId") Long postId);
 }
