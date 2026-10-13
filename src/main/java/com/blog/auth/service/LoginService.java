@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +47,8 @@ public class LoginService {
     this.passwordEncoder = passwordEncoder;
     this.turnstileVerifier = turnstileVerifier;
     this.clock = clock;
-    this.dummyHash = passwordEncoder.encode("dummy-password-for-timing");
+    // 없는 이메일도 같은 시간이 걸리게 비교만 하는 해시. 값은 매번 무작위라 어떤 비밀번호와도 맞지 않는다
+    this.dummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
   }
 
   /**
