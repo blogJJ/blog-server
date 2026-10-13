@@ -57,8 +57,8 @@ class SvgRasterizerTest {
 
   @Test
   void rejectsNonSvg() {
-    assertThatThrownBy(() -> SvgRasterizer.toPng("not svg".getBytes(StandardCharsets.UTF_8)))
-        .isInstanceOf(RuntimeException.class);
+    byte[] notSvg = "not svg".getBytes(StandardCharsets.UTF_8);
+    assertThatThrownBy(() -> SvgRasterizer.toPng(notSvg)).isInstanceOf(RuntimeException.class);
   }
 
   private static int distinctColors(BufferedImage image) {

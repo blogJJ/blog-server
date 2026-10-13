@@ -590,10 +590,9 @@ class SocialLoginFlowTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SOCIAL_SIGNUP_EXPIRED"));
     // 화면을 거치지 않고 불러도 서비스가 막는다
-    assertThatThrownBy(
-            () ->
-                socialLoginService.completeSignup(
-                    expired, new SocialLoginService.SignupForm("김소셜", nickname(), true, true)))
+    SocialLoginService.SignupForm form =
+        new SocialLoginService.SignupForm("김소셜", nickname(), true, true);
+    assertThatThrownBy(() -> socialLoginService.completeSignup(expired, form))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.SOCIAL_SIGNUP_EXPIRED);

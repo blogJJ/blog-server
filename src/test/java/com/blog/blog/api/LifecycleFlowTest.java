@@ -488,7 +488,8 @@ class LifecycleFlowTest {
         .andExpect(status().isForbidden());
 
     // 서비스도 블로그장이 아닌 회원의 철회는 막는다. 관리자 철회(byAdmin)는 블로그장이 아니어도 된다
-    assertThatThrownBy(() -> closeService.revokeClose(blogId, member.getId()))
+    long memberId = member.getId();
+    assertThatThrownBy(() -> closeService.revokeClose(blogId, memberId))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.FORBIDDEN);

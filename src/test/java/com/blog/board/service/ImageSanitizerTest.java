@@ -186,7 +186,8 @@ class ImageSanitizerTest {
   void brokenJpegIsRejected() {
     byte[] jpeg = TestImages.jpeg();
     // 머리 구간 중간에서 잘린 파일 (영상 데이터 시작이 없다)
-    assertThatThrownBy(() -> ImageSanitizer.sanitize(Arrays.copyOf(jpeg, 12), ImageType.JPEG))
+    byte[] cutJpeg = Arrays.copyOf(jpeg, 12);
+    assertThatThrownBy(() -> ImageSanitizer.sanitize(cutJpeg, ImageType.JPEG))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Broken JPEG");
     // SOI 뒤에 표지(FF)가 아닌 바이트
@@ -222,8 +223,8 @@ class ImageSanitizerTest {
   @DisplayName("IEND가 없거나 조각 길이가 파일보다 긴 PNG는 받지 않는다 (Broken PNG)")
   void brokenPngIsRejected() {
     byte[] png = TestImages.png();
-    assertThatThrownBy(
-            () -> ImageSanitizer.sanitize(Arrays.copyOf(png, png.length - 12), ImageType.PNG))
+    byte[] noIend = Arrays.copyOf(png, png.length - 12);
+    assertThatThrownBy(() -> ImageSanitizer.sanitize(noIend, ImageType.PNG))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Broken PNG");
     byte[] tooLong = png.clone();

@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,7 +73,11 @@ class AccountFlowTest {
 
   @BeforeEach
   void setUp() {
-    ip = "10.7." + (int) (Math.random() * 250) + "." + ((int) (Math.random() * 250) + 1);
+    ip =
+        "10.7."
+            + ThreadLocalRandom.current().nextInt(250)
+            + "."
+            + (ThreadLocalRandom.current().nextInt(250) + 1);
   }
 
   // ---------- 비밀번호 찾기 (T096) ----------

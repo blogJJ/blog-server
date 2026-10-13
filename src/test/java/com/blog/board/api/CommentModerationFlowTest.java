@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -166,7 +169,7 @@ class CommentModerationFlowTest {
     call(author, put("/api/comments/" + id), commentBody("번호는 지웠어요", null))
         .andExpect(status().isOk());
     verify(claude, timeout(5000)).check("번호는 지웠어요");
-    Thread.sleep(300);
+    awaitWorkerIdle();
     assertThat(string("select status from comments where id = ?", id)).isEqualTo("ACTIVE");
 
     // 고친 내용이 다시 수상하면 다시 숨긴다
@@ -262,7 +265,7 @@ class CommentModerationFlowTest {
     long id = comment(author, postId, "실패하는 댓글", null);
 
     verify(claude, timeout(5000)).check("실패하는 댓글");
-    Thread.sleep(300);
+    awaitWorkerIdle();
     assertThat(string("select status from comments where id = ?", id)).isEqualTo("ACTIVE");
     assertThat(string("select review_status from comments where id = ?", id)).isNull();
     call(null, get("/api/posts/" + postId + "/comments"), null)
@@ -277,7 +280,7 @@ class CommentModerationFlowTest {
 
     long id = comment(newUser(), postId, "키 없음", null);
 
-    Thread.sleep(300);
+    awaitWorkerIdle();
     verify(claude, never()).check(anyString());
     assertThat(string("select status from comments where id = ?", id)).isEqualTo("ACTIVE");
   }
@@ -330,6 +333,16 @@ class CommentModerationFlowTest {
   }
 
   // ---------- 도우미 ----------
+
+  /** 댓글 검사 작업 스레드가 받은 일을 모두 끝낼 때까지 기다린다. 숨기지 않았음을 확인할 때 쓴다. */
+  private void awaitWorkerIdle() {
+    Object target = AopTestUtils.getUltimateTargetObject(moderationService);
+    ThreadPoolExecutor worker = (ThreadPoolExecutor) ReflectionTestUtils.getField(target, "worker");
+    assertThat(worker).isNotNull();
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .until(() -> worker.getCompletedTaskCount() == worker.getTaskCount());
+  }
 
   private void awaitStatus(long commentId, String status) {
     await()
