@@ -14,6 +14,7 @@ import com.blog.auth.domain.User;
 import com.blog.auth.domain.UserRole;
 import com.blog.auth.repository.UserRepository;
 import com.blog.common.security.AuthUser;
+import com.blog.social.domain.NotificationTargetType;
 import com.blog.social.domain.NotificationType;
 import com.blog.social.service.NotificationService;
 import com.blog.support.IntegrationTest;
@@ -22,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -159,7 +161,81 @@ class NotificationFlowTest {
     mockMvc.perform(get("/api/notifications/unread-count")).andExpect(status().isUnauthorized());
   }
 
+  @Test
+  @DisplayName("알림을 누르면 종류에 맞는 화면으로 가고, 대상이 없어졌거나 갈 화면이 없으면 링크가 없다 (SOC-04, T093, T166)")
+  void eachNotificationLinksToItsScreen() throws Exception {
+    User owner = newUser();
+    User receiver = newUser();
+    long blogId = createBlog(owner);
+    String slug = slugOf(blogId);
+    long postId = writePost(owner, blogId);
+
+    notify(receiver, NotificationType.OWNER_TRANSFER_REQUEST, NotificationTargetType.BLOG, blogId);
+    notify(receiver, NotificationType.JOIN_REQUEST, NotificationTargetType.BLOG, blogId);
+    notify(receiver, NotificationType.COMMENT_REVIEW, NotificationTargetType.BLOG, blogId);
+    notify(receiver, NotificationType.MEMBER_SANCTION, NotificationTargetType.BLOG, blogId);
+    notify(receiver, NotificationType.MEMBER_SANCTION, NotificationTargetType.BLOG, Long.MAX_VALUE);
+    notify(receiver, NotificationType.FOLLOW, NotificationTargetType.USER, owner.getId());
+    notify(receiver, NotificationType.NOTICE, NotificationTargetType.POST, postId);
+    notify(receiver, NotificationType.POST_LIKE, NotificationTargetType.POST, postId);
+    notify(receiver, NotificationType.POST_LIKE, NotificationTargetType.POST, Long.MAX_VALUE);
+    notify(receiver, NotificationType.REPORT_RESULT, NotificationTargetType.REPORT, 1L);
+    notify(receiver, NotificationType.NOTICE, null, null);
+    notify(receiver, NotificationType.MEMBER_SANCTION, NotificationTargetType.BLOG, null);
+
+    Map<String, String> links = new LinkedHashMap<>();
+    for (JsonNode item : body(call(receiver, get("/api/notifications"), null)).get("items")) {
+      String key = item.get("type").asString() + ":" + item.get("message").asString();
+      links.put(key, item.get("link").isNull() ? null : item.get("link").asString());
+    }
+    String b = "BLOG:" + blogId;
+    assertThat(links)
+        .containsEntry("OWNER_TRANSFER_REQUEST:" + b, "/transfer.html")
+        .containsEntry("JOIN_REQUEST:" + b, "/blog/" + slug + "/admin")
+        .containsEntry("COMMENT_REVIEW:" + b, "/blog/" + slug + "/admin#comments")
+        .containsEntry("MEMBER_SANCTION:" + b, "/blog/" + slug)
+        .containsEntry("MEMBER_SANCTION:BLOG:" + Long.MAX_VALUE, null)
+        .containsEntry("FOLLOW:USER:" + owner.getId(), "/profile.html?id=" + owner.getId())
+        .containsEntry("NOTICE:POST:" + postId, "/notices.html?id=" + postId)
+        .containsEntry("POST_LIKE:POST:" + postId, "/blog/" + slug + "/posts/" + postId)
+        .containsEntry("POST_LIKE:POST:" + Long.MAX_VALUE, null)
+        .containsEntry("REPORT_RESULT:REPORT:1", null)
+        .containsEntry("NOTICE:-", null)
+        .containsEntry("MEMBER_SANCTION:BLOG:null", null);
+  }
+
+  @Test
+  @DisplayName("알림 설정 저장은 끌 수 있는 종류에 켬·끔 값이 있을 때만 되고, 하나라도 틀리면 보관 기간도 바뀌지 않는다 (SOC-04, 3.6)")
+  void invalidSettingsChangeNothing() throws Exception {
+    User user = newUser();
+
+    Map<String, Boolean> missingValue = new LinkedHashMap<>();
+    missingValue.put("COMMENT", null);
+    call(user, put("/api/me/notification-settings"), settingsBody(7, missingValue))
+        .andExpect(status().isBadRequest());
+    call(user, put("/api/me/notification-settings"), settingsBody(7, Map.of("NOPE", true)))
+        .andExpect(status().isBadRequest());
+    call(user, get("/api/me/notification-settings"), null)
+        .andExpect(jsonPath("$.keepDays").value(30))
+        .andExpect(jsonPath("$.items[?(@.type == 'COMMENT')].enabled").value(true));
+
+    // 7일로 줄였다가 30일로 되돌릴 수 있다
+    call(user, put("/api/me/notification-settings"), settingsBody(7, null))
+        .andExpect(jsonPath("$.keepDays").value(7));
+    call(user, put("/api/me/notification-settings"), settingsBody(30, Map.of("FOLLOW", false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.keepDays").value(30))
+        .andExpect(jsonPath("$.items[?(@.type == 'FOLLOW')].enabled").value(false));
+  }
+
   // ---------- 도우미 ----------
+
+  /** 메시지에 대상을 적어 두어 목록에서 어느 알림인지 알아본다 */
+  private void notify(
+      User receiver, NotificationType type, NotificationTargetType target, Long id) {
+    String message = target == null ? "-" : target.name() + ":" + id;
+    notificationService.notify(receiver.getId(), null, type, target, id, message);
+  }
 
   private int count(User user) {
     return jdbc.queryForObject(

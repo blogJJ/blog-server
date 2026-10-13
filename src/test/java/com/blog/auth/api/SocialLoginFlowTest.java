@@ -1,6 +1,8 @@
 package com.blog.auth.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +17,10 @@ import com.blog.auth.domain.SocialProvider;
 import com.blog.auth.domain.User;
 import com.blog.auth.repository.SocialAccountRepository;
 import com.blog.auth.repository.UserRepository;
+import com.blog.auth.service.PendingSocialSignup;
+import com.blog.auth.service.SocialLoginService;
+import com.blog.common.error.BusinessException;
+import com.blog.common.error.ErrorCode;
 import com.blog.common.security.AuthCookies;
 import com.blog.support.IntegrationTest;
 import jakarta.servlet.http.Cookie;
@@ -27,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -71,6 +78,7 @@ class SocialLoginFlowTest {
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired SocialLoginHandlers handlers;
   @Autowired Clock clock;
+  @Autowired SocialLoginService socialLoginService;
 
   String ip;
   String email;
@@ -470,7 +478,179 @@ class SocialLoginFlowTest {
         .andExpect(status().isOk());
   }
 
+  // ---------- 잠금·제공자 계정 하나 ----------
+
+  @Test
+  @DisplayName("이미 연결된 소셜 계정이라도 로그인 잠금 중이면 들어가지 못한다 (D-128, 5번 실패 5분)")
+  void linkedAccountIsBlockedWhileLocked() throws Exception {
+    User user = newUser(email);
+    assertThat(callback(new MockHttpSession(), google(email, true, "홍길동")).getRedirectedUrl())
+        .isEqualTo("/");
+    jdbc.update(
+        "update users set login_fail_count = 5, locked_until = ? where id = ?",
+        LocalDateTime.now(clock).plusMinutes(5),
+        user.getId());
+
+    // 연결된 계정은 이메일을 보지 않고 제공자 회원 번호로 찾는다
+    MockHttpServletResponse response =
+        callback(new MockHttpSession(), google("other-" + email, false, "홍길동"));
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/login.html?social_error=locked");
+    assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("같은 이메일 회원에게 다른 구글 계정이 이미 연결돼 있으면 새 구글 계정을 붙이지 않는다 (회원당 제공자별 하나, D-128)")
+  void secondGoogleAccountWithSameEmailIsRefused() throws Exception {
+    User user = newUser(email);
+    socialAccountRepository.save(
+        new SocialAccount(user, SocialProvider.GOOGLE, "g-first-" + UUID.randomUUID(), email));
+
+    MockHttpServletResponse response = callback(new MockHttpSession(), google(email, true, "홍길동"));
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/login.html?social_error=provider_taken");
+    assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).isEmpty();
+    assertThat(socialAccountRepository.findWithUser(SocialProvider.GOOGLE, sub)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("내 정보에서 같은 구글 계정을 다시 연결하면 그대로 두고, 다른 구글 계정은 먼저 끊어야 연결된다 (D-128)")
+  void relinkingFromMePageKeepsOneAccountPerProvider() throws Exception {
+    User user = newUser(email);
+    Cookie cookie = accessTokenOf(passwordLogin(user));
+    assertThat(callback(startLink(cookie), google(email, true, "홍길동"), cookie).getRedirectedUrl())
+        .isEqualTo("/me.html?social_linked=google");
+
+    assertThat(callback(startLink(cookie), google(email, true, "홍길동"), cookie).getRedirectedUrl())
+        .isEqualTo("/me.html?social_linked=google");
+    assertThat(socialAccountRepository.findByUserIdOrderByIdAsc(user.getId())).hasSize(1);
+
+    String firstSub = sub;
+    sub = "g-" + UUID.randomUUID();
+    assertThat(callback(startLink(cookie), google(email, true, "홍길동"), cookie).getRedirectedUrl())
+        .isEqualTo("/me.html?social_error=provider_taken");
+    assertThat(socialAccountRepository.findByUserIdOrderByIdAsc(user.getId()))
+        .singleElement()
+        .extracting(SocialAccount::getProviderUserId)
+        .isEqualTo(firstSub);
+  }
+
+  // ---------- 가입 마무리의 경합 ----------
+
+  @Test
+  @DisplayName("가입 마무리 중 같은 이메일로 다른 가입이 끝났으면 가입하지 않는다. 약관은 둘 다 동의해야 한다 (D-128, USR-01)")
+  void signupStopsWhenTheEmailWasTakenMeanwhile() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    callback(session, google(email, true, "김소셜"));
+
+    perform(
+            post("/api/auth/social/signup").session(session),
+            Map.of(
+                "name", "김소셜", "nickname", nickname(), "agreeTerms", false, "agreePrivacy", true))
+        .andExpect(status().isBadRequest());
+
+    User other = newUser(email);
+    perform(
+            post("/api/auth/social/signup").session(session),
+            Map.of("name", "김소셜", "nickname", nickname(), "agreeTerms", true, "agreePrivacy", true))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("DUPLICATE_EMAIL"));
+    assertThat(socialAccountRepository.findWithUser(SocialProvider.GOOGLE, sub)).isEmpty();
+    assertThat(socialAccountRepository.findByUserIdOrderByIdAsc(other.getId())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("가입 마무리 중 그 소셜 계정이 다른 회원에게 연결됐으면 가입하지 않는다 (D-128)")
+  void signupStopsWhenTheSocialAccountWasLinkedMeanwhile() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    callback(session, google(email, true, "김소셜"));
+    User other = newUser("o" + email);
+    socialAccountRepository.save(new SocialAccount(other, SocialProvider.GOOGLE, sub, email));
+
+    perform(
+            post("/api/auth/social/signup").session(session),
+            Map.of("name", "김소셜", "nickname", nickname(), "agreeTerms", true, "agreePrivacy", true))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value(containsString("이미 가입된 소셜 계정")));
+    assertThat(userRepository.findByEmail(email)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("10분이 지난 가입 정보로는 가입할 수 없다 (D-128)")
+  void expiredPendingSignupIsRejected() throws Exception {
+    PendingSocialSignup expired =
+        new PendingSocialSignup(
+            SocialProvider.GOOGLE, sub, email, "김소셜", false, clock.instant().minusSeconds(1));
+    MockHttpSession session = new MockHttpSession();
+    session.setAttribute(SocialSession.PENDING, expired);
+
+    perform(
+            post("/api/auth/social/signup").session(session),
+            Map.of("name", "김소셜", "nickname", nickname(), "agreeTerms", true, "agreePrivacy", true))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SOCIAL_SIGNUP_EXPIRED"));
+    // 화면을 거치지 않고 불러도 서비스가 막는다
+    assertThatThrownBy(
+            () ->
+                socialLoginService.completeSignup(
+                    expired, new SocialLoginService.SignupForm("김소셜", nickname(), true, true)))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.SOCIAL_SIGNUP_EXPIRED);
+    assertThat(userRepository.findByEmail(email)).isEmpty();
+  }
+
+  // ---------- 해제 ----------
+
+  @Test
+  @DisplayName("비밀번호가 없어도 다른 소셜 연결이 남아 있으면 끊을 수 있고, 연결 안 된 제공자는 끊을 것이 없다 (D-128)")
+  void passwordlessUserCanUnlinkWhileAnotherLinkRemains() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    callback(session, google(email, true, "김소셜"));
+    Cookie cookie =
+        perform(
+                post("/api/auth/social/signup").session(session),
+                Map.of(
+                    "name",
+                    "김소셜",
+                    "nickname",
+                    nickname(),
+                    "agreeTerms",
+                    true,
+                    "agreePrivacy",
+                    true))
+            .andReturn()
+            .getResponse()
+            .getCookie(AuthCookies.ACCESS_TOKEN);
+    User user = userRepository.findByEmail(email).orElseThrow();
+
+    perform(delete("/api/me/social/github").cookie(cookie))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("연결된 계정이 없어요."));
+
+    socialAccountRepository.save(
+        new SocialAccount(user, SocialProvider.GITHUB, "gh-" + UUID.randomUUID(), email));
+    perform(delete("/api/me/social/google").cookie(cookie)).andExpect(status().isNoContent());
+    // 이제 남은 깃허브가 마지막 방법이라 끊을 수 없다
+    perform(delete("/api/me/social/github").cookie(cookie))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("SOCIAL_LAST_LOGIN_METHOD"));
+    assertThat(socialAccountRepository.findByUserIdOrderByIdAsc(user.getId()))
+        .extracting(SocialAccount::getProvider)
+        .containsExactly(SocialProvider.GITHUB);
+  }
+
   // ---------- 도우미 ----------
+
+  /** 내 정보 화면의 "연결" 버튼: 세션에 연결할 회원을 적는다 */
+  private MockHttpSession startLink(Cookie cookie) throws Exception {
+    return (MockHttpSession)
+        perform(post("/api/me/social/google/link").cookie(cookie))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getRequest()
+            .getSession();
+  }
 
   /** 구글 OIDC가 돌려줬을 회원 정보 */
   private OAuth2User google(String email, boolean verified, String name) {
