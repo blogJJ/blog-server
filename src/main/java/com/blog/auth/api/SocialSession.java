@@ -60,7 +60,7 @@ final class SocialSession {
   }
 
   /** 지나지 않은 가입 마무리 정보 */
-  static Optional<PendingSocialSignup> pending(HttpServletRequest request, Instant now) {
+  static Optional<PendingSocialSignup> findPending(HttpServletRequest request, Instant now) {
     HttpSession session = request.getSession(false);
     if (session == null
         || !(session.getAttribute(PENDING) instanceof PendingSocialSignup pending)) {
