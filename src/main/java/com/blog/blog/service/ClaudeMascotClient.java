@@ -44,7 +44,7 @@ public class ClaudeMascotClient {
       writing), DESK (programming), KITCHEN (home cooking, recipes), CAFE (cafes, coffee), SKY \
       (flying, travel by plane), STAGE (music, bands), PHOTO (photography, landscapes), GAME \
       (games), PARK (walks, pets), BAKERY (baking, desserts), SEA (beach, overseas travel), \
-      SNOWFIELD (sports, fitness, winter), GARDEN (daily life, diary, mood), LIBRARY (reading, book \
+      SNOWFIELD (winter sports only: skiing, snowboarding, skating, winter), GARDEN (daily life, diary, mood), LIBRARY (reading, book \
       reviews, humanities), ROOFTOP (city gardening, balcony, relaxing in town), CAMPSITE (camping, \
       car camping, campfires), MOUNTAIN (hiking, trekking, mountains), TRAIN (domestic trips, \
       railways, journeys), AQUARIUM (fish, aquariums, sea life), ATELIER (drawing, painting, \
@@ -53,14 +53,18 @@ public class ClaudeMascotClient {
       (home interior, living alone, cozy room, sleep), STREET_MARKET (markets, street food, \
       snacks), RIVERSIDE (rivers, picnics, cycling, fishing), GREENHOUSE (houseplants, gardening), \
       LAUNDROMAT (housekeeping, laundry, tidying up), CLASSROOM (school, teaching, classes), GYM \
-      (fitness, weight training, yoga, diet), RECORD_SHOP (vinyl, LPs, retro music), CONVENIENCE \
+      (fitness, weight training, yoga, pilates, diet, home workouts), SOCCER (football, futsal, \
+      soccer leagues), TRACK (running, jogging, marathons, track and field), POOL (swimming), COURT \
+      (basketball), BASEBALL (baseball, KBO, going to ball games), RECORD_SHOP (vinyl, LPs, retro music), CONVENIENCE \
       (convenience stores, ramen, snacks, new product reviews), OFFICE (work life, career, \
       marketing, jobs), SUBWAY (commuting, city routines), BUS_STOP (waiting, everyday moods, local \
       trips), HANOK (Korean tradition, history, tea ceremony), FARM (farming, country life), \
       SPACE_STATION (science fiction, rockets, science), POJANGMACHA (drinks, late-night snacks, \
       Korean street tents), NIGHT_CITY (anything else, city life, money). Then a time of day, weather and palette that \
-      suit its mood (OCEAN for water and cool calm topics, FOREST for nature and outdoors, PASTEL \
-      for soft and cute ones). Prop is the theme for small props inside the scene (animals, plants, \
+      suit its mood. For sport in general or a sport without its own scene (tennis, golf, \
+      climbing), choose GYM, SOCCER, TRACK, POOL, COURT, BASEBALL, PARK, RIVERSIDE or MOUNTAIN, \
+      whichever fits best, never SNOWFIELD unless the tags are about winter. Palette: OCEAN for water and cool calm topics, FOREST for nature and outdoors, PASTEL \
+      for soft and cute ones. Prop is the theme for small props inside the scene (animals, plants, \
       shelf items, posters); pick the one the tags point to most, for example CAT for a cat blog \
       even when the scene is a library. \
       Backdrop is the view through the scene's windows or behind it, and event is a seasonal or \

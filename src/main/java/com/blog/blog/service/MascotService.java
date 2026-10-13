@@ -109,6 +109,87 @@ public class MascotService {
     List<Long> ids = blogRepository.findIdsWithoutMascot(PageRequest.of(0, BACKFILL_BATCH));
     ids.forEach(this::assignSafely);
     refreshLegacyCovers();
+    refreshSportCovers();
+  }
+
+  /**
+   * 운동 태그가 있거나 장면이 눈밭인 블로그의 장면을 새 운동 사전으로 한 번 다시 고른다 (T158 후속). 운동 단어가 모두 눈밭으로 가던 때 고른 장면을 바로잡는다.
+   * 지금 장면이 이 태그로 고를 수 있는 장면이면(헬스장, 운동 장면, 겨울 단어가 있는 눈밭) 그대로 두므로 두 번째부터는 바꾸지 않는다. 장면 칸만 바꾸고 나머지 칸,
+   * 마스코트, 대표 이미지(cover_image)는 그대로 두며 Claude는 부르지 않는다.
+   *
+   * @return 바꾼 블로그 수
+   */
+  public int refreshSportCovers() {
+    int changed = 0;
+    long after = 0;
+    String pattern = KeywordScenePicker.sportPattern();
+    List<Long> ids;
+    while (!(ids = blogRepository.findIdsForSportRefresh(pattern, after, REFRESH_BATCH))
+        .isEmpty()) {
+      after = ids.get(ids.size() - 1);
+      for (Long id : ids) {
+        try {
+          if (refreshSportCover(id)) {
+            changed++;
+          }
+        } catch (RuntimeException e) {
+          log.warn("블로그 {} 운동 장면을 다시 고르지 못함: {}", id, e.toString());
+        }
+      }
+    }
+    return changed;
+  }
+
+  private boolean refreshSportCover(Long blogId) {
+    Boolean done =
+        tx.execute(
+            s ->
+                blogRepository
+                    .findById(blogId)
+                    .filter(Blog::isOpen)
+                    .map(
+                        b -> {
+                          CoverScene next =
+                              sportCover(
+                                  b.getName(),
+                                  tagNames(b.getId()),
+                                  b.getCoverScene(),
+                                  ThreadLocalRandom.current());
+                          if (next == null) {
+                            return false;
+                          }
+                          b.changeCoverScene(next);
+                          return true;
+                        })
+                    .orElse(false));
+    return Boolean.TRUE.equals(done);
+  }
+
+  /**
+   * 운동 장면 다시 고르기(T158 후속)에서 바꿀 장면. 바꾸지 않으면 null. 겨울 단어가 있는 눈밭과 이 태그로 고를 수 있는 장면은 그대로 둔다. 운동 단어가 없는
+   * 눈밭은 사전이 고르는 장면, 사전에도 없으면 운동 장면 중 하나로 바꾼다.
+   */
+  static CoverScene sportCover(
+      String name, List<String> tags, CoverScene current, RandomGenerator random) {
+    if (current == null) {
+      return null;
+    }
+    Scene now = current.scene();
+    if (now == Scene.SNOWFIELD && KeywordScenePicker.hasWinterWord(tags)) {
+      return null;
+    }
+    Set<Scene> possible = KeywordScenePicker.possibleScenes(name, tags);
+    if (KeywordScenePicker.hasSportWord(tags) || now == Scene.SNOWFIELD) {
+      if (possible.contains(now)) {
+        return null;
+      }
+      List<Scene> pool = KeywordScenePicker.SPORT_POOL;
+      Scene next =
+          KeywordScenePicker.scene(name, tags, random.nextInt(1 << 16))
+              .orElseGet(() -> pool.get(random.nextInt(pool.size())));
+      return current.withScene(next);
+    }
+    return null;
   }
 
   /**
@@ -161,7 +242,7 @@ public class MascotService {
       String name, List<String> tags, CoverScene current, RandomGenerator random) {
     Scene[] scenes = Scene.values();
     Scene scene =
-        KeywordScenePicker.scene(name, tags)
+        KeywordScenePicker.scene(name, tags, random.nextInt(1 << 16))
             .orElseGet(
                 () -> {
                   Scene s;
@@ -262,7 +343,7 @@ public class MascotService {
     return new ClaudeMascotClient.Art(
         MascotDesign.ofVariant(base, seed),
         new CoverScene(
-            KeywordScenePicker.scene(name, tags).orElseGet(() -> sceneFor(base, h / 512)),
+            KeywordScenePicker.scene(name, tags, h).orElseGet(() -> sceneFor(base, h / 512)),
             times[h % times.length],
             // 날씨는 절반쯤 맑게
             h / 4 % 2 == 0 ? CoverScene.Weather.CLEAR : weathers[h / 8 % weathers.length],

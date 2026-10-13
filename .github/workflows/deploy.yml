@@ -7,7 +7,7 @@
 #   SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD  서버 접속. 주소는 외부(핫스팟)용 주소
 #   APP_PORT                                     내가 받은 포트번호. nginx가 이 포트로 넘겨준다
 #   DB_ADDRESS, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD  Crowfoot MySQL #2 접속 정보.
-#       DB_ADDRESS는 내부 IP(10.116.64.14)를 쓴다. 컨테이너 안에서는 s4.java21.net이 외부 주소로 가서 막힌다
+#       DB_ADDRESS는 컨테이너 안에서 닿는 내부 주소를 쓴다. 외부 도메인은 컨테이너 안에서 막힌다
 #   JWT_SECRET, HASH_SECRET                      openssl rand -base64 48 로 만든 값. 한 번 정하면 바꾸지 않는다
 #   MAIL_USERNAME, MAIL_PASSWORD                 Gmail 주소와 앱 비밀번호
 #   TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY     Cloudflare Turnstile 키

@@ -169,7 +169,7 @@
       park: '공원·산책',
       bakery: '베이킹',
       sea: '바다·여행',
-      snowfield: '운동·겨울',
+      snowfield: '겨울·눈밭',
       garden: '일상·감성',
       'night-city': '기본(도시의 밤)',
       library: '도서관',
@@ -197,7 +197,12 @@
       hanok: '한옥',
       farm: '농장·텃밭',
       'space-station': '우주정거장',
-      pojangmacha: '포장마차'
+      pojangmacha: '포장마차',
+      soccer: '축구장',
+      track: '달리기 트랙',
+      pool: '수영장',
+      court: '농구 코트',
+      baseball: '야구장'
     },
     time: { dawn: '새벽', day: '낮', sunset: '노을', night: '밤' },
     weather: { clear: '맑음', cloudy: '흐림', rain: '비', snow: '눈', petals: '벚꽃', leaves: '낙엽' },
@@ -8618,6 +8623,912 @@
     }
   };
 
+  // ---- 운동 장면 (T158 후속). 축구장, 달리기 트랙, 수영장, 농구 코트, 야구장. 마스코트가 공을 몰거나 달리거나 헤엄친다
+
+  // 3x5 숫자와 몇 글자. 전광판과 거리 표지판에 쓴다
+  var MINI = {
+    0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001',
+    5: '111100111001111', 6: '111100111101111', 7: '111001010010010', 8: '111101111101111', 9: '111101111001111',
+    K: '101101110101101', F: '111100110100100', I: '111010010010111', N: '101111111111101', S: '111100111001111',
+    H: '101101111101101', R: '110101110101101', U: '101101101101111', G: '111100101101111', O: '111101101101111',
+    A: '010101111101101', L: '100100100100111', B: '110101110101110', M: '101111111101101', E: '111100111100111',
+    W: '101101111111101', Y: '101101010010010', ' ': '000000000000000'
+  };
+  // 섞기 모드에서 그림 전체를 좌우로 뒤집으면(env.mirror) 글자가 거꾸로 보이므로 미리 뒤집어 그린다
+  function miniText(g, env, x, y, s, c) {
+    s = String(s);
+    var wt = s.length * 4 - 2;
+    for (var i = 0; i < s.length; i++) {
+      var m = MINI[s.charAt(i)] || MINI[' '];
+      for (var k = 0; k < 15; k++) {
+        if (m.charAt(k) !== '1') continue;
+        var dx = i * 4 + (k % 3);
+        g.p(env.mirror ? x + wt - dx : x + dx, y + fl(k / 3), c);
+      }
+    }
+  }
+
+  // 관중석 사람들. 줄마다 한 칸씩 앞(아래)으로 내려오고 가끔 손을 들고 일어선다
+  function crowd(g, env, x0, y0, w, rows, t, salt, cheer) {
+    var P = env.P;
+    var shirts = [P.accent, P.accent2, '#ffffff', '#ffd25a', P.accentD, '#3a6ab0', '#e8483a', P.leaf];
+    var skin = ['#f2c8a0', '#e0b088', '#b8865a'];
+    var hair = ['#2a2026', '#5a3a2a', '#1e1a22', '#8a5a3a'];
+    var seat = mix(P.metal, P.ink, 0.3);
+    for (var r = 0; r < rows; r++) {
+      var yy = y0 + r * 4;
+      g.r(x0, yy + 2, w, 2, mix(seat, WHITE, r * 0.05));
+      g.r(x0, yy + 2, w, 1, mix(seat, WHITE, 0.2 + r * 0.05));
+      for (var x = x0 + ((r & 1) ? 2 : 0) + 1; x < x0 + w - 2; x += 4) {
+        var h = hash(x * 3 + salt, r + env.seed);
+        if (h < 0.1) continue;
+        var up = mod(t + fl(h * 60), cheer ? 10 : 28) < 3 ? 1 : 0;
+        var sc = shirts[fl(h * 97) % shirts.length];
+        g.r(x, yy + 1 - up, 2, 2, sc);
+        g.p(x, yy - 1 - up, hair[fl(h * 13) % 4]);
+        g.p(x + 1, yy - 1 - up, hair[fl(h * 13) % 4]);
+        g.p(x, yy - up, skin[fl(h * 7) % 3]);
+        g.p(x + 1, yy - up, skin[fl(h * 7) % 3]);
+        if (up) {
+          g.p(x - 1, yy - 2, skin[fl(h * 7) % 3]);
+          g.p(x + 2, yy - 2, skin[fl(h * 7) % 3]);
+        }
+      }
+    }
+  }
+
+  // 조명탑. 낮에는 꺼져 있고 해 질 녘부터 켜져 경기장을 밝힌다
+  function floodlight(g, env, x, yb, h, t) {
+    var P = env.P;
+    var on = env.time !== 'day';
+    var top = yb - h;
+    g.r(x, top, 2, h, P.metalD);
+    g.r(x + 1, top, 1, h, mix(P.metalD, P.ink, 0.3));
+    for (var y = top + 4; y < yb; y += 6) g.line(x - 1, y, x + 2, y + 3, mix(P.metalD, P.ink, 0.2));
+    g.r(x - 5, top - 6, 12, 7, mix(P.metalD, P.ink, 0.2));
+    g.em = on ? 1 : 0;
+    for (var j = 0; j < 3; j++) for (var i = 0; i < 5; i++) g.p(x - 4 + i * 2 + (j & 1), top - 5 + j * 2, on ? (mod(t + i + j, 23) === 0 ? '#ffffff' : '#fff6cf') : '#c8ccd4');
+    g.em = 0;
+    if (on) {
+      halo(g, x + 1, top - 3, 5, 5, '#fff6c8', 0.3);
+      g.light(x + 1, top + 10, 110, [1, 0.97, 0.86], env.time === 'night' ? 0.55 : 0.3, { top: top - 6 });
+    }
+  }
+
+  // 작은 사람(선수, 관중이 아닌 달리는 사람). 9칸 높이, 두 걸음 그림
+  var RUN_A = ['..hh.', '..ss.', '.cccs', 's.cc.', '..cc.', '..dd.', '.d..d', 'k...d', '....k'];
+  var RUN_B = ['..hh.', '..ss.', '..cc.', '.scc.', '..cs.', '..dd.', '..dd.', '..d..', '..kk.'];
+  function runner(g, env, x, yb, t, shirt, flip, ph, o) {
+    o = o || {};
+    var st = mod(t + (ph || 0), 4) < 2;
+    var map = {
+      h: hx(o.hair || ['#2a2026', '#5a3a2a', '#e8c070'][(ph || 0) % 3]),
+      s: hx(o.skin || ['#f2c8a0', '#d8a878', '#a8784e'][((ph || 0) >> 1) % 3]),
+      c: shirt,
+      d: o.shorts || env.P.ink,
+      k: hx('#ffffff')
+    };
+    g.br(x, yb, 5, 1, env.P.ink, 0.25);
+    g.spr(x, yb - 9 - (st ? 0 : 1), st ? RUN_A : RUN_B, map, !!flip);
+  }
+
+  // 마스코트가 없을 때 쓰는 공 차는 사람·달리는 사람
+  function hero(g, env, x, yb, t, flip) {
+    return runner(g, env, x + 5, yb, t, env.P.accent, flip, 1);
+  }
+
+  // 축구공. 굴러가면 무늬가 돈다
+  function soccerBall(g, x, y, t, dir) {
+    g.ell(x + 2, y + 2, 2, 2, '#f8f8f6');
+    var k = mod(fl(t * (dir || 1)), 4);
+    var pts = [[1, 1], [3, 1], [3, 3], [1, 3]];
+    g.p(x + pts[k][0], y + pts[k][1], '#2a2a30');
+    g.p(x + 2, y + 2, '#2a2a30');
+    g.p(x + 4, y + 3, '#c8c8d0');
+    g.p(x + 3, y + 4, '#c8c8d0');
+  }
+
+  function cone(g, x, yb) {
+    g.r(x + 2, yb - 5, 1, 1, '#ff8a3a');
+    g.r(x + 1, yb - 4, 3, 1, '#ffffff');
+    g.r(x + 1, yb - 3, 3, 1, '#ff7a2a');
+    g.r(x, yb - 2, 5, 1, '#ff7a2a');
+    g.r(x - 1, yb - 1, 7, 1, '#d85a1a');
+  }
+
+  // 잔디. 깎은 줄무늬가 원근으로 퍼진다. 눈이 오면 덮인다
+  function pitch(g, env, y0, y1, band, salt) {
+    var P = env.P;
+    var snow = snowy(env);
+    var a = snow ? hx('#eef3fa') : (autumnal(env) ? mix(P.leaf, '#c8a040', 0.25) : P.leaf);
+    var b = snow ? hx('#dfe8f4') : mix(a, '#f6ffd8', 0.16);
+    for (var y = y0; y < y1; y++) {
+      var f = (y - y0) / Math.max(1, y1 - y0);
+      for (var x = 0; x < W; x++) {
+        var u = 96 + (x - 96) / (0.7 + f * 0.6);
+        var c = (fl(u / band) & 1) ? a : b;
+        if ((x * 7 + y * 13 + (salt || 0)) % 23 === 0) c = mix(c, P.ink, 0.12);
+        g.p(x, y, c);
+      }
+    }
+  }
+
+  // 흰 줄. 눈 위에서도 보이게 조금 비친다
+  function chalk(g, env, x0, y0, x1, y1) {
+    g.line(x0, y0, x1, y1, snowy(env) ? '#c8d4e8' : mix(env.P.leaf, WHITE, 0.82));
+  }
+  function chalkEll(g, env, cx, cy, rx, ry, from, to) {
+    var c = snowy(env) ? '#c8d4e8' : mix(env.P.leaf, WHITE, 0.82);
+    var n = fl((rx + ry) * 4);
+    for (var i = 0; i <= n; i++) {
+      var a = from + ((to - from) * i) / n;
+      g.p(cx + rnd(Math.cos(a) * rx), cy + rnd(Math.sin(a) * ry), c);
+    }
+  }
+
+  // 축구장과 농구 코트는 골대가 한쪽 끝에 있어 띠로 자르면 골대가 가운데로 오고 선이 끊긴다. 큰 배치는 장면이 직접 고른다
+  SC.soccer = {
+    still: 10,
+    outdoor: true,
+    selfLayout: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['city', 'trees', 'hills', 'city']),
+        stands: R.pick(['full', 'left', 'right', 'none']),
+        goalLeft: R.ch(0.5),
+        band: R.pick([12, 14, 18]),
+        kit: R.pick(['#e8483a', '#3a6ab0', '#ffd25a', '#ffffff', '#5ab86a']),
+        kit2: R.pick(['#f08a3a', '#8a4ab8', '#2a2a30']),
+        lights: R.ch(0.75),
+        boards: R.pick(['accent', 'mix', 'mono']),
+        fly: hp(R, env, 'fly', FLYERS),
+        critter: hopt(R, env, 'critter', ['bird', 'pup', 'chick'], 0.6),
+        cup: hp(R, env, 'cup', ['bottle', 'bottle', 'iced']),
+        cones: R.ch(0.6),
+        keeper: R.ch(0.7),
+        mates: R.i(1, 2)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      // 섞기 모드 배치: 1은 골대 반대편, 2는 골문 가까이, 3은 골대 없이 센터서클
+      var lay = env.layout || 0;
+      var gl = lay === 1 ? !L.goalLeft : L.goalLeft;
+      var goal = lay !== 3;
+      skyTop(g, env, 42, t, 22);
+      flyer(g, env, L.fly, 70, 8, t);
+      distant(g, env, 0, 12, W, 30, bk(env, L.far), t);
+      // 관중석. 배경이 있을 때는 낮게 깔아 뒤 풍경이 보인다
+      if (L.stands !== 'none') {
+        var sx = L.stands === 'right' ? 84 : 0;
+        var sw = L.stands === 'full' ? W : 108;
+        var top = env.bd ? 30 : 24;
+        g.r(sx, top - 2, sw, 2, P.metalD);
+        for (x = sx + 6; x < sx + sw; x += 24) g.r(x, top - 6, 1, 4, P.metalD);
+        g.r(sx, top - 7, sw, 2, mix(P.metalD, P.accent, 0.3));
+        g.r(sx, top, sw, 42 - top, mix(P.metal, P.ink, 0.4));
+        crowd(g, env, sx, top + 1, sw, fl((42 - top) / 4), t, 3, mod(t, 60) < 14);
+      }
+      if (L.lights || env.time === 'night') {
+        floodlight(g, env, 10, 40, 26, t);
+        floodlight(g, env, 180, 40, 26, t);
+      }
+      // 광고판
+      g.em = env.time === 'day' ? 0 : 1;
+      for (x = 0; x < W; x += 24) {
+        var k = fl(x / 24);
+        var bc = L.boards === 'mono' ? (k & 1 ? P.accent : P.accentD) : (L.boards === 'mix' ? [P.accent, '#3a6ab0', '#ffd25a', P.accent2][k % 4] : (k & 1 ? P.accent2 : P.accent));
+        g.r(x, 40, 24, 4, bc);
+        g.r(x + 3 + (k % 3), 41, 8 + (k % 5), 1, mix(bc, WHITE, 0.7));
+        g.r(x + 4, 42, 5 + (k % 4), 1, mix(bc, WHITE, 0.45));
+        g.p(x, 40, mix(bc, P.ink, 0.4));
+      }
+      g.em = 0;
+      pitch(g, env, 44, H, L.band, 3);
+      // 선: 터치라인, 하프라인, 센터서클, 페널티 박스
+      chalk(g, env, 0, 46, W - 1, 46);
+      var hx0 = lay === 3 ? 101 : (lay === 2 ? (gl ? 176 : 16) : (gl ? 132 : 60));
+      chalk(g, env, hx0, 46, hx0 + (gl ? 10 : -10), H - 1);
+      chalkEll(g, env, hx0 + (gl ? 5 : -5), 62, 22, 8, 0, PI * 2);
+      g.r(hx0 + (gl ? 4 : -6), 61, 2, 1, mix(P.leaf, WHITE, 0.82));
+      var f = function (v) {
+        return gl ? v : W - 1 - v;
+      };
+      if (goal) {
+      chalk(g, env, f(0), 50, f(36), 50);
+      chalk(g, env, f(36), 50, f(52), 76);
+      chalk(g, env, f(52), 76, f(0), 76);
+      chalk(g, env, f(0), 53, f(14), 53);
+      chalk(g, env, f(14), 53, f(20), 64);
+      chalkEll(g, env, f(44), 63, 6, 6, gl ? -PI / 2.6 : PI - PI / 2.6, gl ? PI / 2.6 : PI + PI / 2.6);
+      // 골대와 그물
+      var netC = mix(P.leaf, WHITE, 0.6);
+      for (var y = 42; y < 70; y++) {
+        var gx = rnd(4 + (y - 42) * 0.55);
+        for (x = 0; x < gx; x++) {
+          if (y < 42 + x * 0.6) continue;
+          if (mod(x + y, 3) === 0 || mod(x - y, 3) === 0) g.b(f(x), y, netC, 0.55);
+        }
+      }
+      g.line(f(4), 42, f(4), 58, '#f6f6f2');
+      g.line(f(5), 42, f(5), 58, '#d8dce4');
+      g.line(f(4), 42, f(19), 51, '#f6f6f2');
+      g.line(f(19), 51, f(19), 70, '#f6f6f2');
+      g.line(f(20), 51, f(20), 70, '#d8dce4');
+      g.br(f(gl ? 2 : 20), 70, 18, 1, P.ink, 0.2);
+      }
+      // 코너 깃발
+      var cfx = gl ? 184 : 6;
+      g.r(cfx, 40, 1, 7, '#f6f6f2');
+      var wv = mod(t, 6) < 3;
+      g.r(cfx + (gl ? -4 : 1), 40, 4, 2 + (wv ? 0 : 1), '#ffd25a');
+      if (L.keeper && goal) runner(g, env, f(10) - 2, 64 + rnd(Math.sin(t * 0.15) * 3), t * 0.5, hx(L.kit2), !gl, 2, { shorts: P.ink });
+      for (var m = 0; m < L.mates; m++) {
+        var rx = mod(30 + m * 70 - t * (0.6 + m * 0.2) * (gl ? 1 : -1), W + 20) - 10;
+        runner(g, env, rx, 52 + m * 4, t, hx(m ? L.kit2 : L.kit), gl, m + 3);
+      }
+      if (L.cones) for (var c = 0; c < 4; c++) cone(g, gl ? 150 + c * 9 : 12 + c * 9, 79 - (c & 1));
+      cupOf(g, env, L.cup, gl ? 176 : 10, 60, P.accent, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, gl ? 118 : 66, 79, t, gl);
+      // 공을 몰고 골대 쪽으로 왔다 갔다 한다
+      var a = t * 0.07;
+      var mx = (lay === 2 ? (gl ? 64 : 112) : lay === 3 ? (gl ? 112 : 64) : 92) + rnd(Math.sin(a) * 14);
+      var dir = Math.cos(a) >= 0 ? 1 : -1;
+      var run = mod(t, 4) < 2 ? 1 : 0;
+      var bx = dir > 0 ? mx + 17 : mx - 6;
+      var by = 70 - (mod(t, 8) < 2 ? 1 : 0);
+      if (MASCOTS[env.spec.mascot]) mascot(g, env, mx, 74 - run, t, { sleep: false, flip: dir < 0 });
+      else hero(g, env, mx, 74, t, dir < 0);
+      g.br(bx, 74, 5, 1, P.ink, 0.25);
+      soccerBall(g, bx, by, t * 0.5, dir);
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  SC.track = {
+    still: 6,
+    outdoor: true,
+    setup: function (env, R) {
+      return {
+        course: R.pick(['track', 'track', 'road']),
+        far: R.pick(['trees', 'city', 'hills', 'trees']),
+        lane: R.pick(['#c8583a', '#c8583a', '#b8483a', '#3a78b8', '#d0683a']),
+        stands: R.ch(0.5),
+        hurdles: R.ch(0.45),
+        others: R.i(1, 3),
+        kits: [R.pick(['#e8483a', '#3a6ab0', '#ffd25a', '#5ab86a']), R.pick(['#ffffff', '#8a4ab8', '#f08a3a'])],
+        km: R.pick([5, 10, 21, 42]),
+        fence: R.pick(['accent', 'accent2', 'mix']),
+        fly: hp(R, env, 'fly', FLYERS),
+        critter: hopt(R, env, 'critter', ['bird', 'pup', 'squirrel'], 0.6),
+        cup: hp(R, env, 'cup', ['bottle', 'iced', 'bottle']),
+        tree: R.ch(0.6),
+        lamp: R.ch(0.6)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var k;
+      var snow = snowy(env);
+      // 카메라가 달리는 마스코트를 따라간다. 바닥 표시와 장애물이 뒤로 흘러간다
+      var scroll = t * 1.6;
+      skyTop(g, env, 42, t, 22);
+      flyer(g, env, L.fly, 60, 9, t);
+      distant(g, env, 0, 14, W, 28, bk(env, L.far), t);
+      if (L.course === 'track') {
+        if (L.stands) {
+          g.r(0, 32, W, 10, mix(P.metal, P.ink, 0.4));
+          crowd(g, env, 0, 33, W, 2, t, 7, false);
+        } else if (L.tree) {
+          for (k = 0; k < 6; k++) tree(g, env, 12 + k * 34 + (k % 2) * 6, 42, 6 + (k % 3), t);
+        }
+        if (L.lamp) floodlight(g, env, 150, 42, 24, t);
+        // 안쪽 잔디
+        pitch(g, env, 42, 50, 16, 5);
+        g.r(0, 50, W, 1, snow ? '#e8eef8' : '#f6f6f2');
+        // 레인. 가까울수록 넓다
+        var lc = hx(L.lane);
+        var lanes = [51, 55, 60, 66, 73, H];
+        for (k = 0; k < lanes.length - 1; k++) {
+          for (y = lanes[k]; y < lanes[k + 1]; y++) {
+            for (x = 0; x < W; x++) {
+              var c = (x * 5 + y * 11) % 13 === 0 ? mix(lc, P.ink, 0.15) : ((x * 3 + y * 7) % 19 === 0 ? mix(lc, WHITE, 0.15) : lc);
+              if (snow && bay(x, y) < 0.04) c = hx('#eef3fa');
+              g.p(x, y, c);
+            }
+          }
+          if (k > 0) g.r(0, lanes[k], W, 1, '#f6f6f2');
+          // 흘러가는 거리 표시
+          for (x = 0; x < W + 40; x += 48) {
+            var tx = mod(x - scroll * (0.8 + k * 0.1), W + 40) - 20;
+            g.r(tx, lanes[k] + 1, 1, lanes[k + 1] - lanes[k] - 1, mix(lc, WHITE, 0.5));
+          }
+        }
+        // 계단식 출발선
+        var sx = mod(140 - scroll, W + 80) - 40;
+        for (k = 0; k < 4; k++) {
+          var ly = lanes[k + 1];
+          g.r(sx + k * 4, ly + 1, 2, lanes[k + 2] - ly - 1, '#f6f6f2');
+        }
+        if (L.hurdles) {
+          for (k = 0; k < 2; k++) {
+            var hx0 = mod(60 + k * 110 - scroll, W + 40) - 20;
+            var hy = k ? 72 : 59;
+            g.r(hx0, hy - 6, 1, 6, P.metalD);
+            g.r(hx0 + 10, hy - 6, 1, 6, P.metalD);
+            for (x = 0; x < 11; x++) g.p(hx0 + x, hy - 7, mod(x, 4) < 2 ? '#f6f6f2' : P.ink);
+            g.r(hx0 - 1, hy, 3, 1, P.metalD);
+            g.r(hx0 + 9, hy, 3, 1, P.metalD);
+          }
+        }
+      } else {
+        // 마라톤 길: 응원하는 사람들, 울타리, 아스팔트, 가운데 점선, 급수대
+        var curb = mix(P.paper, P.metal, 0.5);
+        g.r(0, 34, W, 8, mix(curb, P.ink, 0.2));
+        crowd(g, env, 0, 36, W, 2, t, 11, true);
+        for (x = 0; x < W; x += 32) {
+          var fc = L.fence === 'mix' ? [P.accent, '#3a6ab0', P.accent2][fl(x / 32) % 3] : P[L.fence];
+          g.r(x, 42, 32, 5, fc);
+          g.r(x, 42, 32, 1, mix(fc, WHITE, 0.4));
+          g.r(x + 5, 44, 12, 1, mix(fc, WHITE, 0.65));
+          g.r(x, 42, 1, 6, P.metalD);
+        }
+        g.r(0, 47, W, 2, curb);
+        var road = mix(P.metal, P.ink, 0.45);
+        for (y = 49; y < H; y++) {
+          for (x = 0; x < W; x++) {
+            var rc = (x * 7 + y * 13) % 11 === 0 ? mix(road, WHITE, 0.08) : road;
+            if (snow && (y < 52 || y > 76) && bay(x, y) < 0.6) rc = hx('#e6ecf6');
+            g.p(x, y, rc);
+          }
+        }
+        for (x = 0; x < W + 24; x += 24) g.r(mod(x - scroll, W + 24) - 12, 63, 12, 1, '#f0e8c8');
+        // 마라톤 길 안내선(파란 선)
+        g.r(0, 72, W, 1, '#3a8ad0');
+        // 거리 표지판
+        var kx = mod(150 - scroll * 0.9, W + 60) - 30;
+        g.r(kx + 8, 26, 1, 22, P.metalD);
+        g.r(kx, 18, 18, 9, '#f6f6f2');
+        g.r(kx, 18, 18, 1, P.accent);
+        miniText(g, env, kx + 2 + (String(L.km).length < 2 ? 2 : 0), 21, L.km + 'K', P.ink);
+        // 급수대
+        var wx = mod(40 - scroll, W + 80) - 40;
+        g.r(wx, 46, 28, 2, P.paper);
+        g.r(wx + 1, 48, 1, 6, P.metalD);
+        g.r(wx + 26, 48, 1, 6, P.metalD);
+        for (k = 0; k < 5; k++) {
+          g.r(wx + 2 + k * 5, 43, 3, 3, '#f6f6f2');
+          g.p(wx + 3 + k * 5, 43, '#6ac8ff');
+        }
+        cone(g, mod(100 - scroll, W + 20) - 10, 64);
+        // 가로등. 해가 지면 길을 비춘다
+        if (L.lamp || env.time === 'night') {
+          for (k = 0; k < 2; k++) {
+            var px = mod(60 + k * 96 - scroll * 0.9, W + 40) - 20;
+            g.r(px, 22, 1, 26, P.metalD);
+            g.r(px, 22, 6, 1, P.metalD);
+            g.em = 1;
+            g.r(px + 4, 23, 3, 1, env.time === 'day' ? '#e8e8dc' : '#fff1c2');
+            g.em = 0;
+            g.light(px + 5, 25, 56, env.T.lamp, env.lampK * 0.9, { top: 23 });
+          }
+        }
+      }
+      if (L.critter !== 'none') critter(g, env, L.critter, mod(30 - scroll * 0.5, W + 20) - 10, L.course === 'track' ? 50 : 49, t, false);
+      // 다른 사람들. 마스코트보다 조금 느리거나 빨라 앞뒤로 엇갈린다
+      for (k = 0; k < L.others; k++) {
+        var spd = [0.35, -0.25, 0.55][k];
+        var ox = mod(20 + k * 64 + t * spd, W + 30) - 15;
+        var oy = L.course === 'track' ? [59, 54, 71][k] : [58, 54, 78][k];
+        runner(g, env, ox, oy, t, hx(L.kits[k % 2]), false, k + 2);
+      }
+      // 마스코트는 가운데에서 제자리 달리기, 발밑에 먼지
+      var mx = 86 + rnd(Math.sin(t * 0.05) * 6);
+      var my = L.course === 'track' ? 70 : 69;
+      var up = mod(t, 4) < 2 ? 1 : 0;
+      if (MASCOTS[env.spec.mascot]) mascot(g, env, mx, my - up, t, { sleep: false });
+      else runner(g, env, mx + 5, my, t, P.accent, false, 1);
+      for (k = 0; k < 3; k++) {
+        var dp = mod(t * 2 + k * 5, 14);
+        g.b(mx - 2 - dp, my - 1 - fl(dp / 5), snow ? WHITE : P.paperD, 0.5 - dp * 0.03);
+      }
+      cupOf(g, env, L.cup, 176, 79, P.accent, t);
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  // 물속 빛 무늬
+  // 사인 값 표. 물결은 칸마다 사인을 두 번 구해 느려서 표에서 읽는다
+  var SIN_T = [];
+  for (var si = 0; si < 1024; si++) SIN_T.push(Math.sin((si / 1024) * PI * 2));
+  function fsin(a) {
+    return SIN_T[(rnd(a * (1024 / (PI * 2))) & 1023)];
+  }
+  function caustic(g, x, y, w, h, t, c, deep, light) {
+    for (var yy = y; yy < y + h; yy++) {
+      var f = (yy - y) / Math.max(1, h - 1);
+      var base = mix(c, deep, f * 0.55);
+      var a0 = t * 0.21 + Math.sin(yy * 0.7 + t * 0.1) * 1.8;
+      var b0 = yy * 0.55 - t * 0.17;
+      for (var xx = x; xx < x + w; xx++) {
+        var v = fsin(xx * 0.31 + a0) + fsin(b0 + xx * 0.09);
+        g.p(xx, yy, v > 1.45 ? light : (v > 1.15 && bay(xx, yy) < 0.5 ? mix(base, light, 0.5) : base));
+      }
+    }
+  }
+
+  // 레인 줄. 색 구슬이 이어지고 물결 따라 출렁인다
+  function laneRope(g, y, t, c1, c2, ph) {
+    for (var x = 0; x < W; x += 2) {
+      var yy = y + rnd(Math.sin(x * 0.08 + t * 0.2 + ph) * 0.6);
+      var seg = fl(x / 8) % 3;
+      var c = seg === 0 ? c1 : (seg === 1 ? '#f6f6f2' : c2);
+      g.p(x, yy, c);
+      g.p(x + 1, yy, mix(hx(c), [0, 0, 0], 0.2));
+    }
+  }
+
+  SC.pool = {
+    still: 9,
+    setup: function (env, R) {
+      return {
+        wallStyle: R.i(0, 2),
+        view: R.pick(['trees', 'city', 'hills', 'sea']),
+        wins: R.pick([2, 3]),
+        water: R.pick(['#3ab8d8', '#38a8d0', '#4ac0c8']),
+        rope: [R.pick(['#e8483a', '#ffd25a', '#3a6ab0']), R.pick(['#3a6ab0', '#5ab86a', '#e8483a'])],
+        chair: R.ch(0.6),
+        left: R.ch(0.5),
+        flags: R.ch(0.7),
+        ring: R.ch(0.6),
+        other: R.ch(0.6),
+        cap: R.pick(['#e8483a', '#ffd25a', '#3a6ab0', '#f6f6f2']),
+        cup: hp(R, env, 'cup', ['bottle', 'bottle', 'iced']),
+        floor: hopt(R, env, 'floor', ['bag', 'bigplant', 'basket', 'umbrella'], 0.35),
+        plant: hp(R, env, 'plant', PLANTS2)
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var k;
+      // 벽은 하얀 타일
+      var tileC = mix(P.wall, '#eef6fa', 0.55);
+      g.r(0, 0, W, 38, tileC);
+      if (env.wallX) wallTex(g, env, 38, env.wallX);
+      for (y = 3; y < 38; y += 5) g.r(0, y, W, 1, mix(tileC, P.ink, 0.08));
+      for (y = 0; y < 38; y += 5) for (x = ((y / 5) & 1) * 3; x < W; x += 6) g.p(x, y + 1, mix(tileC, P.ink, 0.06));
+      g.r(0, 30, W, 3, mix(tileC, L.rope[0], 0.5));
+      g.r(0, 30, W, 1, mix(tileC, L.rope[0], 0.3));
+      // 큰 창
+      var n = L.wins;
+      var ww = n === 2 ? 52 : 40;
+      var gap = (W - n * ww) / (n + 1);
+      for (k = 0; k < n; k++) win(g, env, rnd(gap + k * (ww + gap)), 4, ww, 22, t, { panes: 4, sill: false, view: L.view, lightR: 60 });
+      // 배영 깃발 줄
+      if (L.flags) {
+        for (x = 0; x < W; x++) g.p(x, 7 + rnd(Math.abs(Math.sin((x / 96) * PI)) * 3), P.ink);
+        for (x = 3; x < W; x += 7) {
+          var fy = 8 + rnd(Math.abs(Math.sin((x / 96) * PI)) * 3);
+          var fc = (fl(x / 7) & 1) ? L.rope[0] : L.rope[1];
+          g.r(x - 2, fy, 5, 1, fc);
+          g.r(x - 1, fy + 1, 3, 1, fc);
+          g.p(x, fy + 2, fc);
+        }
+      }
+      // 천장 조명. 밤에도 실내는 밝다
+      g.em = 1;
+      for (x = 24; x < W; x += 48) {
+        g.r(x - 4, 0, 9, 1, env.time === 'day' ? '#e8eef2' : '#fff6dc');
+        g.r(x - 3, 1, 7, 1, env.time === 'day' ? '#d8e0e6' : '#fffbe8');
+      }
+      g.em = 0;
+      if (env.time !== 'day') for (x = 48; x < W; x += 96) g.light(x, 4, 72, [1, 0.96, 0.88], env.lampK * 0.5, { n: 3, sy: 1.4 });
+      // 가장자리 바닥
+      var deck = mix(P.floor, '#e8eef2', 0.5);
+      g.r(0, 38, W, 4, deck);
+      g.r(0, 41, W, 1, mix(deck, P.ink, 0.2));
+      // 물
+      caustic(g, 0, 42, W, 32, t, hx(L.water), mix(hx(L.water), '#1a4a8a', 0.6), mix(hx(L.water), WHITE, 0.55));
+      for (x = 0; x < W; x++) if (bay(x, 42) < 0.5) g.p(x, 42, mix(hx(L.water), WHITE, 0.35));
+      // 바닥 레인 표시
+      g.br(0, 52, W, 1, '#1a3a6a', 0.35);
+      g.br(0, 63, W, 1, '#1a3a6a', 0.35);
+      // 밤에는 물속 조명이 켜진다
+      if (env.time !== 'day') {
+        g.em = 1;
+        for (x = 16; x < W; x += 40) {
+          g.r(x, 71, 3, 2, '#e8ffff');
+          halo(g, x + 1, 71, 1, 6, '#9af0ff', 0.35);
+        }
+        g.em = 0;
+        g.light(96, 60, 90, [0.6, 0.95, 1], 0.25, { n: 3 });
+      }
+      laneRope(g, 47, t, L.rope[0], L.rope[1], 0);
+      laneRope(g, 57, t, L.rope[1], L.rope[0], 1);
+      laneRope(g, 68, t, L.rope[0], L.rope[1], 2);
+      // 가까운 바닥
+      g.r(0, 74, W, H - 74, deck);
+      g.r(0, 74, W, 1, mix(deck, WHITE, 0.5));
+      for (x = 0; x < W; x += 8) g.r(x, 75, 1, 5, mix(deck, P.ink, 0.1));
+      // 사다리
+      var lx = L.left ? 150 : 30;
+      for (k = 0; k < 2; k++) {
+        g.r(lx + k * 8, 66, 1, 9, P.metalL);
+        g.r(lx + k * 8, 66, 2, 1, P.metalL);
+      }
+      g.r(lx, 70, 9, 1, mix(P.metalL, P.ink, 0.2));
+      // 감시탑 의자
+      if (L.chair) {
+        var cx = L.left ? 20 : 160;
+        g.r(cx, 24, 12, 2, P.accent);
+        g.r(cx, 18, 2, 8, P.accent);
+        g.line(cx + 1, 26, cx - 2, 41, P.paper);
+        g.line(cx + 10, 26, cx + 13, 41, P.paper);
+        g.r(cx - 1, 33, 15, 1, P.paper);
+        g.r(cx + 1, 14, 10, 2, P.accent2);
+        g.r(cx + 5, 16, 1, 8, P.metalD);
+      }
+      // 튜브
+      if (L.ring) {
+        var rx = mod(40 + t * 0.15, W + 20) - 10;
+        var ry = 61 + rnd(Math.sin(t * 0.2));
+        g.ell(rx, ry, 5, 2, '#ff7a6a');
+        g.ell(rx, ry, 2, 1, mix(hx(L.water), WHITE, 0.2));
+        g.p(rx - 4, ry - 1, '#ffffff');
+        g.p(rx + 4, ry + 1, '#ffffff');
+      }
+      // 다른 사람 수영모
+      if (L.other) {
+        var ox = mod(160 - t * 0.5, W + 30) - 15;
+        g.ell(ox, 51, 2, 1, hx(L.cap));
+        g.p(ox - 1, 52, '#f2c8a0');
+        var arm = mod(t, 6) < 3;
+        g.p(ox + (arm ? -3 : 3), 50, '#f2c8a0');
+        for (k = 0; k < 3; k++) g.b(ox + 4 + k * 2, 52, WHITE, 0.6 - k * 0.15);
+      }
+      // 마스코트: 머리만 내놓고 헤엄친다
+      var a = t * 0.05;
+      var mx = 88 + rnd(Math.sin(a) * 18);
+      var dir = Math.cos(a) >= 0 ? 1 : -1;
+      var wl = 63;
+      var bob = mod(t, 6) < 3 ? 0 : 1;
+      var m = MASCOTS[env.spec.mascot];
+      if (m) {
+        g.clip(0, 0, W, wl);
+        mascot(g, env, mx, wl + 6 + bob, t, { sleep: false, flip: dir < 0 });
+        g.noclip();
+        var bc = hx(m.c.b);
+        var st = mod(t, 8);
+        // 팔 젓기
+        var ax = dir > 0 ? (st < 4 ? mx + 15 : mx - 1) : (st < 4 ? mx - 1 : mx + 15);
+        g.p(ax, wl - 2 - (st % 4 === 1 ? 1 : 0), bc);
+        g.p(ax + (dir > 0 ? 1 : -1), wl - 1, bc);
+      } else {
+        g.ell(mx + 8, wl - 1, 3, 2, hx(L.cap));
+        g.r(mx + 6, wl, 5, 1, '#f2c8a0');
+        var st2 = mod(t, 8);
+        g.p(mx + (st2 < 4 ? 13 : 3), wl - 2, '#f2c8a0');
+      }
+      // 물결과 물보라
+      for (x = -2; x < 19; x++) g.b(mx + x, wl, WHITE, 0.55 + (mod(x + t, 4) === 0 ? 0.3 : 0));
+      for (k = 0; k < 6; k++) {
+        var sp = mod(t + k * 3, 12);
+        var sxp = dir > 0 ? mx - 3 - sp : mx + 19 + sp;
+        g.b(sxp, wl - (k & 1) - (sp < 3 ? 1 : 0), WHITE, 0.75 - sp * 0.05);
+      }
+      // 가까운 바닥 소품
+      if (L.floor !== 'none') floorThing(g, env, L.floor, L.left ? 6 : 170, 79, t);
+      cupOf(g, env, L.cup, L.left ? 60 : 120, 79, P.accent, t);
+      // 킥판 더미
+      var kx = L.left ? 80 : 96;
+      for (k = 0; k < 3; k++) g.r(kx, 77 - k * 2, 12, 2, [P.accent, '#ffd25a', P.accent2][k]);
+      plant(g, env, L.left ? 182 : 2, 79, L.plant, t, 6);
+    }
+  };
+
+  SC.court = {
+    still: 14,
+    outdoor: true,
+    selfLayout: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['city', 'street', 'city', 'trees']),
+        court: R.pick(['#c8683a', '#3a78b0', '#4a9a5a', '#8a5ab0', '#c8683a']),
+        hoopLeft: R.ch(0.5),
+        wall: R.pick(['mural', 'none', 'none']),
+        fence: R.ch(0.8),
+        lamp: R.ch(0.7),
+        bench: R.ch(0.6),
+        cup: hp(R, env, 'cup', ['bottle', 'iced', 'bottle']),
+        floor: hopt(R, env, 'floor', ['bag', 'skate', 'boxes'], 0.4),
+        critter: hopt(R, env, 'critter', ['pup', 'kitty', 'bird'], 0.6),
+        fly: hp(R, env, 'fly', FLYERS),
+        net: R.pick(['white', 'chain'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var k;
+      // 섞기 모드 배치: 1은 골대 반대편, 2는 벽화 벽, 3은 멀리서 3점 슛
+      var lay = env.layout || 0;
+      var hl = lay === 1 ? !L.hoopLeft : L.hoopLeft;
+      var f = function (v) {
+        return hl ? v : W - 1 - v;
+      };
+      skyTop(g, env, 46, t, 24);
+      flyer(g, env, L.fly, 120, 8, t);
+      distant(g, env, 0, 12, W, 34, bk(env, L.far), t);
+      // 울타리 밑 보도
+      var walk = mix(P.paper, P.metal, 0.5);
+      g.r(0, 46, W, 4, walk);
+      g.r(0, 46, W, 1, mix(walk, WHITE, 0.25));
+      // 벽화 벽
+      if (L.wall === 'mural' || lay === 2) {
+        var wx0 = hl ? 96 : 0;
+        var wc = mix(P.paper, P.metal, 0.4);
+        g.r(wx0, 28, 96, 18, wc);
+        g.r(wx0, 28, 96, 1, mix(wc, WHITE, 0.3));
+        for (x = wx0; x < wx0 + 96; x++) {
+          var hh = 34 + rnd(Math.sin(x * 0.11) * 3 + Math.sin(x * 0.05) * 2);
+          for (y = hh; y < 46; y++) g.p(x, y, [P.accent, P.accent2, '#ffd25a', '#3a8ad0'][fl((x - wx0) / 24)]);
+        }
+        g.ell(wx0 + 40, 36, 5, 5, '#e8803a');
+        g.line(wx0 + 35, 36, wx0 + 45, 36, P.ink);
+        g.line(wx0 + 40, 31, wx0 + 40, 41, P.ink);
+      }
+      // 철망 울타리
+      if (L.fence) {
+        var mc = mix(P.metal, WHITE, 0.2);
+        for (y = 20; y < 50; y++) for (x = 0; x < W; x++) if (mod(x + y, 6) === 0 || mod(x - y, 6) === 0) g.b(x, y, mc, 0.45);
+        g.r(0, 19, W, 1, P.metalD);
+        for (x = 0; x < W; x += 32) g.r(x, 19, 2, 31, P.metalD);
+      }
+      // 코트 바닥
+      var cc = hx(L.court);
+      var cL = mix(cc, WHITE, 0.18);
+      var snow = snowy(env);
+      for (y = 50; y < H; y++) {
+        for (x = 0; x < W; x++) {
+          var c = (x * 7 + y * 11) % 17 === 0 ? mix(cc, P.ink, 0.1) : cc;
+          if (snow && bay(x, y) < 0.04) c = hx('#eef3fa');
+          g.p(x, y, c);
+        }
+      }
+      g.r(0, 50, W, 1, mix(cc, P.ink, 0.3));
+      // 페인트 존(키)
+      for (y = 56; y < 76; y++) {
+        var kw = 34 + fl((y - 56) * 0.5);
+        for (x = 0; x < kw; x++) g.p(f(x), y, (x * 7 + y * 11) % 17 === 0 ? mix(cL, P.ink, 0.1) : cL);
+      }
+      var lineC = '#f6f6f2';
+      g.line(0, 52, W - 1, 52, lineC);
+      g.line(f(0), 56, f(34), 56, lineC);
+      g.line(f(34), 56, f(44), 76, lineC);
+      g.line(f(44), 76, f(0), 76, lineC);
+      for (k = 0; k <= 40; k++) {
+        var a = -PI / 2 + (PI * k) / 40;
+        g.p(f(rnd(Math.cos(a) * 66)), 64 + rnd(Math.sin(a) * 12), lineC);
+      }
+      g.line(f(150), 52, f(160), H - 1, lineC);
+      // 골대
+      var px = f(6);
+      g.r(px - 1, 30, 3, 46, P.metalD);
+      g.r(px - 1, 30, 1, 46, mix(P.metalD, WHITE, 0.2));
+      g.br(px - 3, 76, 9, 1, P.ink, 0.3);
+      g.line(px, 30, f(14), 26, P.metalD);
+      var bx0 = hl ? 12 : W - 30;
+      g.r(bx0, 18, 18, 13, '#f6f6f2');
+      g.r(bx0, 18, 18, 1, '#d8dce4');
+      g.r(bx0 + 5, 23, 8, 6, '#e8483a');
+      g.r(bx0 + 6, 24, 6, 4, '#f6f6f2');
+      var rimX = f(21);
+      g.r(rimX - 5, 31, 11, 1, '#e8603a');
+      g.r(rimX - 4, 32, 9, 1, '#c8482a');
+      // 공이 들어가면 그물이 흔들린다
+      var cyc = mod(t, 72);
+      var swish = cyc >= 66 ? 1 : 0;
+      for (k = 0; k < 5; k++) {
+        var nx = rimX - 4 + k * 2;
+        var nc = L.net === 'chain' ? P.metalL : '#f6f6f2';
+        for (y = 0; y < 7; y++) g.p(nx + rnd((2 - k) * y * 0.12) + (swish && y > 2 ? (mod(t, 2) ? 1 : -1) : 0), 33 + y, nc);
+      }
+      if (L.lamp) {
+        var lx = f(176);
+        g.r(lx, 22, 2, 54, P.metalD);
+        g.r(hl ? lx - 6 : lx, 20, 8, 2, P.metalD);
+        g.em = 1;
+        g.r(hl ? lx - 6 : lx + 1, 22, 6, 1, env.time === 'day' ? '#e8e8dc' : '#fff1c2');
+        g.em = 0;
+        g.light(hl ? lx - 3 : lx + 4, 24, 70, env.T.lamp, env.lampK * 0.9, { top: 22 });
+      }
+      if (L.bench) {
+        var bnx = f(hl ? 120 : 120) - (hl ? 0 : 26);
+        g.r(bnx, 54, 26, 2, P.woodL);
+        g.r(bnx, 56, 26, 1, P.woodD);
+        g.r(bnx + 2, 57, 1, 4, P.metalD);
+        g.r(bnx + 23, 57, 1, 4, P.metalD);
+        cupOf(g, env, L.cup, bnx + 4, 54, P.accent, t);
+      }
+      if (L.floor !== 'none') floorThing(g, env, L.floor, f(hl ? 170 : 170) - (hl ? 0 : 16), 79, t);
+      if (L.critter !== 'none') critter(g, env, L.critter, f(hl ? 150 : 150) - (hl ? 0 : 8), 60, t, !hl);
+      // 마스코트: 드리블하다 골대로 슛
+      var mo = lay === 3 ? 124 : 92;
+      var mx = hl ? mo : W - mo - 16;
+      var faceHoop = !hl;
+      var jump = cyc >= 48 && cyc < 54 ? (cyc < 51 ? cyc - 47 : 54 - cyc) : 0;
+      if (MASCOTS[env.spec.mascot]) mascot(g, env, mx, 76 - jump, t, { sleep: false, flip: !faceHoop });
+      else runner(g, env, mx + 5, 76 - jump, t * 0.5, P.accent, hl, 1);
+      var ballC = '#e8803a';
+      var ballX;
+      var ballY;
+      var hand = hl ? mx - 3 : mx + 16;
+      if (cyc < 48) {
+        ballX = hand;
+        ballY = 76 - 4 - rnd(Math.abs(Math.sin(cyc * 0.4)) * 10);
+        g.br(ballX, 76, 4, 1, P.ink, 0.25);
+      } else if (cyc < 66) {
+        var s = (cyc - 48) / 18;
+        var sx0 = hl ? mx : mx + 12;
+        ballX = rnd(sx0 + (rimX - 2 - sx0) * s);
+        ballY = rnd(60 + (26 - 60) * s - Math.sin(s * PI) * 22);
+      } else {
+        ballX = rimX - 2;
+        ballY = 31 + (cyc - 66) * 2;
+      }
+      g.ell(ballX + 2, ballY + 2, 2, 2, ballC);
+      g.p(ballX + 1, ballY + 1, '#ffb070');
+      g.p(ballX + 2, ballY + 2, '#8a3a1a');
+      g.p(ballX + 3, ballY + 3, '#8a3a1a');
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
+  // 야구장은 홈 뒤에서 바라본 다이아몬드라 띠로 자르면 모양이 깨진다. 섞기 모드의 큰 배치는 장면이 직접 고른다(전광판 자리, 카메라 위치)
+  SC.baseball = {
+    still: 4,
+    outdoor: true,
+    selfLayout: true,
+    noMirror: true,
+    setup: function (env, R) {
+      return {
+        far: R.pick(['city', 'hills', 'city']),
+        board: R.pick(['left', 'right', 'center']),
+        wall: R.pick(['#2f6a4a', '#2a5a8a', '#3a4a5a']),
+        dirt: R.pick(['#c8925a', '#b87a4a', '#d0a070']),
+        score: [R.i(0, 9), R.i(0, 9)],
+        inning: R.i(1, 9),
+        band: R.pick([10, 12, 16]),
+        lights: R.ch(0.8),
+        fly: hp(R, env, 'fly', ['blimp', 'flock', 'plane', 'balloon', 'none']),
+        cup: hp(R, env, 'cup', ['bottle', 'iced', 'glass']),
+        team: R.pick(['#e8483a', '#3a6ab0', '#2a2a30', '#5ab86a'])
+      };
+    },
+    draw: function (g, env, L, t) {
+      var P = env.P;
+      var x;
+      var y;
+      var k;
+      // 섞기 모드 배치: 1은 전광판 반대편, 2는 카메라를 왼쪽으로, 3은 오른쪽으로
+      var lay = env.layout || 0;
+      var cx = 96 + (lay === 2 ? -22 : lay === 3 ? 22 : 0);
+      var board = lay === 1 ? (L.board === 'left' ? 'right' : 'left') : L.board;
+      skyTop(g, env, 34, t, 18);
+      flyer(g, env, L.fly, 100, 7, t);
+      distant(g, env, 0, 6, W, 22, bk(env, L.far), t);
+      // 관중석
+      g.r(0, 18, W, 16, mix(P.metal, P.ink, 0.45));
+      g.r(0, 16, W, 2, mix(P.metalD, P.accent, 0.3));
+      crowd(g, env, 0, 19, W, 4, t, 17, mod(t, 64) >= 40);
+      // 전광판
+      var bw = 46;
+      var bxs = board === 'left' ? 8 : (board === 'right' ? W - bw - 8 : cx - bw / 2);
+      g.r(bxs - 2, 4, bw + 4, 22, P.metalD);
+      g.r(bxs, 6, bw, 18, '#141824');
+      g.em = 1;
+      miniText(g, env, bxs + 3, 8, 'HOME', '#ffd25a');
+      miniText(g, env, bxs + 3, 15, 'AWAY', '#ffd25a');
+      miniText(g, env, bxs + 36, 8, L.score[0], '#ff6a5a');
+      miniText(g, env, bxs + 36, 15, L.score[1], '#ff6a5a');
+      for (k = 0; k < 3; k++) g.p(bxs + 24 + k * 3, 21, k < mod(fl(t / 16), 4) ? '#7cff9a' : '#2a3a2a');
+      miniText(g, env, bxs + 25, 8, L.inning, '#f6f6f2');
+      g.em = 0;
+      g.r(bxs + bw / 2 - 1, 26, 2, 8, P.metalD);
+      if (L.lights || env.time !== 'day') {
+        floodlight(g, env, board === 'left' ? 150 : 20, 18, 12, t);
+        floodlight(g, env, board === 'left' ? 180 : 60, 18, 12, t);
+      }
+      // 외야 담장
+      var wc = hx(L.wall);
+      g.r(0, 34, W, 6, wc);
+      g.r(0, 34, W, 1, '#ffd25a');
+      for (x = 8; x < W; x += 40) miniText(g, env, x, 35, [100, 115, 122, 115, 100][fl(x / 40)] || 100, mix(wc, WHITE, 0.7));
+      // 외야 잔디(체크 무늬로 깎음)
+      var snow = snowy(env);
+      var ga = snow ? hx('#eef3fa') : P.leaf;
+      var gb = snow ? hx('#dfe8f4') : mix(P.leaf, '#f6ffd8', 0.16);
+      for (y = 40; y < H; y++) {
+        var ff = (y - 40) / 40;
+        for (x = 0; x < W; x++) {
+          var u = cx + (x - cx) / (0.6 + ff * 0.8);
+          g.p(x, y, ((fl(u / L.band) + fl((y - 40) / 4)) & 1) ? ga : gb);
+        }
+      }
+      // 내야 흙: 홈을 꼭짓점으로 한 부채꼴, 그 안에 잔디 다이아몬드
+      var dc = snow ? hx('#e8e0d8') : hx(L.dirt);
+      var dcD = mix(dc, P.ink, 0.15);
+      var hy = 79;
+      for (y = 50; y < H; y++) {
+        var dy = hy - y;
+        var hw = 70 * Math.sqrt(Math.max(0, 1 - Math.pow((dy - 14) / 20, 2)));
+        if (dy <= 14) hw = Math.max(hw, 14 + dy * 3.9);
+        for (x = fl(cx - hw); x <= cx + hw; x++) g.p(x, y, (x * 5 + y * 7) % 13 === 0 ? dcD : dc);
+      }
+      for (y = 58; y < 77; y++) {
+        var dd = Math.abs(y - 67);
+        var iw = (9 - dd) * 3.4;
+        for (x = fl(cx - iw); x <= cx + iw; x++) g.p(x, y, (fl(x / 6) & 1) ? ga : gb);
+      }
+      // 베이스 라인과 베이스
+      var lc = '#f6f6f2';
+      g.line(cx, hy, cx - 72, 50, lc);
+      g.line(cx, hy, cx + 72, 50, lc);
+      g.r(cx - 1, 56, 3, 2, lc);
+      g.r(cx - 34, 66, 3, 2, lc);
+      g.r(cx + 32, 66, 3, 2, lc);
+      g.r(cx - 2, 78, 5, 2, lc);
+      // 투수 마운드
+      g.ell(cx, 67, 6, 2, mix(dc, WHITE, 0.12));
+      g.r(cx - 1, 67, 3, 1, lc);
+      // 투수(작은 사람)와 공
+      var cyc = mod(t, 40);
+      runner(g, env, cx - 2, 67, cyc < 8 ? 0 : 2, hx(L.team), false, 4, { shorts: hx('#f6f6f2') });
+      // 마스코트 타자. 공이 오면 휘두르고 공은 담장 너머로 날아간다
+      var bx = cx - 26;
+      var swing = cyc >= 20 && cyc < 24;
+      var after = cyc >= 22;
+      var ballX;
+      var ballY;
+      var ballR = 1;
+      if (cyc >= 10 && cyc < 22) {
+        var s = (cyc - 10) / 12;
+        ballX = cx + (bx + 18 - cx) * s;
+        ballY = 63 + (70 - 63) * s;
+        ballR = s > 0.5 ? 1 : 0;
+      } else if (after && cyc < 38) {
+        var s2 = (cyc - 22) / 16;
+        ballX = bx + 18 + (cx + 40 - bx - 18) * s2;
+        ballY = 70 - Math.sin(s2 * PI * 0.8) * 50 - s2 * 10;
+        ballR = s2 < 0.4 ? 1 : 0;
+      }
+      if (MASCOTS[env.spec.mascot]) mascot(g, env, bx, 79, t, { sleep: false });
+      else runner(g, env, bx + 5, 79, 0, P.accent, false, 1);
+      // 배트
+      var bc = hx('#d8a868');
+      if (swing || (after && cyc < 30)) g.line(bx + 12, 72, bx + 24, 70, bc);
+      else {
+        g.line(bx + 13, 72, bx + 18, 61, bc);
+        g.p(bx + 18, 60, mix(bc, P.ink, 0.2));
+      }
+      if (ballX != null) {
+        if (ballR) g.r(ballX, ballY, 2, 2, '#f8f8f6');
+        else g.p(ballX, ballY, '#f8f8f6');
+        g.p(ballX + (after ? -1 : 1), ballY + 1, '#e8483a');
+      }
+      // 포수 미트
+      g.r(cx + 6, 75, 4, 3, '#8a5a3a');
+      cupOf(g, env, L.cup, board === 'right' ? 6 : 176, 79, P.accent, t);
+      weather(g, env, 0, 0, W, H, t);
+    }
+  };
+
   // ------------------------------------------------ layers (T158, D-129)
   //
   // 저장값에 일곱째 칸(배경~계절)이 있으면 '섞기' 모드로 그린다. 장면(구도)은 그대로 두고
@@ -8661,6 +9572,8 @@
     var X = xr(env, 101);
     var P = env.P;
     env.mirror = X.ch(0.5);
+    // 전광판 글자처럼 뒤집으면 어색한 장면은 뒤집지 않는다(난수는 같은 만큼 쓴다)
+    if (SC[env.spec.scene] && SC[env.spec.scene].noMirror) env.mirror = false;
     env.pose = X.pick(['', '', 'flip', 'hop', 'nap', 'awake']);
     env.wallX = X.pick(['', '', 'brick', 'plank', 'tile', 'stripe', 'dots', 'check']);
     env.floorX = X.pick(['', '', 'herring', 'carpet', 'check', 'concrete']);
@@ -9715,7 +10628,8 @@
 
   function planLayout(g, env, scene, L) {
     var kind = env.layout;
-    if (!kind) return null;
+    // 띠로 자르면 모양이 깨지는 장면은 배치를 직접 고른다(selfLayout)
+    if (!kind || scene.selfLayout) return null;
     g.clear();
     g.cnt = new Uint16Array(W * H);
     g.keep = [];
