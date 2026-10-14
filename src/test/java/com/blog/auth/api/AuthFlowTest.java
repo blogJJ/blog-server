@@ -152,7 +152,9 @@ class AuthFlowTest {
             "changed34@",
             signup.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
             loggedIn.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
-            loggedIn.getCookie(AuthCookies.REFRESH_TOKEN).getValue());
+            loggedIn.getCookie(AuthCookies.REFRESH_TOKEN).getValue(),
+            "인증번호: " + code,
+            "인증번호: " + resetCode.group(1));
     // 테스트는 메일을 보내지 않고 본문을 로그로 남기므로(app.mail.log-only) 그 여러 줄은 뺀다
     List<String> lines = new java.util.ArrayList<>();
     boolean inMail = false;
@@ -164,12 +166,7 @@ class AuthFlowTest {
         lines.add(line);
       }
     }
-    assertThat(lines).isNotEmpty();
-    for (String secret : secrets) {
-      assertThat(lines).noneMatch(line -> line.contains(secret));
-    }
-    assertThat(lines).noneMatch(line -> line.contains("인증번호: " + code));
-    assertThat(lines).noneMatch(line -> line.contains("인증번호: " + resetCode.group(1)));
+    assertThat(lines).isNotEmpty().noneMatch(line -> secrets.stream().anyMatch(line::contains));
   }
 
   @Test
