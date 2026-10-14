@@ -96,8 +96,8 @@ class ProdHttpsBehindProxyTest {
 
     assertThat(res.statusCode()).isBetween(301, 308);
     String location = res.headers().firstValue("Location").orElseThrow();
-    assertThat(location).doesNotStartWith("http://");
     assertThat(location)
+        .doesNotStartWith("http://")
         .satisfiesAnyOf(
             l -> assertThat(l).startsWith("/login.html"),
             l -> assertThat(l).startsWith(SITE + "/login.html"));

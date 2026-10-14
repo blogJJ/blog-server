@@ -162,7 +162,7 @@ class TurnstileVerifierTest {
                   @Override
                   public URI getURI() {
                     URI uri = super.getURI();
-                    assertThat(uri.toString()).isEqualTo(TurnstileVerifier.VERIFY_URL);
+                    assertThat(uri).hasToString(TurnstileVerifier.VERIFY_URL);
                     return URI.create("http://127.0.0.1:" + port + uri.getPath());
                   }
                 },

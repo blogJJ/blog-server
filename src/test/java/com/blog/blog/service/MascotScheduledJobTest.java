@@ -239,7 +239,7 @@ class MascotScheduledJobTest {
     long clear = weathers.stream().filter(w -> w == CoverScene.Weather.CLEAR).count();
 
     assertThat(clear).isBetween(160L, 300L);
-    assertThat(new HashSet<>(weathers).size()).isGreaterThan(2);
+    assertThat(new HashSet<>(weathers)).hasSizeGreaterThan(2);
     assertThat(MascotService.fallback(null, List.of(), Mascot.CAT).mascot().base())
         .isEqualTo(Mascot.CAT);
   }

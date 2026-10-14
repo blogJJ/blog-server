@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -86,7 +87,11 @@ class SocialLoginFlowTest {
 
   @BeforeEach
   void setUp() {
-    ip = "10.8." + (int) (Math.random() * 250) + "." + ((int) (Math.random() * 250) + 1);
+    ip =
+        "10.8."
+            + ThreadLocalRandom.current().nextInt(250)
+            + "."
+            + (ThreadLocalRandom.current().nextInt(250) + 1);
     email = "s" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
     sub = "g-" + UUID.randomUUID();
   }

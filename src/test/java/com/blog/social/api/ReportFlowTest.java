@@ -97,8 +97,7 @@ class ReportFlowTest {
     long reportId =
         created(call(newUser(), post("/api/reports"), report("BLOG", blogId, null, "SPAM", null)));
     String snapshot = column(reportId, "target_snapshot", String.class);
-    assertThat(snapshot).isEqualTo("[블로그] 넷글자다\n" + "😀".repeat(500));
-    assertThat(snapshot).doesNotContain("?");
+    assertThat(snapshot).isEqualTo("[블로그] 넷글자다\n" + "😀".repeat(500)).doesNotContain("?");
   }
 
   @Test

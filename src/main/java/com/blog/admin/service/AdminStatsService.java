@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,9 +72,7 @@ public class AdminStatsService {
     Map<LocalDate, Long> map = new HashMap<>();
     jdbc.query(
         sql,
-        rs -> {
-          map.put(rs.getDate("d").toLocalDate(), rs.getLong("c"));
-        },
+        (RowCallbackHandler) rs -> map.put(rs.getDate("d").toLocalDate(), rs.getLong("c")),
         Date.valueOf(from));
     return map;
   }

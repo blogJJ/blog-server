@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,8 +78,8 @@ class AuthFlowTest {
 
   @BeforeEach
   void setUp() {
-    int n = (int) (Math.random() * 250) + 1;
-    ip = "10.9." + (int) (Math.random() * 250) + "." + n;
+    int n = ThreadLocalRandom.current().nextInt(250) + 1;
+    ip = "10.9." + ThreadLocalRandom.current().nextInt(250) + "." + n;
     email = "u" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
     when(turnstileVerifier.getSiteKey()).thenReturn("site-key");
   }
@@ -100,8 +101,7 @@ class AuthFlowTest {
 
     List<String> setCookies = response.getHeaders(HttpHeaders.SET_COOKIE);
     assertThat(setCookies)
-        .anySatisfy(c -> assertThat(c).startsWith("access_token=").contains("HttpOnly"));
-    assertThat(setCookies)
+        .anySatisfy(c -> assertThat(c).startsWith("access_token=").contains("HttpOnly"))
         .anySatisfy(
             c ->
                 assertThat(c)

@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -146,9 +147,7 @@ public class SimilarPostRepository {
     named.query(
         "select id, content from posts where id in (:ids)",
         new MapSqlParameterSource("ids", ids),
-        rs -> {
-          map.put(rs.getLong("id"), rs.getString("content"));
-        });
+        (RowCallbackHandler) rs -> map.put(rs.getLong("id"), rs.getString("content")));
     return map;
   }
 }
