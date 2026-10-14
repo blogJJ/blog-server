@@ -28,16 +28,97 @@
     return a;
   }
 
+  /** 상단 메뉴 줄을 보이는 화면: 메인, 검색, 공지사항 (D-149) */
+  var NAV_PAGES = ['/', '/index.html', '/search.html', '/notices.html'];
+
+  var SEARCH_TYPES = [
+    ['post', '글'],
+    ['blog', '블로그'],
+    ['tag', '태그'],
+    ['nickname', '닉네임']
+  ];
+
+  /** J blog 로고: 동그라미 J + blog (D-149) */
+  function logo() {
+    var a = link('/', 'site-logo');
+    a.setAttribute('aria-label', 'J blog 홈');
+    a.appendChild(el('span', 'site-logo__mark', 'J'));
+    a.appendChild(el('span', 'site-logo__text', 'blog'));
+    return a;
+  }
+
+  /** 모든 화면 위의 통합 검색 칸. 검색 화면은 자기 검색 칸이 있어 넣지 않는다 */
+  function searchForm() {
+    var form = el('form', 'site-search');
+    form.action = '/search.html';
+    form.method = 'get';
+    form.setAttribute('role', 'search');
+    var select = el('select', 'site-search__type');
+    select.name = 'type';
+    select.setAttribute('aria-label', '검색 대상');
+    SEARCH_TYPES.forEach(function (t) {
+      var option = el('option', '', t[1]);
+      option.value = t[0];
+      select.appendChild(option);
+    });
+    var input = el('input', 'site-search__input');
+    input.type = 'search';
+    input.name = 'q';
+    input.minLength = 2;
+    input.maxLength = 20;
+    input.required = true;
+    input.placeholder = '검색어를 입력하세요';
+    input.setAttribute('aria-label', '통합 검색');
+    var button = el('button', 'site-search__button', '검색');
+    button.type = 'submit';
+    form.append(select, input, button);
+    return form;
+  }
+
+  /** 메인·검색·공지 화면의 두 번째 줄 메뉴 */
+  function navRow() {
+    var path = window.location.pathname;
+    var params = new URLSearchParams(window.location.search);
+    var nav = el('nav', 'site-nav');
+    nav.setAttribute('aria-label', '블로그 메뉴');
+    var inner = el('div', 'site-nav__inner');
+    var browse = params.get('tab') === 'blogs';
+    [
+      ['/', '블로그 홈', (path === '/' || path === '/index.html') && !browse],
+      ['/?tab=blogs', '블로그 둘러보기', browse],
+      ['/notices.html', '공지사항', path === '/notices.html']
+    ].forEach(function (item) {
+      var a = link(item[0], 'site-nav__item' + (item[2] ? ' is-current' : ''), item[1]);
+      if (item[2]) {
+        a.setAttribute('aria-current', 'page');
+      }
+      inner.appendChild(a);
+    });
+    var actions = el('div', 'site-nav__actions');
+    inner.appendChild(actions);
+    nav.appendChild(inner);
+    return { nav: nav, actions: actions };
+  }
+
   function buildHeader() {
     var header = el('header', 'site-header');
     var inner = el('div', 'site-header__inner');
-    inner.appendChild(link('/', 'site-header__logo', '블로그'));
+    inner.appendChild(logo());
+    if (window.location.pathname !== '/search.html') {
+      inner.appendChild(searchForm());
+    }
     var menu = el('nav', 'site-header__menu');
     menu.setAttribute('aria-label', '상단 메뉴');
     inner.appendChild(menu);
     inner.appendChild(themeButton());
     header.appendChild(inner);
-    return { header: header, menu: menu };
+    var navActions = null;
+    if (NAV_PAGES.indexOf(window.location.pathname) >= 0) {
+      var row = navRow();
+      header.appendChild(row.nav);
+      navActions = row.actions;
+    }
+    return { header: header, menu: menu, navActions: navActions };
   }
 
   /** 밝은/어두운 모드 버튼 (D-117). 바꾸는 일은 theme.js가 한다 */
@@ -146,6 +227,10 @@
     var user = await loadUser();
     window.Layout.user = user;
     window.Layout.ready = true;
+    if (parts.navActions && user) {
+      parts.navActions.appendChild(link('/blog-new.html', 'site-nav__action', '블로그 만들기'));
+      parts.navActions.appendChild(link('/my-blogs.html', 'site-nav__action', '내 블로그'));
+    }
     if (user) {
       renderMember(parts.menu, user);
     } else {

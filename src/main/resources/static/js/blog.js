@@ -33,12 +33,12 @@
     $('blocked').hidden = false;
     $('blocked-title').textContent = title;
     $('blocked-desc').textContent = desc || '';
-    document.title = title + ' - 블로그';
+    document.title = title + ' - J blog';
   }
 
   function render() {
     var v = blog.viewer;
-    document.title = blog.name + ' - 블로그';
+    document.title = blog.name + ' - J blog';
     $('blocked').hidden = true;
     $('blog').hidden = false;
     $('name').textContent = blog.name;

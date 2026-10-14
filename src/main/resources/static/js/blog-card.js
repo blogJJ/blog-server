@@ -113,44 +113,93 @@
     return '/profile.html?id=' + encodeURIComponent(userId);
   }
 
+  /** 닉네임 첫 글자 동그라미. 색은 닉네임으로 정해져 같은 사람은 늘 같은 색이다 (D-149) */
+  function avatar(name) {
+    var text = (name || '?').trim();
+    var first = text ? Array.from(text)[0] : '?';
+    var hash = 0;
+    for (var i = 0; i < text.length; i++) {
+      hash = (hash * 31 + text.charCodeAt(i)) | 0;
+    }
+    var span = el('span', 'avatar avatar--c' + (Math.abs(hash) % 6), first.toUpperCase());
+    span.setAttribute('aria-hidden', 'true');
+    return span;
+  }
+
+  /** 하루 안이면 "3시간 전"처럼, 일주일 안이면 "2일 전", 그보다 오래되면 날짜 */
+  function timeAgo(value) {
+    if (!value) {
+      return '';
+    }
+    var minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
+    if (minutes < 1) {
+      return '방금';
+    }
+    if (minutes < 60) {
+      return minutes + '분 전';
+    }
+    if (minutes < 60 * 24) {
+      return Math.floor(minutes / 60) + '시간 전';
+    }
+    if (minutes < 60 * 24 * 7) {
+      return Math.floor(minutes / (60 * 24)) + '일 전';
+    }
+    return formatDate(value);
+  }
+
   /**
-   * 메인 피드·통합 검색의 글 한 줄 (T110). 어느 블로그 글인지 같이 보여 준다 (D-65).
-   * 작성자가 "탈퇴한 계정"이면 authorId가 없어 프로필 링크를 걸지 않는다.
+   * 메인 피드·통합 검색의 글 한 줄 (T110, D-149). 작성자·블로그·시간, 제목, 본문 미리보기, 오른쪽에 첫 이미지.
+   * 어느 블로그 글인지 같이 보여 준다 (D-65). 작성자가 "탈퇴한 계정"이면 authorId가 없어 프로필 링크를 걸지 않는다.
    */
   function postCard(post) {
     var li = el('li', 'feed-item');
     var body = el('div', 'feed-item__body');
-    var title = el('a', 'feed-item__title', post.title);
-    title.href = blogUrl(post.blogSlug) + '/posts/' + post.id;
-    body.appendChild(title);
-    if (post.commentCount > 0) {
-      body.appendChild(el('span', 'post-row__comments', '[' + post.commentCount + ']'));
-    }
-    var meta = el('p', 'feed-item__meta');
-    var blog = el('a', 'feed-item__blog', post.blogName);
-    blog.href = blogUrl(post.blogSlug);
-    meta.appendChild(blog);
-    meta.appendChild(document.createTextNode(' · '));
+
+    var who = el('div', 'feed-item__author');
+    who.appendChild(avatar(post.authorNickname));
+    var names = el('div', 'feed-item__names');
+    var nameLine = el('p', 'feed-item__name');
     if (post.authorId) {
       var author = el('a', '', post.authorNickname);
       author.href = profileUrl(post.authorId);
-      meta.appendChild(author);
+      nameLine.appendChild(author);
     } else {
-      meta.appendChild(document.createTextNode(post.authorNickname));
+      nameLine.appendChild(document.createTextNode(post.authorNickname));
     }
-    meta.appendChild(
-      document.createTextNode(
-        ' · ' + formatDate(post.createdAt) + ' · 조회 ' + post.viewCount + ' · 좋아요 ' + post.likeCount
-      )
-    );
+    names.appendChild(nameLine);
+    var sub = el('p', 'feed-item__sub');
+    var blog = el('a', 'feed-item__blog', post.blogName);
+    blog.href = blogUrl(post.blogSlug);
+    sub.appendChild(blog);
+    var time = el('time', '', ' · ' + timeAgo(post.createdAt));
+    time.dateTime = post.createdAt || '';
+    time.title = formatDate(post.createdAt);
+    sub.appendChild(time);
+    names.appendChild(sub);
+    who.appendChild(names);
+    body.appendChild(who);
+
+    var title = el('a', 'feed-item__title', post.title);
+    title.href = blogUrl(post.blogSlug) + '/posts/' + post.id;
+    body.appendChild(title);
+    if (post.excerpt) {
+      body.appendChild(el('p', 'feed-item__excerpt', post.excerpt));
+    }
+    var meta = el('p', 'feed-item__meta');
+    meta.textContent = '조회 ' + post.viewCount + ' · 좋아요 ' + post.likeCount + ' · 댓글 ' + post.commentCount;
     body.appendChild(meta);
     li.appendChild(body);
     if (post.thumbnail) {
+      var link = el('a', 'feed-item__thumb-link');
+      link.href = title.href;
+      link.tabIndex = -1;
+      link.setAttribute('aria-hidden', 'true');
       var img = el('img', 'feed-item__thumb');
       img.src = post.thumbnail;
       img.alt = '';
       img.loading = 'lazy';
-      li.appendChild(img);
+      link.appendChild(img);
+      li.appendChild(link);
     }
     return li;
   }
@@ -204,6 +253,8 @@
     card: card,
     drawScene: drawScene,
     postCard: postCard,
+    avatar: avatar,
+    timeAgo: timeAgo,
     profileUrl: profileUrl,
     tagList: tagList,
     pager: pager,

@@ -165,7 +165,7 @@
         createEditor(post.markdown);
         await fillCategories(blog.id, post.categoryId);
         $('save').textContent = '수정하기';
-        document.title = '글 수정 - 블로그';
+        document.title = '글 수정 - J blog';
       } else {
         var slug = params.get('blog') || '';
         var b = await Api.get('/api/blogs/by-slug/' + encodeURIComponent(slug));

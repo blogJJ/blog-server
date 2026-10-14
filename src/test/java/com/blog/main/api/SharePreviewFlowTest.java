@@ -62,8 +62,8 @@ class SharePreviewFlowTest {
   void homeHasSiteCard() throws Exception {
     String html = page("/");
     assertThat(html)
-        .contains("<title>블로그</title>")
-        .contains(prop("og:site_name", "블로그"))
+        .contains("<title>J blog</title>")
+        .contains(prop("og:site_name", "J blog"))
         .contains(prop("og:type", "website"))
         .contains(prop("og:url", ORIGIN + "/"))
         .contains(prop("og:image", ORIGIN + "/img/og-default.png"))
@@ -80,7 +80,7 @@ class SharePreviewFlowTest {
 
     String html = page("/blog/" + slug);
     assertThat(html)
-        .contains("<title>고양이 일기 - 블로그</title>")
+        .contains("<title>고양이 일기 - J blog</title>")
         .contains(prop("og:title", "고양이 일기"))
         .contains(prop("og:description", "매일 고양이와 지낸 이야기"))
         .contains(name("description", "매일 고양이와 지낸 이야기"))
@@ -121,8 +121,8 @@ class SharePreviewFlowTest {
           .doesNotContain("블로그 소개")
           .doesNotContain("아무도 몰라야")
           .doesNotContain("링크로만 보는")
-          .contains("<title>블로그</title>")
-          .contains(prop("og:title", "블로그"))
+          .contains("<title>J blog</title>")
+          .contains(prop("og:title", "J blog"))
           .contains(prop("og:url", ORIGIN + "/blog/" + slug))
           .contains(prop("og:image", ORIGIN + "/img/og-default.png"));
     }
@@ -143,7 +143,7 @@ class SharePreviewFlowTest {
     assertThat(post)
         .doesNotContain("비밀 제목")
         .doesNotContain("비밀 본문")
-        .contains(prop("og:title", "블로그"));
+        .contains(prop("og:title", "J blog"));
   }
 
   /**
@@ -208,7 +208,7 @@ class SharePreviewFlowTest {
     assertThat(blog)
         .doesNotContain("<script>x")
         .contains(prop("og:title", "a&quot;&lt;b&gt;&#39;&amp;"))
-        .contains("<title>a&quot;&lt;b&gt;&#39;&amp; - 블로그</title>")
+        .contains("<title>a&quot;&lt;b&gt;&#39;&amp; - J blog</title>")
         .contains(prop("og:description", "&quot;&gt;&lt;script&gt;x&lt;/script&gt;"));
 
     String post = page("/blog/" + slugOf(blogId) + "/posts/" + postId);
@@ -264,7 +264,7 @@ class SharePreviewFlowTest {
     call(owner, delete("/api/posts/" + postId)).andExpect(status().isNoContent());
     assertThat(page("/blog/" + slug + "/posts/" + postId))
         .doesNotContain("제주")
-        .contains(prop("og:title", "블로그"));
+        .contains(prop("og:title", "J blog"));
   }
 
   @Test
