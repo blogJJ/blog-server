@@ -82,8 +82,9 @@ class FeedSearchFlowTest {
     JsonNode items = body(call(null, get("/api/feed?tab=latest&size=30"), null)).get("items");
     Map<Long, String> excerpts = new LinkedHashMap<>();
     items.forEach(i -> excerpts.put(i.get("id").asLong(), i.get("excerpt").asString()));
-    assertThat(excerpts.get(shortPost)).isEqualTo("굵게 쓴 본문");
-    assertThat(excerpts.get(longPost)).isEqualTo("가".repeat(100) + "…");
+    assertThat(excerpts)
+        .containsEntry(shortPost, "굵게 쓴 본문")
+        .containsEntry(longPost, "가".repeat(100) + "…");
   }
 
   @Test
