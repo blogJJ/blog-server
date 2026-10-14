@@ -268,9 +268,6 @@ public class RetentionCleanup {
 
   private static List<List<Long>> chunks(List<Long> ids) {
     List<List<Long>> chunks = new ArrayList<>();
-    if (ids == null) {
-      return chunks;
-    }
     for (int i = 0; i < ids.size(); i += CHUNK) {
       chunks.add(ids.subList(i, Math.min(ids.size(), i + CHUNK)));
     }
