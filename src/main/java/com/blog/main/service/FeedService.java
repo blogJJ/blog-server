@@ -7,6 +7,8 @@ import com.blog.common.web.PageResponse;
 import com.blog.main.repository.MainPostRepository;
 import com.blog.main.service.PostCards.PostCard;
 import com.blog.social.service.BlockService;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,12 +34,14 @@ public class FeedService {
   private final MainPostRepository postRepository;
   private final BlockService blockService;
   private final PostCards cards;
+  private final Clock clock;
 
   public FeedService(
-      MainPostRepository postRepository, BlockService blockService, PostCards cards) {
+      MainPostRepository postRepository, BlockService blockService, PostCards cards, Clock clock) {
     this.postRepository = postRepository;
     this.blockService = blockService;
     this.cards = cards;
+    this.clock = clock;
   }
 
   /**
@@ -56,10 +60,16 @@ public class FeedService {
               postRepository.findPublic(hidden, PageRequest.of(index, pageSize, PostCards.POPULAR));
           case "following" ->
               postRepository.findFollowing(
-                  loggedIn(viewerId), hidden, PageRequest.of(index, pageSize, PostCards.LATEST));
+                  loggedIn(viewerId),
+                  LocalDateTime.now(clock),
+                  hidden,
+                  PageRequest.of(index, pageSize, PostCards.LATEST));
           case "subscribed" ->
               postRepository.findSubscribed(
-                  loggedIn(viewerId), hidden, PageRequest.of(index, pageSize, PostCards.LATEST));
+                  loggedIn(viewerId),
+                  LocalDateTime.now(clock),
+                  hidden,
+                  PageRequest.of(index, pageSize, PostCards.LATEST));
           default ->
               postRepository.findPublic(hidden, PageRequest.of(index, pageSize, PostCards.LATEST));
         };

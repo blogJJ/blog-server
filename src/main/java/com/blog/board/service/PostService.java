@@ -246,7 +246,7 @@ public class PostService {
     if (post.getId() != null) {
       for (PostImage old : imageRepository.findByPostIdOrderBySortOrderAsc(post.getId())) {
         if (!keep.contains(old.getId())) {
-          old.detach();
+          old.detach(LocalDateTime.now(clock));
         }
       }
     }

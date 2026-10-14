@@ -37,8 +37,8 @@
 cd ~/blog-server
 F=backups/blog-20261013-0300.sql.gz
 
-# 복구하는 동안 새 글이 써지지 않게 서버 컨테이너를 멈춘다. 프록시는 그대로 둔다(그동안 502)
-docker ps --format '{{.Names}}' | grep -E '^<owner>-blog-server-(blue|green)$' | xargs -r docker stop
+# 복구하는 동안 새 글이 써지지 않게 앱 컨테이너(app-1, app-2)를 모두 멈춘다. 프록시는 그대로 둔다(그동안 502)
+docker ps --format '{{.Names}}' | grep -E '^<owner>-blog-server-[0-9]+$' | xargs -r docker stop
 
 # 백업에는 DROP TABLE IF EXISTS가 들어 있어 테이블을 통째로 바꾼다
 gzip -dc "$F" | docker run --rm -i --env-file app.env mysql:8.4 \
@@ -46,7 +46,7 @@ gzip -dc "$F" | docker run --rm -i --env-file app.env mysql:8.4 \
     -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" "$DB_NAME"'
 
 # 멈췄던 컨테이너를 다시 띄운다
-docker ps -a --format '{{.Names}}' | grep -E '^<owner>-blog-server-(blue|green)$' | xargs -r docker start
+docker ps -a --format '{{.Names}}' | grep -E '^<owner>-blog-server-[0-9]+$' | xargs -r docker start
 ```
 
 ## 3. 확인
@@ -55,7 +55,7 @@ docker ps -a --format '{{.Names}}' | grep -E '^<owner>-blog-server-(blue|green)$
 curl -s http://127.0.0.1:<APP_PORT>/actuator/health   # {"status":"UP"...}
 ```
 
-사이트에 들어가 최근 글과 로그인을 확인한다. 서버가 안 뜨면 `docker logs <owner>-blog-server-blue`(또는 green)에서 Flyway 오류를 본다.
+사이트에 들어가 최근 글과 로그인을 확인한다. 서버가 안 뜨면 `docker logs <owner>-blog-server-1`(또는 `-2`)에서 Flyway 오류를 본다.
 백업보다 새 버전의 서버가 돌고 있으면 Flyway가 빠진 마이그레이션을 다시 적용하므로 따로 할 일은 없다.
 
 ## 복구 연습 (공개 전 한 번, 그 뒤로 가끔)

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -309,6 +310,39 @@ class DailyBatchIntegrationTest {
         .isZero();
   }
 
+  @Test
+  void retentionCleanupRemovesRemovedAndNeverAttachedImages() throws Exception {
+    LocalDateTime now = LocalDateTime.of(2026, 12, 1, 4, 0);
+    clock.set(now.minusDays(40));
+    User owner = newUser();
+    long blogId = createBlog(owner);
+    String removed = upload(owner, now.minusDays(40));
+    String kept = upload(owner, now.minusDays(40));
+    String abandoned = upload(owner, now.minusDays(31));
+    String fresh = upload(owner, now.minusDays(5));
+    long postId = writePost(owner, blogId, image(removed) + "\n" + image(kept));
+
+    clock.set(now.minusDays(31));
+    Map<String, Object> edit = new LinkedHashMap<>();
+    edit.put("title", "글");
+    edit.put("content", image(kept));
+    edit.put("tags", List.of());
+    edit.put("notice", false);
+    call(owner, put("/api/posts/" + postId), jsonMapper.writeValueAsString(edit))
+        .andExpect(status().isOk());
+    assertThat(rows("post_images where stored_name = ? and deleted_at is not null", removed))
+        .isEqualTo(1);
+
+    clock.set(now);
+    batch.run();
+
+    assertThat(rows("post_images where stored_name = ?", removed)).isZero();
+    assertThat(rows("post_images where stored_name = ?", abandoned)).isZero();
+    assertThat(rows("post_images where stored_name = ? and post_id = ?", kept, postId))
+        .isEqualTo(1);
+    assertThat(rows("post_images where stored_name = ?", fresh)).isEqualTo(1);
+  }
+
   // ---------- 도우미 ----------
 
   private void runAt(int year, int month, int day) {
@@ -350,8 +384,8 @@ class DailyBatchIntegrationTest {
         stage);
   }
 
-  private int rows(String from, Object arg) {
-    return jdbc.queryForObject("select count(*) from " + from, Integer.class, arg);
+  private int rows(String from, Object... args) {
+    return jdbc.queryForObject("select count(*) from " + from, Integer.class, args);
   }
 
   private void markDeleted(long postId, LocalDateTime at) {
@@ -415,6 +449,39 @@ class DailyBatchIntegrationTest {
 
   private void join(User user, long blogId) throws Exception {
     call(user, post("/api/blogs/" + blogId + "/join")).andExpect(status().isOk());
+  }
+
+  /** 글을 저장하기 전에 올린 이미지 행. 파일은 없어도 정리 배치가 조용히 넘어간다 */
+  private String upload(User user, LocalDateTime at) {
+    String name = UUID.randomUUID() + ".webp";
+    jdbc.update(
+        "insert into post_images (uploader_id, stored_name, original_name, content_type,"
+            + " size_bytes, created_at) values (?, ?, 'a.png', 'image/webp', 10, ?)",
+        user.getId(),
+        name,
+        at);
+    return name;
+  }
+
+  private static String image(String storedName) {
+    return "![](/api/images/" + storedName + ")";
+  }
+
+  private long writePost(User user, long blogId, String content) throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("title", "글");
+    body.put("content", content);
+    body.put("tags", List.of());
+    body.put("notice", false);
+    return jsonMapper
+        .readTree(
+            call(user, post("/api/blogs/" + blogId + "/posts"), jsonMapper.writeValueAsString(body))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+        .get("id")
+        .asLong();
   }
 
   private long writePost(User user, long blogId) throws Exception {

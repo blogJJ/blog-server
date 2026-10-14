@@ -1,6 +1,7 @@
 package com.blog.main.repository;
 
 import com.blog.board.domain.Post;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,10 +31,14 @@ public interface MainPostRepository extends Repository<Post, Long> {
 
   String PUBLIC_BLOG = " and b.visibility = com.blog.blog.domain.BlogVisibility.PUBLIC";
 
-  /** 공개 블로그이거나 내가 멤버인 블로그. 비공개로 바뀐 블로그는 멤버가 아닌 구독자에게서 빠진다 (D-50). 메인 관리자는 모든 블로그의 글을 본다 (D-122). */
+  /**
+   * 공개 블로그이거나 내가 멤버인 블로그. 비공개로 바뀐 블로그는 멤버가 아닌 구독자에게서 빠진다 (D-50). 그 블로그에서 정지 중인 멤버는 블로그 화면처럼 멤버로 치지
+   * 않는다. 메인 관리자는 모든 블로그의 글을 본다 (D-122).
+   */
   String VISIBLE_TO_ME =
       " and (b.visibility = com.blog.blog.domain.BlogVisibility.PUBLIC"
-          + " or exists (select m.id from BlogMember m where m.blog = b and m.user.id = :me)"
+          + " or exists (select m.id from BlogMember m where m.blog = b and m.user.id = :me"
+          + " and (m.suspendedUntil is null or m.suspendedUntil <= :now))"
           + " or exists (select u.id from User u where u.id = :me"
           + " and u.role = com.blog.auth.domain.UserRole.ADMIN))";
 
@@ -59,7 +64,10 @@ public interface MainPostRepository extends Repository<Post, Long> {
       countQuery =
           "select count(p) from Post p join p.blog b where" + LIVE + VISIBLE_TO_ME + FOLLOWING)
   Page<Long> findFollowingIds(
-      @Param("me") Long me, @Param("hidden") Collection<Long> hidden, Pageable pageable);
+      @Param("me") Long me,
+      @Param("now") LocalDateTime now,
+      @Param("hidden") Collection<Long> hidden,
+      Pageable pageable);
 
   /** 구독 탭: 내가 구독한 블로그의 글 */
   @Query(
@@ -67,7 +75,10 @@ public interface MainPostRepository extends Repository<Post, Long> {
       countQuery =
           "select count(p) from Post p join p.blog b where" + LIVE + VISIBLE_TO_ME + SUBSCRIBED)
   Page<Long> findSubscribedIds(
-      @Param("me") Long me, @Param("hidden") Collection<Long> hidden, Pageable pageable);
+      @Param("me") Long me,
+      @Param("now") LocalDateTime now,
+      @Param("hidden") Collection<Long> hidden,
+      Pageable pageable);
 
   /** 태그 검색: 태그 규칙으로 정리한 값과 정확히 같은 태그가 달린 공개 블로그의 글 */
   @Query(
@@ -130,13 +141,15 @@ public interface MainPostRepository extends Repository<Post, Long> {
   }
 
   /** 팔로우 탭 */
-  default Page<Post> findFollowing(Long me, Collection<Long> hidden, Pageable pageable) {
-    return withContent(findFollowingIds(me, hidden, pageable));
+  default Page<Post> findFollowing(
+      Long me, LocalDateTime now, Collection<Long> hidden, Pageable pageable) {
+    return withContent(findFollowingIds(me, now, hidden, pageable));
   }
 
   /** 구독 탭 */
-  default Page<Post> findSubscribed(Long me, Collection<Long> hidden, Pageable pageable) {
-    return withContent(findSubscribedIds(me, hidden, pageable));
+  default Page<Post> findSubscribed(
+      Long me, LocalDateTime now, Collection<Long> hidden, Pageable pageable) {
+    return withContent(findSubscribedIds(me, now, hidden, pageable));
   }
 
   /** 태그 검색 */

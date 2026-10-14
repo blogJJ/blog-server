@@ -32,8 +32,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -56,6 +59,8 @@ class AuthFlowTest {
 
   private static final String PASSWORD = "secret12!";
   private static final Pattern CODE = Pattern.compile("인증번호: (\\d{6})");
+  private static final Pattern LOG_LINE =
+      Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
 
   @Autowired MockMvc mockMvc;
   @Autowired JsonMapper jsonMapper;
@@ -112,6 +117,59 @@ class AuthFlowTest {
         .perform(get("/api/me").cookie(response.getCookie(AuthCookies.ACCESS_TOKEN)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value(email));
+  }
+
+  /** 로그에 비밀번호·토큰·인증번호가 남지 않는다 (T141, SC-009). 메일을 콘솔에 찍는 테스트 전용 MailService 줄은 뺀다 */
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void logsNeverContainPasswordsTokensOrCodes(CapturedOutput output) throws Exception {
+    String code = requestCode(email);
+    perform(post("/api/auth/signup/verify"), json("email", email, "code", code))
+        .andExpect(status().isOk());
+    MockHttpServletResponse signup =
+        perform(post("/api/auth/signup"), signupBody(email, nickname()))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse();
+    login(email, "wrong-pass1!", false).andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+    MockHttpServletResponse loggedIn =
+        login(email, PASSWORD, true).andExpect(status().isOk()).andReturn().getResponse();
+    org.mockito.Mockito.clearInvocations(mailService);
+    perform(post("/api/auth/password/code"), json("email", email)).andExpect(status().isOk());
+    ArgumentCaptor<String> mail = ArgumentCaptor.forClass(String.class);
+    verify(mailService).send(eq(email), anyString(), mail.capture());
+    Matcher resetCode = CODE.matcher(mail.getValue());
+    assertThat(resetCode.find()).isTrue();
+    perform(
+            post("/api/auth/password/reset"),
+            json("email", email, "code", resetCode.group(1), "newPassword", "changed34@"))
+        .andExpect(status().isOk());
+
+    List<String> secrets =
+        List.of(
+            PASSWORD,
+            "wrong-pass1!",
+            "changed34@",
+            signup.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
+            loggedIn.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
+            loggedIn.getCookie(AuthCookies.REFRESH_TOKEN).getValue());
+    // 테스트는 메일을 보내지 않고 본문을 로그로 남기므로(app.mail.log-only) 그 여러 줄은 뺀다
+    List<String> lines = new java.util.ArrayList<>();
+    boolean inMail = false;
+    for (String line : output.getAll().lines().toList()) {
+      if (LOG_LINE.matcher(line).lookingAt()) {
+        inMail = line.contains("MailService");
+      }
+      if (!inMail) {
+        lines.add(line);
+      }
+    }
+    assertThat(lines).isNotEmpty();
+    for (String secret : secrets) {
+      assertThat(lines).noneMatch(line -> line.contains(secret));
+    }
+    assertThat(lines).noneMatch(line -> line.contains("인증번호: " + code));
+    assertThat(lines).noneMatch(line -> line.contains("인증번호: " + resetCode.group(1)));
   }
 
   @Test
