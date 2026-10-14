@@ -98,7 +98,7 @@ public class ShareMetaService {
       PostImageRepository imageRepository,
       BlogAccessService accessService,
       ContentRenderer renderer,
-      @Value("${app.site.name:블로그}") String siteName,
+      @Value("${app.site.name:J blog}") String siteName,
       @Value("${app.site.description:누구나 블로그를 만들고 글을 나누는 곳이에요.}") String siteDescription) {
     this.blogRepository = blogRepository;
     this.postRepository = postRepository;

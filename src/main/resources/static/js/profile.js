@@ -26,7 +26,7 @@
   }
 
   function render() {
-    document.title = profile.nickname + ' - 블로그';
+    document.title = profile.nickname + ' - J blog';
     $('blocked').hidden = true;
     $('profile').hidden = false;
     $('nickname').textContent = profile.nickname;

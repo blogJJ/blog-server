@@ -69,6 +69,23 @@ class FeedSearchFlowTest {
     call(null, get("/api/feed?tab=following"), null).andExpect(status().isUnauthorized());
   }
 
+  /** 목록 미리보기 (D-149): 마크다운 기호와 이미지는 빼고 글자만, 본문 첫머리의 제목은 빼고, 100자를 넘으면 자르고 … */
+  @Test
+  void feedCardCarriesPlainTextExcerpt() throws Exception {
+    User writer = newUser();
+    long blogId = createBlog(writer, "PUBLIC");
+    String longText = "가".repeat(150);
+    long shortPost =
+        writePost(writer, blogId, "짧은 미리보기", List.of(), "# 짧은 미리보기\n\n**굵게** 쓴 _본문_ ![](/x.png)");
+    long longPost = writePost(writer, blogId, "긴 미리보기", List.of(), longText);
+
+    JsonNode items = body(call(null, get("/api/feed?tab=latest&size=30"), null)).get("items");
+    Map<Long, String> excerpts = new LinkedHashMap<>();
+    items.forEach(i -> excerpts.put(i.get("id").asLong(), i.get("excerpt").asString()));
+    assertThat(excerpts.get(shortPost)).isEqualTo("굵게 쓴 본문");
+    assertThat(excerpts.get(longPost)).isEqualTo("가".repeat(100) + "…");
+  }
+
   @Test
   void popularIsByLikesAndPrivateOrBlockedPostsAreLeftOut() throws Exception {
     User owner = newUser();
@@ -296,9 +313,14 @@ class FeedSearchFlowTest {
   }
 
   private long writePost(User user, long blogId, String title, List<String> tags) throws Exception {
+    return writePost(user, blogId, title, tags, "본문");
+  }
+
+  private long writePost(User user, long blogId, String title, List<String> tags, String content)
+      throws Exception {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("title", title);
-    body.put("content", "본문");
+    body.put("content", content);
     body.put("tags", tags);
     body.put("notice", false);
     return jsonMapper

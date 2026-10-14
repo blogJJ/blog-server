@@ -293,7 +293,7 @@
       blocked('이 블로그를 관리할 권한이 없어요.');
       return;
     }
-    document.title = blog.name + ' 관리 - 블로그';
+    document.title = blog.name + ' 관리 - J blog';
     $('admin').hidden = false;
     $('blog-link').textContent = blog.name;
     $('blog-link').href = ui.blogUrl(blog.slug);
