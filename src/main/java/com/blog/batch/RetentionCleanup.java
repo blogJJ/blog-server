@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -68,10 +69,9 @@ public class RetentionCleanup {
   /** ④ 삭제한 지 30일 지난 글과 그 글의 댓글·사진·태그·좋아요·조회 기록 */
   int purgeDeletedPosts(LocalDateTime cutoff) {
     List<Long> ids =
-        jdbc.queryForList(
+        ids(
             "select id from posts where status = 'DELETED' and deleted_at < :cutoff",
-            cutoffParam(cutoff),
-            Long.class);
+            cutoffParam(cutoff));
     int count = 0;
     for (List<Long> chunk : chunks(ids)) {
       List<String> files = inTx(() -> purgePosts(chunk));
@@ -209,8 +209,7 @@ public class RetentionCleanup {
   private List<String> purgeBlog(Long blogId) {
     Map<String, Object> p = Map.of("blogId", blogId);
     List<String> files = new ArrayList<>();
-    List<Long> postIds =
-        jdbc.queryForList("select id from posts where blog_id = :blogId", p, Long.class);
+    List<Long> postIds = ids("select id from posts where blog_id = :blogId", p);
     for (List<Long> chunk : chunks(postIds)) {
       files.addAll(purgePosts(chunk));
     }
@@ -268,6 +267,11 @@ public class RetentionCleanup {
 
   private <T> T inTx(Supplier<T> work) {
     return tx.execute(status -> work.get());
+  }
+
+  /** id 목록 조회. 결과가 없으면 빈 목록을 돌려준다. */
+  private List<Long> ids(String sql, Map<String, ?> params) {
+    return Objects.requireNonNullElse(jdbc.queryForList(sql, params, Long.class), List.of());
   }
 
   private static List<List<Long>> chunks(List<Long> ids) {
