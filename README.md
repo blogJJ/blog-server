@@ -1,10 +1,12 @@
 # blog-server
 
+[![CI](https://github.com/blogJJ/blog-server/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/blogJJ/blog-server/actions/workflows/ci.yml) [![사이트 상태](https://github.com/blogJJ/blog-server/actions/workflows/health.yml/badge.svg)](https://github.com/blogJJ/blog-server/actions/workflows/health.yml)
+
 티스토리형 블로그 플랫폼(메인블로그)의 서버입니다. Spring Boot 애플리케이션 하나가 REST API(`/api/**`)와 정적 화면(HTML + 바닐라 JS)을 함께 내려주고, 데이터는 MySQL 8 한 곳에 둡니다. 요구사항·정책·DB 설계는 [blogJJ/blog-docs](https://github.com/blogJJ/blog-docs)에 있고, 이 저장소의 작업은 blog-docs [tasks.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/tasks.md)의 T-번호로 연결됩니다.
 
 | | |
 | --- | --- |
-| 운영 사이트 | https://jj-blog.java21.net |
+| 운영 사이트 | https://jj-blog.java21.net (상태 감시: 5분마다 [Health](https://github.com/blogJJ/blog-server/actions/workflows/health.yml), 응답이 없으면 [site-down 이슈](https://github.com/blogJJ/blog-server/issues?q=label%3Asite-down)) |
 | 기획·설계 | [spec.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/spec.md)(요구사항 ID), [research.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/research.md)(결정 D-번호), [data-model.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/data-model.md), [tasks.md](https://github.com/blogJJ/blog-docs/blob/main/specs/001-main-blog/tasks.md)(작업 T-번호), [constitution.md](https://github.com/blogJJ/blog-docs/blob/main/.specify/memory/constitution.md)(원칙) |
 | 업데이트 기록 | 사이트 [릴리즈 노트](https://jj-blog.java21.net/release-notes.html), 저장소 [Releases](https://github.com/blogJJ/blog-server/releases) |
 
@@ -137,6 +139,7 @@ Git Flow입니다. `feature/*`는 `develop`에서 만들어 `develop`으로, `re
 | [Deploy](.github/workflows/deploy.yml) | `main`의 CI 성공 뒤(또는 직접 실행) | 그 커밋으로 jar·도커 이미지 → SSH로 서버에 올림 → `deploy/deploy.sh`(앱 두 대, 한 대씩 교체). 직접 실행 때 "더미 데이터 넣기" 선택 가능 |
 | [Release](.github/workflows/release.yml) | Deploy 성공 뒤 | `release-notes.json` 맨 위(`releases[0]`) 버전으로 태그와 GitHub Release. 이미 있는 태그면 건너뜀 |
 | [Backup](.github/workflows/backup.yml) | 매일 03:00(Asia/Seoul), 또는 직접 | 서버 DB 전체 백업 → AES-256 암호화 → Actions 아티팩트 7일 보관. 복구는 [RESTORE.md](ops/backup/RESTORE.md) |
+| [Health](.github/workflows/health.yml) | 5분마다, 또는 직접 | 운영 `/actuator/health`가 UP인지 확인(10초 간격 세 번). 다운이면 빨간 실행 + `site-down` 이슈, 복구되면 이슈를 닫음 |
 
 이중화와 무중단 배포(`deploy/deploy.sh`):
 

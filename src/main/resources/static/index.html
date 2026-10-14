@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>블로그</title>
+    <title>J blog</title>
     <!--og-->
     <link rel="stylesheet" href="/css/common.css" />
     <link rel="stylesheet" href="/css/mascot.css" />
@@ -24,31 +24,56 @@
     <script src="/js/feed.js" defer></script>
   </head>
   <body>
-    <!-- 메인: 피드 탭(최신·인기·팔로우·구독)과 블로그 둘러보기 (T110, BRD-09, BLG-02). 검색은 search.html(BRD-08) -->
-    <main>
-      <div class="page-head">
-        <h1>블로그</h1>
-        <a class="button button--primary" href="/blog-new.html" id="new-blog" hidden>블로그 만들기</a>
+    <!-- 메인: 인기 글 큰 카드와 추천 블로그(D-149), 피드 탭(최신·인기·팔로우·구독)과 블로그 둘러보기 (T110, BRD-09, BLG-02).
+         검색은 위 통합 검색 칸 → search.html(BRD-08) -->
+    <main class="home">
+      <section class="home-hero" aria-label="인기 글과 추천 블로그">
+        <div class="home-hero__inner">
+          <div class="hot">
+            <div class="home-head">
+              <h2 class="home-head__title"><span class="home-head__accent">인기 글</span><span class="home-head__more"><span class="home-head__sep" aria-hidden="true">›</span>좋아요를 많이 받은 글</span></h2>
+              <div class="dots" id="hot-pages"></div>
+            </div>
+            <div class="hot__cards" id="hot-cards"></div>
+          </div>
+          <aside class="pick">
+            <div class="home-head">
+              <h2 class="home-head__title">추천 블로그</h2>
+              <div class="dots" id="pick-pages"></div>
+            </div>
+            <div class="pick__card" id="pick-card"></div>
+          </aside>
+        </div>
+      </section>
+      <div class="home-body">
+        <div class="home-main">
+          <div class="tabs" role="tablist" id="tabs">
+            <button class="tabs__item is-current" type="button" role="tab" data-tab="latest">최신 글</button>
+            <button class="tabs__item" type="button" role="tab" data-tab="popular">인기 글</button>
+            <button class="tabs__item" type="button" role="tab" data-tab="following" hidden>팔로우</button>
+            <button class="tabs__item" type="button" role="tab" data-tab="subscribed" hidden>구독</button>
+            <button class="tabs__item" type="button" role="tab" data-tab="blogs">블로그 둘러보기</button>
+          </div>
+          <div class="sub-tabs" id="blog-sort" hidden>
+            <button class="button button--text is-current" type="button" data-sort="latest">최신순</button>
+            <button class="button button--text" type="button" data-sort="popular">인기순</button>
+          </div>
+          <ul class="feed-list" id="feed"></ul>
+          <div class="blog-grid" id="blogs" hidden></div>
+          <p class="empty" id="empty" hidden></p>
+          <nav class="pager" id="pager" aria-label="페이지"></nav>
+        </div>
+        <aside class="home-side">
+          <section class="login-box" id="login-box" aria-label="로그인"></section>
+          <section class="side-box" aria-labelledby="side-notices-title">
+            <div class="side-box__head">
+              <h2 id="side-notices-title">공지사항</h2>
+              <a href="/notices.html">더보기</a>
+            </div>
+            <ul class="side-list" id="side-notices"></ul>
+          </section>
+        </aside>
       </div>
-      <form class="search" action="/search.html" method="get" role="search">
-        <input name="q" type="search" minlength="2" maxlength="20" required placeholder="블로그, 글 제목, 태그, 닉네임 찾기" aria-label="통합 검색" />
-        <button class="button" type="submit">검색</button>
-      </form>
-      <div class="tabs" role="tablist" id="tabs">
-        <button class="tabs__item is-current" type="button" role="tab" data-tab="latest">최신 글</button>
-        <button class="tabs__item" type="button" role="tab" data-tab="popular">인기 글</button>
-        <button class="tabs__item" type="button" role="tab" data-tab="following" hidden>팔로우</button>
-        <button class="tabs__item" type="button" role="tab" data-tab="subscribed" hidden>구독</button>
-        <button class="tabs__item" type="button" role="tab" data-tab="blogs">블로그 둘러보기</button>
-      </div>
-      <div class="sub-tabs" id="blog-sort" hidden>
-        <button class="button button--text is-current" type="button" data-sort="latest">최신순</button>
-        <button class="button button--text" type="button" data-sort="popular">인기순</button>
-      </div>
-      <ul class="feed-list" id="feed"></ul>
-      <div class="blog-grid" id="blogs" hidden></div>
-      <p class="empty" id="empty" hidden></p>
-      <nav class="pager" id="pager" aria-label="페이지"></nav>
     </main>
   </body>
 </html>

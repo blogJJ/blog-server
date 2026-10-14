@@ -33,6 +33,7 @@ jobs:
       SSHPASS: ${{ secrets.SSH_PASSWORD }}
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
     steps:
+      # 필요한 secret이 비어 있으면 이름을 알려 주고 멈춘다
       - name: Check secrets
         run: |
           missing=""
@@ -48,6 +49,7 @@ jobs:
 
       - uses: actions/checkout@v7
 
+      # 백업 스크립트를 서버에 올려 실행하고, 마지막 줄로 받은 파일 경로가 맞는 모양인지 본 뒤 runner로 받아 온다
       - name: Dump on server
         id: dump
         run: |
@@ -64,6 +66,8 @@ jobs:
           sshpass -e scp "${opts[@]}" -P "$SSH_PORT" "$SSH_ID@$SSH_ADDRESS:$remote" "$RUNNER_TEMP/$name.sql.gz"
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
+      # gzip이 깨지지 않았는지 보고, AES-256으로 암호화한다(-pbkdf2 -iter 200000: 암호를 여러 번 섞어 맞혀 보기 어렵게).
+      # 암호화 전 파일은 지운다
       - name: Encrypt
         run: |
           f="$RUNNER_TEMP/${{ steps.dump.outputs.name }}.sql.gz"
@@ -76,6 +80,8 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in "$f.enc" | gzip -t
           ls -lh "$f.enc"
 
+      # 암호화한 파일을 Actions 아티팩트로 올린다. Actions 탭 > 그 실행 > Artifacts에서 받는다.
+      # 이미 압축·암호화된 파일이라 다시 압축하지 않는다(compression-level: 0)
       - uses: actions/upload-artifact@v4
         with:
           name: db-${{ steps.dump.outputs.name }}

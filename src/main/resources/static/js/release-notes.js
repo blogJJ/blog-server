@@ -74,7 +74,7 @@
       $('release-empty').hidden = false;
       return;
     }
-    document.title = r.version + ' 릴리즈 노트 - 블로그';
+    document.title = r.version + ' 릴리즈 노트 - J blog';
     var title = $('release-title');
     title.replaceChildren(el('span', 'release__version', r.version), ' — ' + r.title);
     $('release-date').textContent = formatDate(r.date);
