@@ -12,7 +12,7 @@
 
 - **블로그별 역할은 요청마다 DB로 확인합니다.** 토큰에는 회원 번호만 있고, 블로그장·부블로그장 권한·멤버 정지·계정 정지는 `BlogAuthz`(`@PreAuthorize("@blogAuthz.isOwner(#blogId)")` 등)가 요청 때마다 DB에서 읽습니다. 메인 관리자(`ADMIN`)는 블로그 멤버가 아니지만 폐쇄되지 않은 모든 블로그의 관리 권한을 가집니다.
 - **JWT + 로그인 번호.** Access Token(기본 15분)과 Refresh Token을 HttpOnly 쿠키로만 주고받습니다. Access Token에는 회원 번호(`sub`)와 로그인 번호(`sid` = `refresh_tokens.id`)만 담고, 필터가 그 로그인 행을 DB에서 다시 읽어 로그아웃·비밀번호 변경·30분 무활동·탈퇴를 바로 반영합니다. "로그인 유지"는 14일입니다.
-- **스키마는 Flyway만 바꿉니다.** `ddl-auto: validate`라 엔티티와 테이블이 다르면 서버가 뜨지 않습니다. 기준은 blog-docs [erd_tables.sql](https://github.com/blogJJ/blog-docs/blob/main/docs/02-database/schema/erd_tables.sql)이고, 이미 합쳐진 V 파일은 고치지 않고 다음 번호를 더합니다(현재 V1~V5).
+- **스키마는 Flyway만 바꿉니다.** `ddl-auto: validate`라 엔티티와 테이블이 다르면 서버가 뜨지 않습니다. 기준은 blog-docs [erd_tables.sql](https://github.com/blogJJ/blog-docs/blob/main/docs/02-database/schema/erd_tables.sql)이고, 이미 합쳐진 V 파일은 고치지 않고 다음 번호를 더합니다(현재 V1~V6).
 - **AI는 없어도 동작합니다.** `ANTHROPIC_API_KEY`가 없거나 호출이 실패하면 Claude를 부르지 않고 대체 동작으로 갑니다.
 
   | 기능 | 키가 없거나 실패하면 |
@@ -125,7 +125,7 @@ cp .env.example .env          # JWT_SECRET을 채운다 (예: openssl rand -base
 ./gradlew build    # spotlessCheck + 컴파일 + 테스트 + build/libs/blog-server.jar
 ```
 
-JUnit 5 테스트 메서드 약 570개(`@Test`·`@ParameterizedTest`)입니다. 테스트가 끝나면 JaCoCo가 커버리지 보고서를 `build/reports/jacoco/test/html/index.html`(SonarQube·SonarLint용 XML은 `jacocoTestReport.xml`)에 만듭니다. 2026-10-13 기준 줄 95.7%, 분기 84.8%(소나 방식 합산 92.8%)입니다. main·develop에 푸시되면 CI가 분석 결과를 SonarQube 프로젝트 `jj-blog`로 보냅니다(저장소 시크릿 `SONAR_HOST_URL`·`SONAR_TOKEN` 필요). 통합 테스트는 Testcontainers로 진짜 MySQL 8을 띄워 Flyway 마이그레이션과 엔티티 매핑까지 확인하므로 dockerd(Docker Desktop)가 켜져 있어야 합니다. AI 호출은 가짜 클라이언트·가짜 서버로 대신합니다.
+JUnit 5 테스트 메서드 약 610개(`@Test`·`@ParameterizedTest`)입니다. 테스트가 끝나면 JaCoCo가 커버리지 보고서를 `build/reports/jacoco/test/html/index.html`(SonarQube·SonarLint용 XML은 `jacocoTestReport.xml`)에 만듭니다. 2026-10-13 기준 줄 95.7%, 분기 84.8%(소나 방식 합산 92.8%)입니다. main·develop에 푸시되면 CI가 분석 결과를 SonarQube 프로젝트 `jj-blog`로 보냅니다(저장소 시크릿 `SONAR_HOST_URL`·`SONAR_TOKEN` 필요). 통합 테스트는 Testcontainers로 진짜 MySQL 8을 띄워 Flyway 마이그레이션과 엔티티 매핑까지 확인하므로 dockerd(Docker Desktop)가 켜져 있어야 합니다. AI 호출은 가짜 클라이언트·가짜 서버로 대신합니다.
 
 ## 브랜치 / 배포
 
