@@ -6,10 +6,12 @@
 #
 # - 이미지: ~/blog-server/image.tar.gz (docker save | gzip)
 # - 환경변수: ~/blog-server/app.env (KEY=값 한 줄씩, 따옴표 없이). 이 파일은 본인만 읽게 둔다
-# - 배포 중에도 멈추지 않게 블루그린으로 띄운다. 서버의 <포트번호>에는 전용 프록시(nginx 컨테이너)가 있고,
-#   그 뒤에서 서버 컨테이너 blue와 green이 번갈아 돈다. 서버 nginx는 지금처럼 이 포트로 넘겨주면 되고 설정을 바꾸지 않는다
-# - 새 컨테이너를 먼저 띄우고 HEALTH_TIMEOUT(기본 240초) 안에 /actuator/health가 UP이 되면 프록시를 새 컨테이너로 돌린 뒤 옛 컨테이너를 내린다.
-#   UP이 안 되면 새 컨테이너만 지우고 옛 컨테이너가 계속 응답한다
+# - 이중화: 서버의 <포트번호>에는 전용 프록시(nginx 컨테이너)가 있고, 그 뒤에서 서버 컨테이너 app-1, app-2(REPLICAS, 기본 2)가
+#   늘 같이 돈다. 프록시가 둘에 나눠 보내고(같은 IP는 같은 앱으로), 한 대가 응답하지 않으면 다른 쪽으로 넘긴다.
+#   서버 nginx는 지금처럼 이 포트로 넘겨주면 되고 설정을 바꾸지 않는다
+# - 무중단 배포: 한 대씩 바꾼다(롤링). 바꿀 앱을 프록시에서 빼고 처리 중인 요청을 마치게 한 뒤(30초) 내리고, 새 이미지로 띄워
+#   HEALTH_TIMEOUT(기본 240초) 안에 /actuator/health가 UP이 되면 프록시에 다시 넣고 다음 대로 넘어간다. 그동안 다른 앱이 응답한다.
+#   UP이 안 되면 그 컨테이너만 지우고 멈춘다. 아직 바꾸지 않은 쪽이 계속 응답하고, 다음 배포는 빈 자리부터 채운다
 # - 잠깐 두 버전이 같은 DB를 쓰므로, Flyway 마이그레이션은 옛 버전이 계속 돌 수 있게 만든다
 #   (칼럼·테이블 추가는 괜찮고, 지우거나 이름을 바꾸는 것은 다음 배포로 미룬다)
 # - 공용 서버라 컨테이너·이미지·볼륨 이름 앞에 접속 계정 이름을 붙여 다른 사람 것과 겹치지 않게 한다
@@ -78,25 +80,46 @@ docker tag "$LOADED" "$IMAGE:latest"
 docker network inspect "$NET" >/dev/null 2>&1 || docker network create "$NET" >/dev/null
 mkdir -p "$PROXY_DIR"
 
-# 지금 프록시가 넘겨주는 쪽(blue/green). 프록시가 없으면(블루그린 전 배포) 빈 값
-ACTIVE=""
+# 앱 컨테이너 수. 한 대씩 바꾸므로 2 이상이어야 배포 중에도 응답한다
+REPLICAS="${REPLICAS:-2}"
+if ! [[ "$REPLICAS" =~ ^[2-9]$ ]]; then
+  echo "REPLICAS는 2~9여야 해요: $REPLICAS" >&2
+  exit 1
+fi
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-240}"
+
+# 프록시가 지금 넘겨주는 앱들의 네트워크 이름(app-1, app-2, 예전 블루그린이면 app-blue 같은 것).
+# 프록시가 없으면(블루그린 전 배포) 비어 있다
+SERVING=()
+PROXY_UP=""
 if [ "$(docker inspect -f '{{.State.Running}}' "$PROXY" 2>/dev/null)" = "true" ] \
   && [ -f "$PROXY_DIR/default.conf" ]; then
-  ACTIVE="$(sed -n 's/.*set \$app http:\/\/.*-\(blue\|green\):8080;.*/\1/p' "$PROXY_DIR/default.conf")"
+  PROXY_UP="yes"
+  mapfile -t SERVING < <(grep -oE 'app-[a-z0-9]+:8080' "$PROXY_DIR/default.conf" | sed 's/:8080$//' | sort -u)
 fi
-if [ "$ACTIVE" = "blue" ]; then NEXT="green"; else NEXT="blue"; fi
-NEXT_NAME="${NAME}-${NEXT}"
-# 네트워크 안에서 부르는 이름. 컨테이너 이름에는 계정의 _가 들어가는데, Tomcat은 _가 든 Host를 400으로 막는다
-NEXT_HOST="app-${NEXT}"
 
-# 서버 컨테이너는 포트를 열지 않고 프록시와 같은 네트워크에만 붙는다
+container_of() { echo "${NAME}-${1#app-}"; }
+serving_has() {
+  local h
+  for h in "${SERVING[@]}"; do [ "$h" = "$1" ] && return 0; done
+  return 1
+}
+without() {
+  local h
+  for h in "${SERVING[@]}"; do [ "$h" != "$1" ] && echo "$h"; done
+}
+
+# 서버 컨테이너는 포트를 열지 않고 프록시와 같은 네트워크에만 붙는다.
+# 업로드 폴더는 볼륨 하나를 모든 앱이 같이 쓴다
 start() {
-  docker rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
+  local host="$1" cname
+  cname="$(container_of "$host")"
+  docker rm -f "$cname" >/dev/null 2>&1 || true
   docker run -d \
-    --name "$NEXT_NAME" \
+    --name "$cname" \
     --restart unless-stopped \
     --network "$NET" \
-    --network-alias "$NEXT_HOST" \
+    --network-alias "$host" \
     --env-file "$APP_DIR/app.env" \
     -v "${OWNER}-blog-uploads:/app/uploads" \
     -v "${OWNER}-blog-logs:/app/logs" \
@@ -104,24 +127,22 @@ start() {
     "$IMAGE:latest" >/dev/null
 }
 
-# 네트워크 안에서 새 컨테이너의 상태 확인 주소를 읽는다
+# 네트워크 안에서 그 컨테이너의 상태 확인 주소를 읽는다
 probe() {
   docker run --rm --network "$NET" "$PROXY_IMAGE" \
-    wget -qO- -T 3 "http://${NEXT_HOST}:8080/actuator/health" 2>/dev/null | grep -q '"UP"'
+    wget -qO- -T 3 "http://$1:8080/actuator/health" 2>/dev/null | grep -q '"UP"'
 }
 
-# DB 변경(Flyway)이 잠금을 오래 기다리면 앱이 스스로 멈추므로(spring.flyway.init-sqls), 이 한도는 앱이 뜨는 시간만 넉넉히 덮으면 된다
-HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-240}"
-
 # 확인 한 번에 컨테이너를 하나 띄우느라 몇 초씩 걸리므로 횟수가 아니라 시간(기본 4분, HEALTH_TIMEOUT 초)으로 끊는다.
-# 기다리는 동안 출력이 없으면 ssh 연결이 끊기므로 20초마다 진행 상황을 찍는다
+# 컨테이너가 죽으면 기다리지 않는다
 healthy() {
-  local deadline=$((SECONDS + HEALTH_TIMEOUT)) next_note=$((SECONDS + 20))
+  local host="$1" cname deadline=$((SECONDS + HEALTH_TIMEOUT)) next_note=$((SECONDS + 20))
+  cname="$(container_of "$host")"
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if [ "$(docker inspect -f '{{.State.Running}}' "$NEXT_NAME" 2>/dev/null)" != "true" ]; then
+    if [ "$(docker inspect -f '{{.State.Running}}' "$cname" 2>/dev/null)" != "true" ]; then
       return 1
     fi
-    if probe; then
+    if probe "$host"; then
       return 0
     fi
     if [ "$SECONDS" -ge "$next_note" ]; then
@@ -133,18 +154,33 @@ healthy() {
   return 1
 }
 
-# 서버 nginx에서 온 X-Forwarded-*를 그대로 넘긴다. 서버가 실제 사용자 IP와 http/https를 알 수 있게
+# 프록시가 넘겨줄 앱 목록으로 설정을 쓴다.
+# - 같은 접속 IP는 늘 같은 앱으로 보낸다(서버 nginx가 넘긴 X-Real-IP·X-Forwarded-For로 hash).
+#   메모리로 세는 IP별 요청 제한이 앱 수만큼 늘어나지 않게 한다
+# - resolve: 컨테이너가 죽었다 다시 떠서 내부 주소가 바뀌어도 따라간다
+# - 앱 하나가 연결을 거절하거나 502·503이면 다른 앱으로 한 번 더 보낸다
 write_proxy_conf() {
+  local servers="" h
+  for h in "$@"; do
+    servers+="    server ${h}:8080 resolve max_fails=1 fail_timeout=10s;"$'\n'
+  done
   cat > "$PROXY_DIR/default.conf.new" <<CONF
 resolver 127.0.0.11 valid=10s ipv6=off;
+
+upstream app {
+    zone app 64k;
+    hash \$http_x_real_ip\$http_x_forwarded_for\$remote_addr consistent;
+${servers}}
+
 server {
     listen 8080;
     client_max_body_size 20m;
     access_log off;
 
     location / {
-        set \$app http://${NEXT_HOST}:8080;
-        proxy_pass \$app;
+        proxy_pass http://app;
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_next_upstream_tries 2;
         proxy_http_version 1.1;
         proxy_set_header Host              \$http_host;
         proxy_set_header X-Real-IP         \$http_x_real_ip;
@@ -156,8 +192,19 @@ server {
     }
 }
 CONF
-  # 폴더째 붙여 두었으므로 mv로 바꾸면 컨테이너도 새 파일을 본다
   mv "$PROXY_DIR/default.conf.new" "$PROXY_DIR/default.conf"
+}
+
+# 설정을 쓰고 프록시가 다시 읽게 한다. 이미 처리 중인 요청은 옛 설정으로 끝까지 간다
+route_to() {
+  write_proxy_conf "$@"
+  if ! docker exec "$PROXY" nginx -t >/dev/null 2>&1; then
+    echo "== 프록시 설정이 잘못됐어요:" >&2
+    docker exec "$PROXY" nginx -t >&2 || true
+    exit 1
+  fi
+  docker exec "$PROXY" nginx -s reload >/dev/null
+  SERVING=("$@")
 }
 
 through_proxy() {
@@ -174,25 +221,31 @@ through_proxy() {
   return 1
 }
 
-echo "== 새 컨테이너 띄우기 ($NEXT_NAME). 지금 응답 중: ${ACTIVE:-이전 방식 컨테이너}"
-start
-if ! healthy; then
-  echo "== 새 컨테이너가 ${HEALTH_TIMEOUT}초 안에 뜨지 않았어요. 마지막 로그:" >&2
-  docker logs --tail 80 "$NEXT_NAME" >&2 || true
-  docker rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
-  echo "== 새 컨테이너를 지웠어요. 지금까지 돌던 서버가 계속 응답해요. 원인을 고친 뒤 다시 배포해 주세요" >&2
-  exit 1
-fi
+fail_start() {
+  local host="$1" cname
+  cname="$(container_of "$host")"
+  echo "== $cname 가 ${HEALTH_TIMEOUT}초 안에 뜨지 않았어요. 마지막 로그:" >&2
+  docker logs --tail 80 "$cname" >&2 || true
+  docker rm -f "$cname" >/dev/null 2>&1 || true
+}
 
-echo "== 프록시를 $NEXT_NAME 로 돌리기"
-write_proxy_conf
-if [ -n "$ACTIVE" ]; then
-  docker exec "$PROXY" nginx -t >/dev/null 2>&1
-  # reload는 처리 중인 요청을 끝까지 보내고 새 요청부터 새 컨테이너로 넘긴다
-  docker exec "$PROXY" nginx -s reload >/dev/null 2>&1
-else
-  # 처음 블루그린으로 바꿀 때만: 포트를 쓰던 이전 방식 컨테이너를 내리고 프록시를 띄운다(1~2초 끊김)
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
+HOSTS=()
+for i in $(seq 1 "$REPLICAS"); do HOSTS+=("app-$i"); done
+
+if [ -z "$PROXY_UP" ]; then
+  # 처음 이 방식으로 바꿀 때: 예전 컨테이너가 포트를 잡고 있어 프록시를 띄우려면 한 번 잠깐 멈춘다
+  echo "== 앱 ${REPLICAS}대 띄우기 (지금 응답 중: 이전 방식 컨테이너)"
+  for h in "${HOSTS[@]}"; do
+    start "$h"
+    if ! healthy "$h"; then
+      fail_start "$h"
+      for x in "${HOSTS[@]}"; do docker rm -f "$(container_of "$x")" >/dev/null 2>&1 || true; done
+      echo "== 새 컨테이너를 지웠어요. 지금까지 돌던 서버가 계속 응답해요. 원인을 고친 뒤 다시 배포해 주세요" >&2
+      exit 1
+    fi
+  done
+  write_proxy_conf "${HOSTS[@]}"
+  docker rm -f "$NAME" "${NAME}-blue" "${NAME}-green" >/dev/null 2>&1 || true
   docker rm -f "$PROXY" >/dev/null 2>&1 || true
   docker run -d \
     --name "$PROXY" \
@@ -202,9 +255,46 @@ else
     -v "$PROXY_DIR:/etc/nginx/conf.d:ro" \
     --log-opt max-size=10m --log-opt max-file=3 \
     "$PROXY_IMAGE" >/dev/null
-  # 프록시가 없는 동안 남아 있던 다른 색 컨테이너가 있으면 지운다
-  if [ "$NEXT" = "blue" ]; then OTHER="green"; else OTHER="blue"; fi
-  docker rm -f "${NAME}-${OTHER}" >/dev/null 2>&1 || true
+else
+  # 한 대씩 바꾼다. 프록시가 넘겨주지 않는 자리(새로 늘린 자리, 지난 배포에 실패한 자리)부터 채워서
+  # 바꾸는 동안 늘 한 대 이상이 응답하게 한다
+  ORDER=()
+  for h in "${HOSTS[@]}"; do serving_has "$h" || ORDER+=("$h"); done
+  for h in "${HOSTS[@]}"; do serving_has "$h" && ORDER+=("$h"); done
+
+  for h in "${ORDER[@]}"; do
+    cname="$(container_of "$h")"
+    mapfile -t KEEP < <(without "$h")
+    if serving_has "$h"; then
+      echo "== $cname 를 프록시에서 빼고 내리기"
+      route_to "${KEEP[@]}"
+      docker stop -t 30 "$cname" >/dev/null 2>&1 || true
+    fi
+    echo "== $cname 새 버전 띄우기. 지금 응답 중: ${KEEP[*]}"
+    start "$h"
+    if ! healthy "$h"; then
+      fail_start "$h"
+      echo "== $cname 만 지웠어요. ${KEEP[*]} 가 계속 응답해요. 원인을 고친 뒤 다시 배포해 주세요" >&2
+      exit 1
+    fi
+    route_to "${KEEP[@]}" "$h"
+  done
+
+  # 예전 블루그린 컨테이너처럼 이제 쓰지 않는 자리는 프록시에서 빼고 내린다
+  mapfile -t OLD < <(for h in "${SERVING[@]}"; do
+    printf '%s\n' "${HOSTS[@]}" | grep -qx "$h" || echo "$h"
+  done)
+  if [ "${#OLD[@]}" -gt 0 ]; then
+    echo "== 쓰지 않는 컨테이너 내리기: ${OLD[*]}"
+    route_to "${HOSTS[@]}"
+    for h in "${OLD[@]}"; do
+      docker stop -t 30 "$(container_of "$h")" >/dev/null 2>&1 || true
+    done
+  fi
+  # 설정에 없지만 남아 있는 예전 컨테이너
+  for x in "$NAME" "${NAME}-blue" "${NAME}-green"; do
+    docker rm -f "$x" >/dev/null 2>&1 || true
+  done
 fi
 
 if ! through_proxy; then
@@ -213,13 +303,6 @@ if ! through_proxy; then
   exit 1
 fi
 
-if [ -n "$ACTIVE" ]; then
-  echo "== 옛 컨테이너 내리기 (${NAME}-${ACTIVE})"
-  # 스프링 graceful shutdown이 남은 요청을 마칠 시간을 준다
-  docker stop -t 30 "${NAME}-${ACTIVE}" >/dev/null 2>&1 || true
-  docker rm "${NAME}-${ACTIVE}" >/dev/null 2>&1 || true
-fi
-
-echo "== 배포 완료: $HEALTH_URL 가 UP이에요 ($NEXT_NAME)"
+echo "== 배포 완료: $HEALTH_URL 가 UP이에요 (${HOSTS[*]})"
 rm -f "$APP_DIR/image.tar.gz"
 docker image prune -f >/dev/null 2>&1 || true
