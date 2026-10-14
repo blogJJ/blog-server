@@ -75,9 +75,7 @@ class BlogAuthzIntegrationTest {
         .andExpect(status().isForbidden());
     call(ownerA, delete("/api/posts/" + postB), null).andExpect(status().isForbidden());
 
-    assertThat(
-            jdbc.queryForObject(
-                "select status from blogs where id = ?", String.class, blogB))
+    assertThat(jdbc.queryForObject("select status from blogs where id = ?", String.class, blogB))
         .isEqualTo("ACTIVE");
     assertThat(jdbc.queryForObject("select status from posts where id = ?", String.class, postB))
         .isNotEqualTo("DELETED");
@@ -87,6 +85,41 @@ class BlogAuthzIntegrationTest {
                 Integer.class,
                 memberB.getId()))
         .isZero();
+  }
+
+  @Test
+  void managerWithoutPermissionSuspendedMemberAndSuspendedOwnerAreRejected() throws Exception {
+    User owner = newUser();
+    User manager = newUser();
+    User member = newUser();
+    long blogId = createBlog(owner);
+    call(manager, post("/api/blogs/" + blogId + "/join"), null).andExpect(status().isOk());
+    call(member, post("/api/blogs/" + blogId + "/join"), null).andExpect(status().isOk());
+    call(
+            owner,
+            put("/api/blogs/" + blogId + "/managers/" + manager.getId()),
+            "{\"manager\":true,\"permissions\":[\"MANAGE_POSTS\"]}")
+        .andExpect(status().is2xxSuccessful());
+    String target = "/api/blogs/" + blogId + "/members/" + member.getId();
+
+    call(manager, post(target + "/kick"), "{\"reason\":\"권한 없음\"}")
+        .andExpect(status().isForbidden());
+    call(manager, put("/api/blogs/" + blogId), blogForm()).andExpect(status().isForbidden());
+
+    call(owner, post(target + "/suspend"), "{\"reason\":\"도배\",\"days\":3}")
+        .andExpect(status().is2xxSuccessful());
+    call(member, get("/api/blogs/" + blogId + "/posts"), null).andExpect(status().isForbidden());
+    call(member, post("/api/blogs/" + blogId + "/posts"), "{\"title\":\"t\",\"content\":\"c\"}")
+        .andExpect(status().isForbidden());
+
+    jdbc.update(
+        "update users set suspended_until = ? where id = ?",
+        LocalDateTime.now().plusDays(7),
+        owner.getId());
+    call(owner, put("/api/blogs/" + blogId), blogForm()).andExpect(status().isForbidden());
+    call(owner, post("/api/blogs/" + blogId + "/close"), null).andExpect(status().isForbidden());
+    assertThat(jdbc.queryForObject("select status from blogs where id = ?", String.class, blogId))
+        .isEqualTo("ACTIVE");
   }
 
   private ResultActions call(User user, MockHttpServletRequestBuilder request, String json)
@@ -125,8 +158,7 @@ class BlogAuthzIntegrationTest {
   }
 
   private long writePost(User user, long blogId) throws Exception {
-    String body =
-        "{\"title\":\"멤버 글\",\"content\":\"본문\",\"tags\":[],\"notice\":false}";
+    String body = "{\"title\":\"멤버 글\",\"content\":\"본문\",\"tags\":[],\"notice\":false}";
     String created =
         call(user, post("/api/blogs/" + blogId + "/posts"), body)
             .andExpect(status().isCreated())

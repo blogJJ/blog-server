@@ -72,15 +72,18 @@ public class PostImage {
     this.sizeBytes = sizeBytes;
   }
 
+  /** 본문에 다시 넣은 이미지는 지울 표시도 지운다. */
   public void attach(Post post, int sortOrder) {
     this.post = post;
     this.sortOrder = sortOrder;
+    this.deletedAt = null;
   }
 
-  /** 본문에서 빠진 이미지. 연결을 끊어 두면 정리 배치가 지운다. */
-  public void detach() {
+  /** 본문에서 빠진 이미지. 연결을 끊고 뺀 시각을 적어 두면 30일 뒤 정리 배치가 지운다. */
+  public void detach(LocalDateTime now) {
     this.post = null;
     this.sortOrder = 0;
+    this.deletedAt = now;
   }
 
   public Long getId() {

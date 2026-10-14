@@ -55,6 +55,7 @@ public class MemberSanctionService {
   private final BlogAuthz blogAuthz;
   private final HashUtil hashUtil;
   private final NotificationService notificationService;
+  private final TransferService transferService;
   private final Clock clock;
 
   public MemberSanctionService(
@@ -68,6 +69,7 @@ public class MemberSanctionService {
       BlogAuthz blogAuthz,
       HashUtil hashUtil,
       NotificationService notificationService,
+      TransferService transferService,
       Clock clock) {
     this.blogRepository = blogRepository;
     this.memberRepository = memberRepository;
@@ -79,6 +81,7 @@ public class MemberSanctionService {
     this.blogAuthz = blogAuthz;
     this.hashUtil = hashUtil;
     this.notificationService = notificationService;
+    this.transferService = transferService;
     this.clock = clock;
   }
 
@@ -161,6 +164,8 @@ public class MemberSanctionService {
     memberRepository.flush();
     blogRepository.decreaseMemberCount(blogId);
     postRepository.hideAuthor(blogId, targetId);
+    // 스스로 떠날 때처럼 이 사람에게 온 블로그장 위임 요청도 취소한다 (D-124)
+    transferService.cancelForLeavingMember(blogId, targetId);
     blacklistRepository.save(
         new BlogBlacklist(
             blog,

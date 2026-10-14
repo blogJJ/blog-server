@@ -29,10 +29,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * 다른 회원에게 보이는 응답 어디에도 이메일·전화번호 원문이 없다 (T147, SC-004, SEC-07, D-22). 블로그장이 보는 멤버 목록에는 가린 값만
- * 나온다.
- */
+/** 다른 회원에게 보이는 응답 어디에도 이메일·전화번호 원문이 없다 (T147, SC-004, SEC-07, D-22). 블로그장이 보는 멤버 목록에는 가린 값만 나온다. */
 @IntegrationTest
 class MaskingResponseTest {
 

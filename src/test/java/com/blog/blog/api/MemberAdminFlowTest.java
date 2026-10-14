@@ -167,6 +167,29 @@ class MemberAdminFlowTest {
   }
 
   @Test
+  void kickCancelsPendingTransferToTheKickedMember() throws Exception {
+    User owner = newUser();
+    User member = newUser();
+    long blogId = createBlog(owner);
+    join(member, blogId);
+    call(
+            owner,
+            post("/api/blogs/" + blogId + "/transfers"),
+            "{\"toUserId\":" + member.getId() + "}")
+        .andExpect(status().is2xxSuccessful());
+
+    kick(owner, blogId, member);
+
+    assertThat(
+            jdbc.queryForObject(
+                "select status from blog_owner_transfers where blog_id = ? and to_user_id = ?",
+                String.class,
+                blogId,
+                member.getId()))
+        .isEqualTo("CANCELED");
+  }
+
+  @Test
   void reportsGoToTheRightHandlerAndOnlyOncePerTwoWeeks() throws Exception {
     User owner = newUser();
     User member = newUser();

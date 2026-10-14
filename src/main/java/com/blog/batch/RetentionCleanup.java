@@ -101,18 +101,17 @@ public class RetentionCleanup {
         });
   }
 
-  /** ④ 지운 지 30일 지난 사진 (글은 남아 있고 사진만 뺀 경우) */
+  /** ④ 본문에서 뺀 지 30일 지난 사진(글은 남아 있고 사진만 뺀 경우)과, 올린 뒤 30일 동안 어느 글에도 붙지 않은 사진(글을 저장하지 않고 나간 경우) */
   int purgeDeletedImages(LocalDateTime cutoff) {
     Map<String, Object> p = cutoffParam(cutoff);
+    String where =
+        " from post_images where deleted_at < :cutoff"
+            + " or (post_id is null and deleted_at is null and created_at < :cutoff)";
     List<String> files =
         inTx(
             () -> {
-              List<String> names =
-                  jdbc.queryForList(
-                      "select stored_name from post_images where deleted_at < :cutoff",
-                      p,
-                      String.class);
-              jdbc.update("delete from post_images where deleted_at < :cutoff", p);
+              List<String> names = jdbc.queryForList("select stored_name" + where, p, String.class);
+              jdbc.update("delete" + where, p);
               return names;
             });
     files.forEach(imageService::deleteQuietly);

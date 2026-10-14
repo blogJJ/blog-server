@@ -59,6 +59,8 @@ class AuthFlowTest {
 
   private static final String PASSWORD = "secret12!";
   private static final Pattern CODE = Pattern.compile("인증번호: (\\d{6})");
+  private static final Pattern LOG_LINE =
+      Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
 
   @Autowired MockMvc mockMvc;
   @Autowired JsonMapper jsonMapper;
@@ -132,21 +134,42 @@ class AuthFlowTest {
     login(email, "wrong-pass1!", false).andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
     MockHttpServletResponse loggedIn =
         login(email, PASSWORD, true).andExpect(status().isOk()).andReturn().getResponse();
+    org.mockito.Mockito.clearInvocations(mailService);
+    perform(post("/api/auth/password/code"), json("email", email)).andExpect(status().isOk());
+    ArgumentCaptor<String> mail = ArgumentCaptor.forClass(String.class);
+    verify(mailService).send(eq(email), anyString(), mail.capture());
+    Matcher resetCode = CODE.matcher(mail.getValue());
+    assertThat(resetCode.find()).isTrue();
+    perform(
+            post("/api/auth/password/reset"),
+            json("email", email, "code", resetCode.group(1), "newPassword", "changed34@"))
+        .andExpect(status().isOk());
 
     List<String> secrets =
         List.of(
             PASSWORD,
             "wrong-pass1!",
+            "changed34@",
             signup.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
             loggedIn.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
             loggedIn.getCookie(AuthCookies.REFRESH_TOKEN).getValue());
-    List<String> lines =
-        output.getAll().lines().filter(line -> !line.contains("MailService")).toList();
+    // 테스트는 메일을 보내지 않고 본문을 로그로 남기므로(app.mail.log-only) 그 여러 줄은 뺀다
+    List<String> lines = new java.util.ArrayList<>();
+    boolean inMail = false;
+    for (String line : output.getAll().lines().toList()) {
+      if (LOG_LINE.matcher(line).lookingAt()) {
+        inMail = line.contains("MailService");
+      }
+      if (!inMail) {
+        lines.add(line);
+      }
+    }
     assertThat(lines).isNotEmpty();
     for (String secret : secrets) {
       assertThat(lines).noneMatch(line -> line.contains(secret));
     }
     assertThat(lines).noneMatch(line -> line.contains("인증번호: " + code));
+    assertThat(lines).noneMatch(line -> line.contains("인증번호: " + resetCode.group(1)));
   }
 
   @Test

@@ -113,6 +113,34 @@ class FeedSearchFlowTest {
   }
 
   @Test
+  void suspendedMemberDoesNotSeePrivateBlogPostsInFeed() throws Exception {
+    User owner = newUser();
+    User member = newUser();
+    long blogId = createBlog(owner, "PUBLIC");
+    call(member, post("/api/blogs/" + blogId + "/join"), null).andExpect(status().isOk());
+    call(member, post("/api/blogs/" + blogId + "/subscribe"), null).andExpect(status().isOk());
+    call(member, post("/api/users/" + owner.getId() + "/follow"), null)
+        .andExpect(status().is2xxSuccessful());
+    call(owner, put("/api/blogs/" + blogId), updateBody("PRIVATE")).andExpect(status().isOk());
+    long postId = writePost(owner, blogId, "멤버만 보는 글", List.of());
+    assertThat(ids(body(call(member, get("/api/feed?tab=subscribed"), null)))).contains(postId);
+
+    call(
+            owner,
+            post("/api/blogs/" + blogId + "/members/" + member.getId() + "/suspend"),
+            "{\"reason\":\"도배\",\"days\":3}")
+        .andExpect(status().is2xxSuccessful());
+    assertThat(ids(body(call(member, get("/api/feed?tab=subscribed"), null))))
+        .doesNotContain(postId);
+    assertThat(ids(body(call(member, get("/api/feed?tab=following"), null))))
+        .doesNotContain(postId);
+
+    call(owner, post("/api/blogs/" + blogId + "/members/" + member.getId() + "/release"), null)
+        .andExpect(status().is2xxSuccessful());
+    assertThat(ids(body(call(member, get("/api/feed?tab=following"), null)))).contains(postId);
+  }
+
+  @Test
   void searchFindsTitlesBlogsTagsAndNicknames() throws Exception {
     String word = word();
     User writer = newUser();
