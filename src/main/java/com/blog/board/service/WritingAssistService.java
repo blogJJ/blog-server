@@ -186,10 +186,9 @@ public class WritingAssistService {
     return out;
   }
 
-  /** 비어 있지 않고, 실제로 바꾸며, 너무 길지 않은 후보인지 */
+  /** 비어 있지 않고, 실제로 바꾸며, 너무 길지 않은 후보인지 (null 후보는 부르는 쪽에서 이미 거름) */
   private static boolean worthFixing(SpellingFix f) {
-    return f != null
-        && f.original() != null
+    return f.original() != null
         && f.suggestion() != null
         && !f.original().isBlank()
         && !f.original().equals(f.suggestion())
