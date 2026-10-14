@@ -8,6 +8,7 @@
 # DB 접속 정보는 배포 때 올린 ~/blog-server/app.env(DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD)를 쓴다.
 # DB가 학교 내부 주소라 깃허브에서 바로 붙지 못해 서버 안에서 mysql:8.4 컨테이너로 덤프한다.
 # 서버에도 같은 파일을 7일치 남긴다. 폴더와 파일은 이 계정만 읽는다.
+# -e 실패하면 멈춤 / -u 없는 변수 쓰면 멈춤 / -o pipefail 파이프 중간 실패도 실패
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-$HOME/blog-server}"
@@ -19,11 +20,13 @@ if [ ! -f "$APP_DIR/app.env" ]; then
   exit 1
 fi
 
+# 앞으로 만드는 파일·폴더는 이 계정만 읽고 쓰게
 umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
 file="$BACKUP_DIR/blog-$(TZ=Asia/Seoul date +%Y%m%d-%H%M).sql.gz"
+# 다 쓸 때까지는 .part로 쓰고, 중간에 실패하면(스크립트가 어떻게 끝나든) 지운다
 tmp="$file.part"
 trap 'rm -f "$tmp"' EXIT
 
@@ -43,10 +46,12 @@ if ! gzip -dc "$tmp" | tail -n 1 | grep -q '^-- Dump completed'; then
   echo "덤프가 끝까지 쓰이지 않았어요." >&2
   exit 1
 fi
-mv "$tmp" "$file"
+mv "$tmp" "$file"   # 끝까지 쓰인 것만 진짜 이름으로
 trap - EXIT
 
+# 7일보다 오래된 서버 쪽 백업은 지운다
 find "$BACKUP_DIR" -name 'blog-*.sql.gz' -type f -mtime +$((KEEP_DAYS - 1)) -delete
 
 echo "백업 크기: $(du -h "$file" | cut -f1), 서버에 남은 백업: $(find "$BACKUP_DIR" -name 'blog-*.sql.gz' | wc -l)개" >&2
+# 마지막 줄은 파일 경로만. Backup 워크플로가 이 줄을 읽어 파일을 받아 간다(나머지 안내는 위에서 stderr로)
 echo "$file"

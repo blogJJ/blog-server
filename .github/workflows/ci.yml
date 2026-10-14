@@ -5,6 +5,7 @@
 name: CI
 
 on:
+  # 모든 PR, 그리고 main·develop에 푸시(머지 포함)될 때
   pull_request:
   push:
     branches: [main, develop]
@@ -12,6 +13,7 @@ on:
 permissions:
   contents: read
 
+# 같은 브랜치에 새 푸시가 오면 돌던 CI는 끊고 새것만 돈다
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -34,10 +36,12 @@ jobs:
       # Gradle 의존성·빌드 캐시
       - uses: gradle/actions/setup-gradle@v6
 
+      # spotlessCheck(코드 모양) + 컴파일 + 테스트(Testcontainers로 MySQL 8.4를 띄운다) + jar
       - name: Build
         run: ./gradlew build
 
       # SonarQube 분석 (jj-blog). main·develop 푸시 때만, SONAR_TOKEN 시크릿이 있을 때만 돈다
+      # secret은 if 조건에 바로 못 써서, 있는지 여부만 출력값으로 넘긴다
       - name: Check SonarQube token
         id: sonar
         run: echo "enabled=${{ secrets.SONAR_TOKEN != '' }}" >> "$GITHUB_OUTPUT"

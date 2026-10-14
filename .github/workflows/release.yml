@@ -10,11 +10,13 @@
 name: Release
 
 on:
+  # Deploy가 끝나면 이어서 돈다. 성공했는지는 job의 if가 본다
   workflow_run:
     workflows: [Deploy]
     types: [completed]
     branches: [main]
 
+# 태그와 GitHub Release를 만들려면 쓰기 권한이 필요하다
 permissions:
   contents: write
 
@@ -38,6 +40,8 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
+      # release-notes.json 맨 위 버전을 읽고 확인한다
+      # - v1.2.3 꼴인지 / 이미 태그가 있으면 건너뛴다 / 마지막 태그보다 낮으면 멈춘다
       - name: Pick version
         id: version
         run: |
@@ -64,6 +68,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "새 버전: $version — $title (이전 태그: ${last:-없음})"
 
+      # 배포한 커밋에 버전 태그를 붙이고 GitHub Releases 페이지를 만든다
       - name: Create release
         if: steps.version.outputs.skip != 'true'
         env:
