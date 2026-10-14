@@ -44,7 +44,7 @@ class ImageOptimizerTest {
 
     assertThat(result.type()).isEqualTo(ImageType.WEBP);
     assertThat(ImageType.bySignature(result.data())).contains(ImageType.WEBP);
-    assertThat(result.data().length).isLessThan(jpeg.length / 3);
+    assertThat(result.data()).hasSizeLessThan(jpeg.length / 3);
     assertThat(contains(result.data(), "SECRET-PLACE")).isFalse();
     assertThat(contains(result.data(), "Exif")).isFalse();
     Metadata after = ImageMetadataReader.readMetadata(new ByteArrayInputStream(result.data()));
@@ -97,7 +97,7 @@ class ImageOptimizerTest {
     Result result = ImageOptimizer.optimize(png, ImageType.PNG, Limit.POST);
 
     assertThat(result.type()).isEqualTo(ImageType.WEBP);
-    assertThat(result.data().length).isLessThan(png.length);
+    assertThat(result.data()).hasSizeLessThan(png.length);
     BufferedImage image = TestImages.readWebp(result.data());
     assertThat(image.getWidth()).isEqualTo(300);
     // 무손실이라 화소 값이 그대로다
@@ -204,7 +204,7 @@ class ImageOptimizerTest {
 
     assertThat(result.type()).isEqualTo(ImageType.WEBP);
     assertThat(new String(result.data(), 12, 4, StandardCharsets.ISO_8859_1)).isEqualTo("VP8 ");
-    assertThat(result.data().length).isLessThan(png.length / 4);
+    assertThat(result.data()).hasSizeLessThan(png.length / 4);
     assertThat(ImageOptimizer.webpDimensions(result.data())).containsExactly(800, 600);
   }
 

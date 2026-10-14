@@ -29,18 +29,17 @@ class ContentRendererTest {
             <a href="https://example.com" onclick="x()">링크</a>\
             """);
 
-    assertThat(html).contains("<h1>제목</h1>");
-    assertThat(html).doesNotContain("<script").doesNotContain("onerror").doesNotContain("onclick");
-    assertThat(html).doesNotContain("javascript:");
-    assertThat(html).contains("rel=\"nofollow noopener noreferrer\"");
+    assertThat(html)
+        .contains("<h1>제목</h1>")
+        .doesNotContain("<script", "onerror", "onclick", "javascript:")
+        .contains("rel=\"nofollow noopener noreferrer\"");
   }
 
   @Test
   void onlyOwnImagesStay() {
     String html = renderer.render("![a](" + IMG + ")\n\n![b](https://evil.example/x.png)");
 
-    assertThat(html).contains("src=\"" + IMG + "\"");
-    assertThat(html).doesNotContain("evil.example");
+    assertThat(html).contains("src=\"" + IMG + "\"").doesNotContain("evil.example");
   }
 
   @Test

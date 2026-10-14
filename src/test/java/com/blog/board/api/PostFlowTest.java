@@ -325,7 +325,7 @@ class PostFlowTest {
             .andReturn()
             .getResponse()
             .getContentAsByteArray();
-    assertThat(served.length).isLessThan(photo.length / 3);
+    assertThat(served).hasSizeLessThan(photo.length / 3);
     assertThat(new String(served, java.nio.charset.StandardCharsets.ISO_8859_1))
         .doesNotContain("GPS-HOME-ADDRESS");
     assertThat(TestImages.readWebp(served).getWidth()).isEqualTo(1600);
@@ -333,8 +333,9 @@ class PostFlowTest {
         jdbc.queryForMap(
             "select original_name, content_type, size_bytes from post_images where stored_name = ?",
             url.substring(12));
-    assertThat(row.get("original_name")).isEqualTo("big.jpg");
-    assertThat(row.get("content_type")).isEqualTo("image/webp");
+    assertThat(row)
+        .containsEntry("original_name", "big.jpg")
+        .containsEntry("content_type", "image/webp");
     assertThat(((Number) row.get("size_bytes")).intValue()).isEqualTo(served.length);
 
     // 움직이는 GIF는 그대로 둔다

@@ -131,7 +131,7 @@ class AccountFlowTest {
 
   @Test
   void findEmailListsMaskedAccountsAndResetsWithTheToken() throws Exception {
-    String phone = "010" + (10_000_000 + (int) (Math.random() * 89_999_999));
+    String phone = "010" + (10_000_000 + ThreadLocalRandom.current().nextInt(89_999_999));
     User first = newUser("김찾기", phone);
     User second = newUser("김찾기", phone);
     User withdrawn = newUser("김찾기", phone);
@@ -187,7 +187,7 @@ class AccountFlowTest {
         .andExpect(jsonPath("$.phone").value("01033334444"));
 
     Map<String, Object> form = new LinkedHashMap<>();
-    form.put("nickname", "새닉네임" + (int) (Math.random() * 1000));
+    form.put("nickname", "새닉네임" + ThreadLocalRandom.current().nextInt(1000));
     form.put("phone", "010-7777-8888");
     form.put("bio", "  안녕하세요  ");
     form.put("name", "바뀐이름");
@@ -204,7 +204,7 @@ class AccountFlowTest {
     withCookies(put("/api/me"), me, json(form)).andExpect(status().isConflict());
     form.put("nickname", "관리자임");
     withCookies(put("/api/me"), me, json(form)).andExpect(status().isBadRequest());
-    form.put("nickname", "괜찮은닉" + (int) (Math.random() * 1000));
+    form.put("nickname", "괜찮은닉" + ThreadLocalRandom.current().nextInt(1000));
     form.put("bio", "가".repeat(201));
     withCookies(put("/api/me"), me, json(form)).andExpect(status().isBadRequest());
   }
@@ -281,7 +281,7 @@ class AccountFlowTest {
     return m.group(1);
   }
 
-  private String reset(String key, String value, String code, String newPassword) throws Exception {
+  private String reset(String key, String value, String code, String newPassword) {
     return json(map(key, value, "code", code, "newPassword", newPassword));
   }
 

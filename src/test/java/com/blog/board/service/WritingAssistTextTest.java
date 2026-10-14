@@ -36,9 +36,8 @@ class WritingAssistTextTest {
     String body = "고양이가 귀여워요. 고양이 사진을 찍었어요. 사진 보정도 했어요. 정말 정말 좋아요.";
     List<String> tags =
         KeywordTagSuggester.suggest("고양이 사진", body, List.of("사진", "여행"), List.of(), 5);
-    assertThat(tags).startsWith("사진").contains("고양이").doesNotContain("여행", "정말", "좋아요");
     // '고양이'를 '고양'으로 자르지 않는다
-    assertThat(tags).doesNotContain("고양");
+    assertThat(tags).startsWith("사진").contains("고양이").doesNotContain("여행", "정말", "좋아요", "고양");
 
     assertThat(KeywordTagSuggester.suggest("고양이 사진", body, List.of("사진"), List.of("사진"), 5))
         .doesNotContain("사진");

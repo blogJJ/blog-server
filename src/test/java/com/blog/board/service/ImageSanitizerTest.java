@@ -135,7 +135,7 @@ class ImageSanitizerTest {
 
   @Test
   @DisplayName("회전해야 하지만 풀 수 없는 JPEG(지원하지 않는 압축 방식)도 EXIF·GPS는 지운다")
-  void undecodableRotatedJpegStillLosesExif() throws Exception {
+  void undecodableRotatedJpegStillLosesExif() {
     byte[] jpeg = TestImages.withExif(TestImages.jpeg(), 6, "SECRET-PLACE");
     // SOF0(기본 방식)을 SOF3(무손실 방식)으로 바꾸면 ImageIO가 풀지 못한다
     byte[] lossless = jpeg.clone();
@@ -153,7 +153,7 @@ class ImageSanitizerTest {
 
     assertThat(contains(cleaned, "SECRET-PLACE")).isFalse();
     assertThat(contains(cleaned, "Exif")).isFalse();
-    assertThat(cleaned.length).isEqualTo(TestImages.jpeg().length);
+    assertThat(cleaned).hasSameSizeAs(TestImages.jpeg());
   }
 
   @Test
@@ -206,7 +206,7 @@ class ImageSanitizerTest {
 
   @Test
   @DisplayName("PNG의 eXIf·iTXt·zTXt·tIME 조각을 모두 지우고 그림 화소는 그대로 둔다")
-  void pngLosesExifAndAllTextAndTimeChunks() throws Exception {
+  void pngLosesExifAndAllTextAndTimeChunks() {
     byte[] png = TestImages.encode(TestImages.photo(20, 10, 9), "png");
     byte[] dirty = TestImages.pngWithChunk(png, "eXIf", "MM\0*GPS-37.56".getBytes());
     dirty = TestImages.pngWithChunk(dirty, "iTXt", "Author\0\0\0\0\0Kim".getBytes());
@@ -274,7 +274,7 @@ class ImageSanitizerTest {
 
     assertThat(contains(cleaned, "SECRET")).isFalse();
     assertThat(new String(cleaned, 12, 4, StandardCharsets.ISO_8859_1)).isEqualTo("VP8L");
-    assertThat(cleaned.length).isEqualTo(12 + 8 + 5);
+    assertThat(cleaned).hasSize(12 + 8 + 5);
 
     byte[] overrun = TestImages.webpFile(exif, vp8l);
     ByteBuffer.wrap(overrun, 12 + exif.length + 4, 4).order(ByteOrder.LITTLE_ENDIAN).putInt(500);

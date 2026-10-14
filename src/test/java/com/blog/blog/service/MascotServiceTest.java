@@ -140,8 +140,9 @@ class MascotServiceTest {
 
     String cover = coverOf(legacy.getId());
     // 장면을 고르는 단어가 없어 지금과 다른 장면, 배경은 태그('화산')에서 고른다
-    assertThat(cover).matches("[a-z-]+\\.[a-z]+\\.[a-z]+\\.[a-z]+\\.\\d+\\.[a-z-]+\\.lava~[a-z]*");
-    assertThat(cover).doesNotStartWith("study.");
+    assertThat(cover)
+        .matches("[a-z-]+\\.[a-z]+\\.[a-z]+\\.[a-z]+\\.\\d+\\.[a-z-]+\\.lava~[a-z]*")
+        .doesNotStartWith("study.");
     assertThat(
             jdbc.queryForObject(
                 "select mascot from blogs where id = ?", String.class, legacy.getId()))
@@ -310,8 +311,9 @@ class MascotServiceTest {
     Blog swim = newBlog("물개", List.of("수영"));
     Mascot base = mascotService.assign(swim.getId()).base();
 
-    assertThat(base).isIn(Mascot.PENGUIN, Mascot.WHALE);
-    assertThat(base).isEqualTo(whales < penguins ? Mascot.WHALE : Mascot.PENGUIN);
+    assertThat(base)
+        .isIn(Mascot.PENGUIN, Mascot.WHALE)
+        .isEqualTo(whales < penguins ? Mascot.WHALE : Mascot.PENGUIN);
   }
 
   private String mascotOf(Long blogId) {

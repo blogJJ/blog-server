@@ -57,7 +57,7 @@ class StaticAssetsHttpTest {
     assertThat(res.headers().firstValue("Cache-Control"))
         .hasValue("max-age=31536000, public, immutable");
     assertThat(res.headers().firstValue("Content-Encoding")).hasValue("gzip");
-    assertThat(res.body().length).isLessThan(200_000); // 원본 약 390KB
+    assertThat(res.body()).hasSizeLessThan(200_000); // 원본 약 390KB
   }
 
   @Test
