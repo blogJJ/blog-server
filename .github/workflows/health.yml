@@ -1,0 +1,100 @@
+# 운영 사이트 상태 감시 (T173, D-150).
+# 5분마다 https://jj-blog.java21.net/actuator/health 를 물어 "UP"인지 본다.
+# - 응답이 없거나 UP이 아니면: 이 실행이 빨갛게 되고, 'site-down' 이슈를 하나 연다(이미 열려 있으면 댓글만).
+#   GitHub 앱·메일로 이슈 알림이 간다.
+# - 다시 UP이 되면: 열린 'site-down' 이슈에 복구 시각을 남기고 닫는다.
+# 확인하는 곳: Actions 탭 > Health (초록·빨강 기록), Issues 탭의 site-down 이슈, README 맨 위 배지.
+#
+# 참고
+# - GitHub 예약 실행은 몰리는 시각에 몇 분씩 늦게 돌 수 있다. 정확히 5분 간격은 아니다.
+# - 공개 저장소의 예약 실행은 저장소에 60일 동안 아무 활동이 없으면 GitHub이 멈춘다. 그때는 Actions 탭에서 다시 켠다.
+# - 잠깐 끊긴 것(배포 중 몇 초 등)으로 이슈가 열리지 않게, 10초 간격으로 세 번까지 물어보고 모두 실패해야 다운으로 본다.
+# - 주소를 바꾸려면 Settings > Secrets and variables > Actions > Variables에 SITE_URL을 넣는다.
+name: Health
+
+on:
+  schedule:
+    # GitHub 시간은 UTC지만 5분 간격이라 상관없다
+    - cron: '*/5 * * * *'
+  # Actions 탭에서 손으로 돌려 볼 수 있다
+  workflow_dispatch:
+
+# 이슈를 열고 닫으려면 issues 쓰기 권한이 필요하다. 코드는 읽지도 않는다
+permissions:
+  issues: write
+
+# 앞 실행이 아직 돌고 있으면 겹치지 않게 기다린다
+concurrency:
+  group: health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      URL: ${{ vars.SITE_URL || 'https://jj-blog.java21.net' }}/actuator/health
+      LABEL: site-down
+    steps:
+      # 세 번까지 물어본다. 결과(up 또는 down)와 마지막 응답을 다음 단계로 넘긴다
+      - name: Check
+        id: check
+        run: |
+          state=down
+          detail=""
+          for try in 1 2 3; do
+            # -s 진행 표시 끄기 / -w 상태 코드 덧붙이기 / --max-time 15초 안에 답이 없으면 실패
+            if body="$(curl -s --max-time 15 -w ' (HTTP %{http_code})' "$URL")" && [[ "$body" == *'"UP"'* ]]; then
+              state=up
+              break
+            fi
+            body="${body# }"
+            # HTTP 000은 연결 자체가 안 됐거나 15초 안에 답이 없었다는 뜻
+            detail="$try번째: ${body/(HTTP 000)/응답 없음(연결 실패 또는 15초 초과)}"
+            echo "$detail"
+            [ "$try" -lt 3 ] && sleep 10
+          done
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          # 마지막 응답은 이슈 본문에 넣는다. 너무 길면 자른다
+          {
+            echo "detail<<EOF"
+            echo "${detail:0:500}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "결과: $state"
+
+      # 다운: 열린 site-down 이슈가 없으면 새로 열고, 있으면 아직 다운이라는 댓글은 30분에 한 번만 단다
+      - name: Open issue
+        if: steps.check.outputs.state == 'down'
+        env:
+          DETAIL: ${{ steps.check.outputs.detail }}
+        run: |
+          now="$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          gh label create "$LABEL" --color d73a4a --description "사이트 상태 감시(health.yml)가 연 이슈" 2>/dev/null || true
+          open="$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$open" ]; then
+            gh issue create --label "$LABEL" --title "사이트가 응답하지 않아요 ($now)" --body "$(printf '%s\n\n' \
+              "$now(한국 시간)에 \`$URL\`이 UP을 돌려주지 않았어요. 10초 간격으로 세 번 물어봤어요." \
+              '```' "$DETAIL" '```' \
+              "확인할 것: 서버에서 \`docker ps\`로 프록시와 앱 컨테이너가 떠 있는지, \`docker logs --tail 80 <앱 컨테이너>\`에 오류가 있는지." \
+              "다시 UP이 되면 이 이슈는 자동으로 닫혀요.")"
+          else
+            # 마지막 댓글(없으면 이슈 생성)로부터 30분이 지났을 때만 댓글을 단다
+            last="$(gh issue view "$open" --json createdAt,comments --jq '(.comments | last | .createdAt) // .createdAt')"
+            if [ $(( $(date +%s) - $(date -d "$last" +%s) )) -ge 1800 ]; then
+              gh issue comment "$open" --body "$now 아직 응답하지 않아요. ${DETAIL:0:200}"
+            fi
+          fi
+          echo "::error::$URL 가 UP이 아니에요"
+          exit 1
+
+      # 복구: 열린 site-down 이슈가 있으면 복구 시각을 남기고 닫는다
+      - name: Close issue
+        if: steps.check.outputs.state == 'up'
+        run: |
+          open="$(gh issue list --label "$LABEL" --state open --json number --jq '.[].number')"
+          for n in $open; do
+            gh issue close "$n" --comment "$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M') 다시 UP이에요. 자동으로 닫아요."
+          done
