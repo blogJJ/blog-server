@@ -32,8 +32,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -112,6 +115,38 @@ class AuthFlowTest {
         .perform(get("/api/me").cookie(response.getCookie(AuthCookies.ACCESS_TOKEN)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value(email));
+  }
+
+  /** 로그에 비밀번호·토큰·인증번호가 남지 않는다 (T141, SC-009). 메일을 콘솔에 찍는 테스트 전용 MailService 줄은 뺀다 */
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void logsNeverContainPasswordsTokensOrCodes(CapturedOutput output) throws Exception {
+    String code = requestCode(email);
+    perform(post("/api/auth/signup/verify"), json("email", email, "code", code))
+        .andExpect(status().isOk());
+    MockHttpServletResponse signup =
+        perform(post("/api/auth/signup"), signupBody(email, nickname()))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse();
+    login(email, "wrong-pass1!", false).andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+    MockHttpServletResponse loggedIn =
+        login(email, PASSWORD, true).andExpect(status().isOk()).andReturn().getResponse();
+
+    List<String> secrets =
+        List.of(
+            PASSWORD,
+            "wrong-pass1!",
+            signup.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
+            loggedIn.getCookie(AuthCookies.ACCESS_TOKEN).getValue(),
+            loggedIn.getCookie(AuthCookies.REFRESH_TOKEN).getValue());
+    List<String> lines =
+        output.getAll().lines().filter(line -> !line.contains("MailService")).toList();
+    assertThat(lines).isNotEmpty();
+    for (String secret : secrets) {
+      assertThat(lines).noneMatch(line -> line.contains(secret));
+    }
+    assertThat(lines).noneMatch(line -> line.contains("인증번호: " + code));
   }
 
   @Test
