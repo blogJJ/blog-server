@@ -22,13 +22,13 @@
   | 글쓰기 도우미 | 태그 추천은 단어 세기로, 맞춤법 버튼은 숨김 |
   | 새 댓글 자동 검사 | 검사하지 않고 댓글을 그대로 둠(fail-open) |
 
-- **배포 중에는 옛·새 버전이 같은 DB를 씁니다.** 블루그린 전환 동안 두 버전이 함께 돌므로 마이그레이션은 추가만 합니다. 칼럼·테이블 추가는 괜찮고, 지우거나 이름을 바꾸는 것은 다음 배포로 미룹니다.
+- **배포 중에는 옛·새 버전이 같은 DB를 씁니다.** 한 대씩 바꾸는 동안 두 버전이 함께 돌므로 마이그레이션은 추가만 합니다. 칼럼·테이블 추가는 괜찮고, 지우거나 이름을 바꾸는 것은 다음 배포로 미룹니다.
 
 ## 기술 스택
 
 Java 21 · Spring Boot 4.1.1(Web MVC, Security, OAuth2 Client, Data JPA, Validation, Mail, Actuator, Flyway) · JJWT 0.13.0 · commonmark 0.30.0(+GFM 표·취소선) · jsoup 1.23.2 · metadata-extractor 2.21.0 · webp-imageio 0.11.0 · jsvg 2.2.0 · ShedLock 7.10.1 · springdoc-openapi 3.1.1 · Anthropic Java SDK 2.34.0 · Gradle 9.8.1(wrapper) · Spotless 8.10.4(google-java-format) · JUnit 5 + Testcontainers
 
-그 외: MySQL 8(로컬·테스트는 `mysql:8.4`), Docker(`eclipse-temurin:21-jre` 이미지), nginx(`nginx:1.27-alpine`, 블루그린 프록시), GitHub Actions, Dependabot, Cloudflare Turnstile.
+그 외: MySQL 8(로컬·테스트는 `mysql:8.4`), Docker(`eclipse-temurin:21-jre` 이미지), nginx(`nginx:1.27-alpine`, 앱 두 대 앞 프록시), GitHub Actions, Dependabot, Cloudflare Turnstile.
 
 ## 주요 API / 화면
 
@@ -59,10 +59,10 @@ Java 21 · Spring Boot 4.1.1(Web MVC, Security, OAuth2 Client, Data JPA, Validat
 flowchart LR
     user["브라우저"] -->|https| outer["바깥 nginx<br/>(TLS 종료)"]
     outer --> proxy["프록시 nginx"]
-    proxy -->|지금 쓰는 쪽| blue["앱 blue"]
-    proxy -.->|다음 배포| green["앱 green"]
-    blue --> db[("MySQL 8")]
-    green --> db
+    proxy -->|같은 IP는 같은 앱| app1["앱 1"]
+    proxy --> app2["앱 2"]
+    app1 --> db[("MySQL 8")]
+    app2 --> db
 ```
 
 ## 인증 / 오류
@@ -134,15 +134,18 @@ Git Flow입니다. `feature/*`는 `develop`에서 만들어 `develop`으로, `re
 | 워크플로 | 언제 | 하는 일 |
 | --- | --- | --- |
 | [CI](.github/workflows/ci.yml) | 모든 PR, `main`·`develop` push | `build`: `./gradlew build`. `migrations`(PR만): 합쳐진 Flyway 파일을 고치지 않았는지, 이름·번호가 맞는지 |
-| [Deploy](.github/workflows/deploy.yml) | `main`의 CI 성공 뒤(또는 직접 실행) | 그 커밋으로 jar·도커 이미지 → SSH로 서버에 올림 → `deploy/deploy.sh`(블루그린). 직접 실행 때 "더미 데이터 넣기" 선택 가능 |
+| [Deploy](.github/workflows/deploy.yml) | `main`의 CI 성공 뒤(또는 직접 실행) | 그 커밋으로 jar·도커 이미지 → SSH로 서버에 올림 → `deploy/deploy.sh`(앱 두 대, 한 대씩 교체). 직접 실행 때 "더미 데이터 넣기" 선택 가능 |
 | [Release](.github/workflows/release.yml) | Deploy 성공 뒤 | `release-notes.json` 맨 위(`releases[0]`) 버전으로 태그와 GitHub Release. 이미 있는 태그면 건너뜀 |
 | [Backup](.github/workflows/backup.yml) | 매일 03:00(Asia/Seoul), 또는 직접 | 서버 DB 전체 백업 → AES-256 암호화 → Actions 아티팩트 7일 보관. 복구는 [RESTORE.md](ops/backup/RESTORE.md) |
 
-블루그린 순서(`deploy/deploy.sh`):
+이중화와 무중단 배포(`deploy/deploy.sh`):
 
-1. 지금 이미지를 `:previous`로 남기고, 지금 응답 중인 쪽의 **반대쪽**(blue/green) 컨테이너를 새 이미지로 띄웁니다.
-2. 새 컨테이너의 `/actuator/health`가 `HEALTH_TIMEOUT`(기본 240초) 안에 `UP`이 되면 프록시 설정을 바꾸고 `nginx -s reload`, 옛 컨테이너를 내립니다.
-3. 시간 안에 `UP`이 안 되면 새 컨테이너만 지우고 실패로 끝납니다. 돌던 컨테이너가 계속 응답합니다.
+- 받은 포트(`APP_PORT`)에는 전용 프록시(nginx 컨테이너)가 있고, 그 뒤에서 앱 컨테이너 `app-1`, `app-2`(`REPLICAS`, 기본 2)가 늘 같이 돕니다. 앱은 포트를 열지 않고 도커 내부 네트워크로만 붙으므로 서버 nginx 설정은 그대로입니다.
+- 프록시는 같은 IP(서버 nginx가 넘긴 `X-Real-IP`·`X-Forwarded-For`)를 같은 앱으로 보냅니다. 메모리로 세는 IP별 요청 제한이 두 배로 풀리지 않게 하려는 것입니다. 한 대가 연결을 거절하거나 502·503이면 다른 앱으로 넘깁니다.
+- 업로드 폴더는 도커 볼륨 하나를 같이 쓰고, 예약 작업은 ShedLock으로 한 대에서만 돕니다.
+- 배포는 한 대씩 바꿉니다. 바꿀 앱을 프록시 설정에서 빼고 `nginx -s reload`, 처리 중인 요청을 마치게 한 뒤(30초) 내립니다. 새 이미지로 띄워 `/actuator/health`가 `HEALTH_TIMEOUT`(기본 240초) 안에 `UP`이면 프록시에 다시 넣고 다음 대로 넘어갑니다.
+- 시간 안에 `UP`이 안 되면 그 컨테이너만 지우고 실패로 끝납니다. 아직 바꾸지 않은 앱이 계속 응답하고, 다음 배포는 빈 자리부터 채웁니다.
+- 두 대 모두 같은 서버에 있으므로 앱 장애는 막지만 서버 자체가 내려가는 것은 막지 못합니다.
 
 Deploy와 Backup은 같은 `concurrency` 그룹이라 하나씩만 돕니다. Repository secrets(이름만): `SSH_ADDRESS`, `SSH_PORT`, `SSH_ID`, `SSH_PASSWORD`, `APP_PORT`, `DB_ADDRESS`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `HASH_SECRET`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `BACKUP_PASSPHRASE`. 깃허브 키는 secret 이름이 `GITHUB_`로 시작할 수 없어 `GH_`를 씁니다.
 
