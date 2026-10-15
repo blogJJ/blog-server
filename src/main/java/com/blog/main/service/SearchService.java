@@ -79,6 +79,7 @@ public class SearchService {
   private final BlockService blockService;
   private final RecentSearchService recentSearchService;
   private final PostCards cards;
+  private final CountCache countCache;
 
   public SearchService(
       MainPostRepository postRepository,
@@ -86,13 +87,15 @@ public class SearchService {
       UserRepository userRepository,
       BlockService blockService,
       RecentSearchService recentSearchService,
-      PostCards cards) {
+      PostCards cards,
+      CountCache countCache) {
     this.postRepository = postRepository;
     this.blogQueryService = blogQueryService;
     this.userRepository = userRepository;
     this.blockService = blockService;
     this.recentSearchService = recentSearchService;
     this.cards = cards;
+    this.countCache = countCache;
   }
 
   /**
@@ -126,7 +129,12 @@ public class SearchService {
       return PageResponse.of(Page.<Post>empty(pageable), cards::of);
     }
     return PageResponse.of(
-        postRepository.withContent(postRepository.searchTitleIds(fulltext, sort, hidden, pageable)),
+        postRepository.withContent(
+            countCache.page(
+                postRepository.searchTitleIds(fulltext, sort, hidden, pageable),
+                pageable,
+                "title:" + fulltext + ":" + hidden,
+                () -> postRepository.countTitle(fulltext, hidden))),
         cards::of);
   }
 
@@ -141,8 +149,16 @@ public class SearchService {
     if (tag == null) {
       return PageResponse.of(Page.<Post>empty(pageable), cards::of);
     }
+    String t = tag;
+    Pageable sortedPage = sorted(pageable, sort);
     return PageResponse.of(
-        postRepository.findByTag(tag, hidden, sorted(pageable, sort)), cards::of);
+        postRepository.withContent(
+            countCache.page(
+                postRepository.findByTagIds(t, hidden, sortedPage),
+                sortedPage,
+                "tag:" + t + ":" + hidden,
+                () -> postRepository.countByTag(t, hidden))),
+        cards::of);
   }
 
   private SearchResult byNickname(String q, String sort, List<Long> hidden, Pageable pageable) {

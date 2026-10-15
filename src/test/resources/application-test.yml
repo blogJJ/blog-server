@@ -7,6 +7,9 @@ app:
   # 테스트는 한 IP(127.0.0.1)로 많이 부르므로 기본 제한에 걸리지 않게 한다. 제한 자체는 RateLimitFilterTest에서 확인
   rate-limit:
     api-per-minute: 1000000
+  # 목록 개수를 기억하지 않는다. 글을 쓰고 바로 개수를 확인하는 테스트가 많다. 기억하는 동작은 CountCacheTest에서 확인
+  count-cache:
+    ttl: 0s
   mail:
     log-only: true
   # 테스트에서 올린 이미지는 build 아래에 둔다

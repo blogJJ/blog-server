@@ -52,11 +52,15 @@ public interface MainPostRepository extends Repository<Post, Long> {
   String TAGGED =
       " and exists (select pt.id from PostTag pt where pt.post = p and pt.tag.name = :tag)";
 
-  /** 전체 최신·인기 탭: 공개 블로그의 글 */
-  @Query(
-      value = "select p.id from Post p join p.blog b where" + LIVE + PUBLIC_BLOG,
-      countQuery = "select count(p) from Post p join p.blog b where" + LIVE + PUBLIC_BLOG)
-  Page<Long> findPublicIds(@Param("hidden") Collection<Long> hidden, Pageable pageable);
+  /**
+   * 전체 최신·인기 탭: 공개 블로그의 글. 전체 개수는 {@link #countPublic}으로 따로 세어 CountCache에 잠깐 기억한다 (T175). 최신·인기 탭이
+   * 같은 개수를 나누어 쓴다.
+   */
+  @Query("select p.id from Post p join p.blog b where" + LIVE + PUBLIC_BLOG)
+  List<Long> findPublicIds(@Param("hidden") Collection<Long> hidden, Pageable pageable);
+
+  @Query("select count(p) from Post p join p.blog b where" + LIVE + PUBLIC_BLOG)
+  long countPublic(@Param("hidden") Collection<Long> hidden);
 
   /** 팔로우 탭: 내가 팔로우한 회원의 글. 블로그를 떠나 "탈퇴한 계정"으로 보이는 글은 뺀다 */
   @Query(
@@ -80,12 +84,13 @@ public interface MainPostRepository extends Repository<Post, Long> {
       @Param("hidden") Collection<Long> hidden,
       Pageable pageable);
 
-  /** 태그 검색: 태그 규칙으로 정리한 값과 정확히 같은 태그가 달린 공개 블로그의 글 */
-  @Query(
-      value = "select p.id from Post p join p.blog b where" + LIVE + PUBLIC_BLOG + TAGGED,
-      countQuery = "select count(p) from Post p join p.blog b where" + LIVE + PUBLIC_BLOG + TAGGED)
-  Page<Long> findByTagIds(
+  /** 태그 검색: 태그 규칙으로 정리한 값과 정확히 같은 태그가 달린 공개 블로그의 글. 개수는 {@link #countByTag} */
+  @Query("select p.id from Post p join p.blog b where" + LIVE + PUBLIC_BLOG + TAGGED)
+  List<Long> findByTagIds(
       @Param("tag") String tag, @Param("hidden") Collection<Long> hidden, Pageable pageable);
+
+  @Query("select count(p) from Post p join p.blog b where" + LIVE + PUBLIC_BLOG + TAGGED)
+  long countByTag(@Param("tag") String tag, @Param("hidden") Collection<Long> hidden);
 
   /** 닉네임 검색: 그 회원이 공개 블로그에 쓴 글. "탈퇴한 계정"으로 보이는 글은 뺀다 */
   @Query(
@@ -106,7 +111,7 @@ public interface MainPostRepository extends Repository<Post, Long> {
 
   /**
    * 글 제목 검색 (BRD-08). FULLTEXT ngram(ft_posts_title)이라 번호만 먼저 고르고, 내용은 {@link
-   * #findWithBlogAndAuthor}로 읽는다.
+   * #findWithBlogAndAuthor}로 읽는다. 개수는 {@link #countTitle}.
    *
    * @param q BlogQueryService.toBooleanQuery로 만든 boolean mode 검색식
    * @param sort relevance(관련도, 같으면 최신), latest, popular(좋아요 수)
@@ -120,25 +125,24 @@ public interface MainPostRepository extends Repository<Post, Long> {
               + " order by case when :sort = 'latest' then p.created_at end desc,"
               + " case when :sort = 'popular' then p.like_count end desc,"
               + " match(p.title) against (:q in boolean mode) desc, p.created_at desc, p.id desc",
-      countQuery =
-          "select count(*) from posts p join blogs b on b.id = p.blog_id"
-              + " where p.status = 'PUBLISHED' and b.visibility = 'PUBLIC'"
-              + " and b.status <> 'CLOSED' and b.is_hidden = false and p.author_id not in (:hidden)"
-              + " and match(p.title) against (:q in boolean mode)",
       nativeQuery = true)
-  Page<Long> searchTitleIds(
+  List<Long> searchTitleIds(
       @Param("q") String q,
       @Param("sort") String sort,
       @Param("hidden") Collection<Long> hidden,
       Pageable pageable);
 
+  @Query(
+      value =
+          "select count(*) from posts p join blogs b on b.id = p.blog_id"
+              + " where p.status = 'PUBLISHED' and b.visibility = 'PUBLIC'"
+              + " and b.status <> 'CLOSED' and b.is_hidden = false and p.author_id not in (:hidden)"
+              + " and match(p.title) against (:q in boolean mode)",
+      nativeQuery = true)
+  long countTitle(@Param("q") String q, @Param("hidden") Collection<Long> hidden);
+
   @Query("select p from Post p join fetch p.blog join fetch p.author where p.id in :ids")
   List<Post> findWithBlogAndAuthor(@Param("ids") Collection<Long> ids);
-
-  /** 전체 최신·인기 탭 */
-  default Page<Post> findPublic(Collection<Long> hidden, Pageable pageable) {
-    return withContent(findPublicIds(hidden, pageable));
-  }
 
   /** 팔로우 탭 */
   default Page<Post> findFollowing(
@@ -150,11 +154,6 @@ public interface MainPostRepository extends Repository<Post, Long> {
   default Page<Post> findSubscribed(
       Long me, LocalDateTime now, Collection<Long> hidden, Pageable pageable) {
     return withContent(findSubscribedIds(me, now, hidden, pageable));
-  }
-
-  /** 태그 검색 */
-  default Page<Post> findByTag(String tag, Collection<Long> hidden, Pageable pageable) {
-    return withContent(findByTagIds(tag, hidden, pageable));
   }
 
   /** 닉네임 검색 */
