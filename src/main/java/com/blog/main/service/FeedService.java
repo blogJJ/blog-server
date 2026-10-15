@@ -34,13 +34,19 @@ public class FeedService {
   private final MainPostRepository postRepository;
   private final BlockService blockService;
   private final PostCards cards;
+  private final CountCache countCache;
   private final Clock clock;
 
   public FeedService(
-      MainPostRepository postRepository, BlockService blockService, PostCards cards, Clock clock) {
+      MainPostRepository postRepository,
+      BlockService blockService,
+      PostCards cards,
+      CountCache countCache,
+      Clock clock) {
     this.postRepository = postRepository;
     this.blockService = blockService;
     this.cards = cards;
+    this.countCache = countCache;
     this.clock = clock;
   }
 
@@ -56,8 +62,7 @@ public class FeedService {
     int pageSize = PostCards.pageSize(size);
     Page<Post> posts =
         switch (t) {
-          case "popular" ->
-              postRepository.findPublic(hidden, PageRequest.of(index, pageSize, PostCards.POPULAR));
+          case "popular" -> publicPosts(hidden, PageRequest.of(index, pageSize, PostCards.POPULAR));
           case "following" ->
               postRepository.findFollowing(
                   loggedIn(viewerId),
@@ -70,10 +75,19 @@ public class FeedService {
                   LocalDateTime.now(clock),
                   hidden,
                   PageRequest.of(index, pageSize, PostCards.LATEST));
-          default ->
-              postRepository.findPublic(hidden, PageRequest.of(index, pageSize, PostCards.LATEST));
+          default -> publicPosts(hidden, PageRequest.of(index, pageSize, PostCards.LATEST));
         };
     return PageResponse.of(posts, cards::of);
+  }
+
+  /** 최신·인기 탭. 전체 개수는 차단 목록이 같으면 함께 쓴다 (T175) */
+  private Page<Post> publicPosts(List<Long> hidden, PageRequest pageable) {
+    return postRepository.withContent(
+        countCache.page(
+            postRepository.findPublicIds(hidden, pageable),
+            pageable,
+            "public:" + hidden,
+            () -> postRepository.countPublic(hidden)));
   }
 
   private static Long loggedIn(Long viewerId) {

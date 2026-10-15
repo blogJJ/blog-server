@@ -121,6 +121,9 @@ blog:
     private: 5
 
 app:
+  # 피드·검색 목록의 전체 개수를 이만큼 기억한다. 쪽수가 이만큼 늦게 바뀔 수 있다 (T175, D-151). 0s면 끈다
+  count-cache:
+    ttl: ${COUNT_CACHE_TTL:60s}
   # 공유 미리보기(Open Graph)에 넣는 사이트 이름·설명 (T161). 절대 주소의 앞부분은 아래 site-url
   site:
     name: ${SITE_NAME:J blog}
