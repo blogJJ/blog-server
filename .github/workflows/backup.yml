@@ -82,7 +82,7 @@ jobs:
 
       # 암호화한 파일을 Actions 아티팩트로 올린다. Actions 탭 > 그 실행 > Artifacts에서 받는다.
       # 이미 압축·암호화된 파일이라 다시 압축하지 않는다(compression-level: 0)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: db-${{ steps.dump.outputs.name }}
           path: ${{ runner.temp }}/${{ steps.dump.outputs.name }}.sql.gz.enc
